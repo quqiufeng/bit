@@ -1,7 +1,7 @@
 # BitKindle Native 技术设计
 
 - 版本：0.1（设计基线）
-- 状态：M1 自举管道已打通；SysV 用户 ABI 迁移进行中
+- 状态：M1 SysV 标量自举已打通；浮点/聚合/varargs 待补
 - 日期：2026-10-21
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
@@ -758,15 +758,17 @@ bit/
 - `./build.sh` 已打通 `c1-stage0` → `c1-stage1` → `c1-stage2`。
 - `compiler*.o`、`runtime*.o`、`c1-stage*` 均逐字节一致。
 - 编译器不链接 glibc，只使用 Linux syscall。
-- 为尽快打通自举，M1 暂时复用上游的 Microsoft x64 代码生成和调用约定；ELF 只替换对象容器、运行时与启动/链接层。详见 ADR-011。
-- 因此当前产物尚不能直接按 SysV ABI 链接 glibc；SysV 后端是 M1 剩余工作。
+- Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，第 7 个起走栈。
+- `tests/sysv/` 覆盖寄存器/栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。
+- 尚未实现：浮点参数传递、聚合参数/返回、variadic 定义、`long double` 80-bit、结构体 eightbyte 分类。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
 - stage1/stage2 逐字节一致。已通过。
 - 构建 stage1/stage2 不需要 gcc。已通过。
 - 编译器不链接 glibc。已通过。
-- SysV ABI 与 hosted/用户程序测试。待完成。
+- SysV 标量 ABI 与自举测试。已通过。
+- SysV 浮点/聚合/varargs ABI 与 hosted 测试。待完成。
 
 ### M2：Linux hosted 与互操作
 
@@ -919,10 +921,16 @@ bit/
 
 ### ADR-011：M1 先用上游 Win64 代码生成打通 ELF 自举
 
-- 状态：接受（临时）
-- 决策：M1 复用上游 `compiler.c` 的机器码生成与 Microsoft x64 调用约定；只替换对象写出（C1O1 → ELF64）、运行时符号、启动与 syscall stub。gcc stage0 按 SysV 编译，stage1/stage2 内部使用 Win64 ABI。
-- 理由：上游编译器只依赖 12 个运行时符号，且代码生成、寄存器分配和栈布局已经稳定。先打通自举可把 SysV ABI、结构体分类、varargs 等高风险工作隔离到后续增量，而不是同时改代码生成和对象/链接层。
-- 后果：当前 `c1-stage*` 产出的 ELF 可执行文件使用 Win64 内部 ABI，不能直接链接 glibc，也不满足最终 SysV 用户 ABI 契约。M1 完成前必须实现 SysV 后端，或明确把当前阶段限定为“编译器自举专用 ABI”。此偏离已记录，不能悄悄变成默认设计。
+- 状态：已废弃（被 ADR-012 取代）
+- 历史决策：先复用上游 Microsoft x64 代码生成，只替换 ELF 对象写出、运行时符号、启动与 syscall stub，以最快打通 stage1/stage2。
+- 废弃原因：该路径会让编译器自身与用户程序停留在 Win64 内部 ABI，不能按 Linux SysV 契约调用 glibc 或第三方 `.so`，也制造双 ABI 漂移。自举链路验证完成后已切回 SysV。
+
+### ADR-012：Linux 自举统一使用 SysV 标量 ABI
+
+- 状态：接受
+- 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
+- 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
+- 后果：当前先支持标量整数/指针子集。浮点参数、聚合参数/返回、variadic 定义、`long double` 80-bit 和结构体 eightbyte 分类尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
 
 ---
 

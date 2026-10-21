@@ -1,7 +1,7 @@
 # BitKindle Native
 
 > 以自举为目标的 C 工具链，Linux 与 Windows 各自原生发展。  
-> 状态：M1 自举管道已打通（Linux，`stage1` = `stage2`）· SysV 用户 ABI 迁移进行中 · 暂定名
+> 状态：M1 SysV 标量自举已打通（`stage1` = `stage2`）· 浮点/聚合/varargs 待补 · 暂定名
 
 本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把“从零构建自己的 C 工具链”这一目标带到 Linux，同时保留 Windows 的原生实现。两个平台共享语言前端、纯算法和语言测试；不共享 ABI、运行时、目标文件格式和链接器。
 
@@ -173,12 +173,13 @@ bit/
 │   ├── elf-output.c           # ELF64 可重定位对象写出
 │   ├── runtime.c              # freestanding 运行时 / 12 个平台符号
 │   ├── linuximports.h         # 编译器使用的运行时声明
-│   ├── startup-sysv.S         # gcc stage0 入口
-│   ├── startup-win64.S        # C1 stage1/stage2 入口
-│   ├── syscalls-sysv.S        # SysV syscall stub
-│   └── syscalls-win64.S       # Win64 syscall stub
+│   ├── startup-sysv.S         # SysV 入口（gcc stage0 与 C1 共用）
+│   └── syscalls-sysv.S        # SysV syscall stub
 ├── examples/
 │   └── hello.c
+├── tests/
+│   ├── run.sh
+│   └── sysv/                  # SysV ABI/语言回归测试
 ├── LICENSE
 └── NOTICE
 ```
@@ -190,7 +191,7 @@ bit/
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
-| M1 | Linux freestanding：gcc stage0、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2` 已通过；SysV 用户 ABI 待完成 |
+| M1 | Linux freestanding：gcc stage0、SysV 标量 ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、SysV 整数/指针 ABI 已通过；浮点/聚合/varargs 待完成 |
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 计划 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 计划 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
@@ -209,7 +210,8 @@ bit/
 - `compiler1.o` 与 `compiler2.o` 逐字节一致；
 - `runtime1.o` 与 `runtime2.o` 逐字节一致；
 - `c1-stage1` 与 `c1-stage2` 逐字节一致；
-- `examples/hello.c` 可编译、链接并运行。
+- `examples/hello.c` 可编译、链接并运行；
+- `tests/sysv/*.c` 的寄存器/栈参数、LP64、函数指针、全局初始化、递归等测试通过。
 
 Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 

@@ -1700,26 +1700,11 @@ int label_ahead(void) {
 }
 
 int prologue(void) {
-    int start, tail, branch;
     emit(0x55);
     sequence(0xe58948, 3);
-    emit(0xb8);
+    sequence(0xec8148, 3);
     frame_patch = position;
     emit32(0);
-    start = position;
-    emit(0x3d);
-    emit32(4096);
-    tail = jump(0x82);
-    sequence(0xec8148, 3);
-    emit32(4096);
-    sequence(0x240485, 3);
-    emit(0x2d);
-    emit32(4096);
-    branch = jump(0);
-    patch(branch, start);
-    patch(tail, position);
-    sequence(0xc42948, 3);
-    sequence(0x240485, 3);
     return 0;
 }
 
@@ -1729,7 +1714,8 @@ int epilogue(void) {
 
 /* Types: void=0, int=1, unsigned int=2, long=3, unsigned long=4,
    signed char=5, unsigned char=6, short=7, unsigned short=8, char=9.
-   The Windows data model uses 32-bit int/long and signed plain char. */
+   The Linux data model is LP64: long, unsigned long, long long and
+   pointers are 64-bit; int is 32-bit and plain char is signed. */
 int qualifier(int t) {
     if (t == 271)
         return 1;
@@ -2004,7 +1990,7 @@ int floating_type(int t) {
 
 int wide_type(int t) {
     t = unqualified(t);
-    return t == 10 || t == 11 || t == 14 || t == 15 || is_pointer(t);
+    return t == 3 || t == 4 || t == 10 || t == 11 || t == 14 || t == 15 || is_pointer(t);
 }
 
 int default_promoted(int t) {
@@ -2038,7 +2024,7 @@ int type_size(int t) {
         return 1;
     if (t == 7 || t == 8)
         return 2;
-    if ((t >= 1 && t <= 4) || t == 13)
+    if (t == 1 || t == 2 || t == 13)
         return 4;
     return error();
 }
@@ -4819,7 +4805,8 @@ int primary(void) {
 }
 
 int arguments(int id, int signature) {
-    int n = 0, i, saved_stack, result, output = 0, hidden = 0, t, copy, target = 0, expected = -1;
+    int n = 0, i, stack_args, stack_bytes, frame_size, result, output = 0, hidden = 0, t, copy,
+        target = 0, expected = -1;
     int actual_types[128];
     if (id >= 0) {
         if (!function_exists(id))
@@ -4858,6 +4845,8 @@ int arguments(int id, int signature) {
             convert(default_promoted(expression_type));
         }
         t = expression_type;
+        if (floating_type(t))
+            return error_message("SysV floating arguments are not implemented");
         actual_types[n + hidden] = t;
         if (is_record(t)) {
             if (record_indirect(t)) {
@@ -4882,57 +4871,53 @@ int arguments(int id, int signature) {
     if (id >= 0)
         symbol_flags[id] = symbol_flags[id] | 2;
     n += hidden;
-    if (n > 4) {
-        /* R11 addresses the evaluated arguments in reverse stack order.
-           A separate aligned area contains shadow space and ABI stack slots. */
-        sequence(0xe38949, 3);
-        sequence(0xe48348, 3);
-        emit(0xf0);
-        saved_stack = n * 8;
-        sequence(0xec8148, 3);
-        emit32(((saved_stack + 8 + 15) / 16) * 16);
-        sequence(0x838d49, 3);
-        emit32(n * 8);
-        sequence(0x24848948, 4);
-        emit32(saved_stack);
-        sequence(0x8b8b49, 3);
+    /* Arguments were pushed left-to-right, so R11 points at the last one.
+       Copy them into the SysV integer register set and stack area. */
+    stack_args = n > 6 ? n - 6 : 0;
+    stack_bytes = stack_args * 8;
+    frame_size = ((stack_bytes + 8 + 15) / 16) * 16;
+    sequence(0xe38949, 3);
+    sequence(0xe48348, 3);
+    emit(0xf0);
+    sequence(0xec8148, 3);
+    emit32(frame_size);
+    sequence(0x838d49, 3);
+    emit32(n * 8);
+    sequence(0x24848948, 4);
+    emit32(stack_bytes);
+    if (n >= 1) {
+        sequence(0xbb8b49, 3);
         emit32((n - 1) * 8);
-        sequence(0x938b49, 3);
-        emit32((n - 2) * 8);
-        sequence(0x838b4d, 3);
-        emit32((n - 3) * 8);
-        sequence(0x8b8b4d, 3);
-        emit32((n - 4) * 8);
-        for (i = 4; i < n; i = i + 1) {
-            sequence(0x838b49, 3);
-            emit32((n - i - 1) * 8);
-            sequence(0x24848948, 4);
-            emit32(i * 8);
-        }
-        floating_arguments(actual_types, n);
-        invoke(id, target, n - hidden);
-        sequence(0x24a48b48, 4);
-        emit32(saved_stack);
-    } else {
-        if (n == 4)
-            sequence(0x5941, 2);
-        if (n >= 3)
-            sequence(0x5841, 2);
-        if (n >= 2)
-            emit(0x5a);
-        if (n >= 1)
-            emit(0x59);
-        sequence(0xe38949, 3);
-        sequence(0xe48348, 3);
-        emit(0xf0);
-        sequence(0x30ec8348, 4);
-        sequence(0x245c894c, 4);
-        emit(0x20);
-        floating_arguments(actual_types, n);
-        invoke(id, target, n - hidden);
-        sequence(0x24648b48, 4);
-        emit(0x20);
     }
+    if (n >= 2) {
+        sequence(0xb38b49, 3);
+        emit32((n - 2) * 8);
+    }
+    if (n >= 3) {
+        sequence(0x938b49, 3);
+        emit32((n - 3) * 8);
+    }
+    if (n >= 4) {
+        sequence(0x8b8b49, 3);
+        emit32((n - 4) * 8);
+    }
+    if (n >= 5) {
+        sequence(0x838b4d, 3);
+        emit32((n - 5) * 8);
+    }
+    if (n >= 6) {
+        sequence(0x8b8b4d, 3);
+        emit32((n - 6) * 8);
+    }
+    for (i = 6; i < n; i = i + 1) {
+        sequence(0x838b49, 3);
+        emit32((n - i - 1) * 8);
+        sequence(0x24848948, 4);
+        emit32((i - 6) * 8);
+    }
+    invoke(id, target, n - hidden);
+    sequence(0x24a48b48, 4);
+    emit32(stack_bytes);
     if (floating_type(result))
         floating_from_xmm(result, 0);
     if (output) {
@@ -8717,44 +8702,44 @@ function_body:
     current_variadic = variadic;
     current_oldstyle = old;
     current_va_offset = 16 + (n + hidden) * 8;
-    if (variadic) {
-        sequence(0x4d8948, 3);
-        emit(16);
-        sequence(0x558948, 3);
-        emit(24);
-        sequence(0x45894c, 3);
-        emit(32);
-        sequence(0x4d894c, 3);
-        emit(40);
-    }
+    if (variadic)
+        return error_message("SysV variadic definitions are not implemented");
+    if (hidden)
+        return error_message("SysV aggregate returns are not implemented");
     for (i = 0; i < n; i++)
         if (record_indirect(parameter_decl_type[i]) || floating_type(parameter_decl_type[i]))
-            aggregate = 1;
-    if (aggregate)
-        aggregate_parameters(n, hidden);
-    else {
-        if (n >= 1) {
-            emit(0x48);
-            sequence(0xf84d89, 3);
-        }
-        if (n >= 2) {
-            emit(0x48);
-            sequence(0xf05589, 3);
-        }
-        if (n >= 3) {
-            sequence(0x45894c, 3);
-            emit(0xe8);
-        }
-        if (n >= 4) {
-            sequence(0x4d894c, 3);
-            emit(0xe0);
-        }
-        for (i = 4; i < n; i = i + 1) {
-            sequence(0x858b48, 3);
-            emit32(16 + i * 8);
-            sequence(0x858948, 3);
-            emit32(-(i + 1) * 8);
-        }
+            return error_message("SysV aggregate or floating parameters are not implemented");
+    /* SysV integer argument registers: RDI, RSI, RDX, RCX, R8, R9.
+       Stack arguments begin at [rbp+16] after the pushed frame pointer. */
+    if (n >= 1) {
+        sequence(0xbd8948, 3);
+        emit32(-parameter_offset[0]);
+    }
+    if (n >= 2) {
+        sequence(0xb58948, 3);
+        emit32(-parameter_offset[1]);
+    }
+    if (n >= 3) {
+        sequence(0x958948, 3);
+        emit32(-parameter_offset[2]);
+    }
+    if (n >= 4) {
+        sequence(0x8d8948, 3);
+        emit32(-parameter_offset[3]);
+    }
+    if (n >= 5) {
+        sequence(0x85894c, 3);
+        emit32(-parameter_offset[4]);
+    }
+    if (n >= 6) {
+        sequence(0x8d894c, 3);
+        emit32(-parameter_offset[5]);
+    }
+    for (i = 6; i < n; i = i + 1) {
+        sequence(0x858b48, 3);
+        emit32(16 + (i - 6) * 8);
+        sequence(0x858948, 3);
+        emit32(-parameter_offset[i]);
     }
     for (i = 0; i < n; i++) {
         if (!aggregate && unqualified(parameter_decl_type[i]) == 12) {

@@ -1,9 +1,7 @@
 /* Freestanding Linux runtime for the C1 host compiler.
-   The same source is compiled by gcc for the SysV stage0 executable and by
-   C1 for the Win64-ABI stage1/stage2 executables.  Syscalls live in tiny
-   assembly stubs selected by C1_SYSV_HOST. */
+   The same source is compiled by gcc for stage0 and by C1 for the
+   stage1/stage2 executables.  Syscalls live in tiny assembly stubs. */
 
-#ifdef C1_SYSV_HOST
 extern long long __c1_sysv_read(long long, void *, unsigned long long);
 extern long long __c1_sysv_write(long long, const void *, unsigned long long);
 extern long long __c1_sysv_open(const char *, long long, long long);
@@ -19,25 +17,8 @@ extern void __c1_sysv_exit(long long);
 #define C1_MMAP __c1_sysv_mmap
 #define C1_MUNMAP __c1_sysv_munmap
 #define C1_EXIT __c1_sysv_exit
-#else
-extern long long __c1_win64_read(long long, void *, unsigned long long);
-extern long long __c1_win64_write(long long, const void *, unsigned long long);
-extern long long __c1_win64_open(const char *, long long, long long);
-extern long long __c1_win64_close(long long);
-extern long long __c1_win64_mmap(long long, unsigned long long, long long, long long, long long,
-                                 long long);
-extern long long __c1_win64_munmap(long long, unsigned long long);
-extern void __c1_win64_exit(long long);
-#define C1_READ __c1_win64_read
-#define C1_WRITE __c1_win64_write
-#define C1_OPEN __c1_win64_open
-#define C1_CLOSE __c1_win64_close
-#define C1_MMAP __c1_win64_mmap
-#define C1_MUNMAP __c1_win64_munmap
-#define C1_EXIT __c1_win64_exit
-#endif
 
-int main(void);
+int main(int argc, char **argv);
 
 void *memcpy(void *destination, const void *source, unsigned long long count) {
     unsigned char *d = (unsigned char *)destination;
@@ -180,6 +161,6 @@ int puts(char *text) {
     return __c0_putchar('\n');
 }
 
-int __c1_start(void) {
-    return main();
+int __c1_start(long long argc, char **argv, char **envp) {
+    return main((int)argc, argv);
 }
