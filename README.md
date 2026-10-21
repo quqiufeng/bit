@@ -206,6 +206,9 @@ bit/
 │   ├── README.md
 │   ├── sources.json
 │   └── float_parse.c
+├── windows/
+│   ├── README.md
+│   └── upstream.lock
 ├── tools/
 │   └── check_sources.py
 ├── examples/
@@ -232,7 +235,7 @@ bit/
 | M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
 | M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点（含 NaN）/varargs/聚合/80-bit long double/packed 已通过；`_Complex long double`/完整 hosted 头待补 |
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread 回调已通过；更多头/边界待完成 |
-| M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`，加入边界文档/来源清单/PE 许可检查；Windows 树和其余前端抽取待做 |
+| M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`，加入边界文档/来源清单/PE 许可检查，并冻结上游 Windows 参考提交；Windows 树实际导入和其余前端抽取待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
 | M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 后续 |
 

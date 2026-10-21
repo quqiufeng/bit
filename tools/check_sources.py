@@ -17,6 +17,14 @@ notice = (root / "NOTICE").read_text()
 if "MIT" not in notice or "BitKindle" not in notice:
     errors.append("NOTICE is missing the upstream MIT attribution")
 
+lock = json.loads((root / "windows/upstream.lock").read_text())
+if len(lock.get("commit", "")) != 40:
+    errors.append("windows/upstream.lock must pin a full 40-character commit")
+if lock.get("license") != "MIT":
+    errors.append("windows/upstream.lock must record the MIT license")
+if not (root / "windows/README.md").is_file():
+    errors.append("windows/README.md is missing")
+
 for entry in manifest["derived"]:
     path = root / entry["path"]
     if not path.is_file():

@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/tombkeeper/BitKindle",
+  "commit": "4527957e530d193ad5a81f7af9afeba1d1d0634f",
+  "date": "2026-10-20T23:11:26+08:00",
+  "license": "MIT",
+  "role": "Windows x64 reference implementation",
+  "build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/bootstrap-c99/build.ps1",
+  "note": "Not vendored into this repository yet. The Linux tree must remain independent of this build."
+}
