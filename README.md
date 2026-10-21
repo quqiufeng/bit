@@ -246,7 +246,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread 回调已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2，支持简单 `.a` 成员）；仅纯种子链/PIC 待做，hosted 测试仍用系统 `ld` |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2，支持 `.a` 选择性成员抽取）；仅纯种子链/PIC 待做，hosted 测试仍用系统 `ld` |
 
 ## 快速开始
 

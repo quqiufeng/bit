@@ -55,6 +55,8 @@ struct object {
     int sec_first, sec_count;
     int sym_first, sym_count;
     int rela_first, rela_count;
+    int is_archive;
+    int active;
     int sec_map[MAX_SECTIONS];
 };
 
@@ -182,6 +184,8 @@ static int parse_memory(const char *path, unsigned char *bytes, u64 length) {
     o = &objects[object_count];
     o->bytes = bytes;
     o->length = length;
+    o->is_archive = 0;
+    o->active = 1;
     if (o->length < 64 || o->bytes[0] != 0x7f || o->bytes[1] != 'E' ||
         o->bytes[2] != 'L' || o->bytes[3] != 'F' || o->bytes[4] != 2) {
         return 1;
@@ -328,7 +332,7 @@ static int layout_sections(void) {
     int i;
     for (i = 0; i < section_count; i++) {
         struct section *s = &sections[i];
-        if (!(s->flags & 2))
+        if (!(s->flags & 2) || !objects[s->object].active)
             continue;
         if (s->type == 1 && (s->flags & 4)) {
             s->out_kind = 1;
@@ -360,7 +364,7 @@ static int build_images(void) {
     memset(data_image, 0, (size_t)data_size);
     for (i = 0; i < section_count; i++) {
         struct section *s = &sections[i];
-        if (!s->data || !s->size)
+        if (!objects[s->object].active || !s->data || !s->size)
             continue;
         if (s->out_kind == 1)
             memcpy(text_image + s->out_off, s->data, (size_t)s->size);
@@ -375,7 +379,10 @@ static int apply_relocations(void) {
     for (i = 0; i < rela_count; i++) {
         struct rela *r = &relas[i];
         struct object *o = &objects[r->object];
-        int gsec = o->sec_map[r->target_sec];
+        int gsec;
+        if (!o->active)
+            continue;
+        gsec = o->sec_map[r->target_sec];
         struct section *s = &sections[gsec];
         unsigned char *dest;
         u64 place, target;
@@ -409,13 +416,53 @@ static int apply_relocations(void) {
     return 0;
 }
 
+static int active_references(const char *name) {
+    int i, j;
+    for (i = 0; i < object_count; i++) {
+        struct object *o = &objects[i];
+        if (!o->active)
+            continue;
+        for (j = 0; j < o->sym_count; j++) {
+            struct symbol *s = &symbols[o->sym_first + j];
+            if (s->shndx == 0 && s->bind != 0 && same_name(s->name, name))
+                return 1;
+        }
+    }
+    return 0;
+}
+
+static int activate_archives(void) {
+    int changed, i, j, needed;
+    do {
+        changed = 0;
+        for (i = 0; i < object_count; i++) {
+            struct object *o = &objects[i];
+            if (!o->is_archive || o->active)
+                continue;
+            needed = 0;
+            for (j = 0; j < o->sym_count; j++) {
+                struct symbol *s = &symbols[o->sym_first + j];
+                if (s->shndx != 0 && s->bind != 0 && s->name[0] && active_references(s->name)) {
+                    needed = 1;
+                    break;
+                }
+            }
+            if (needed) {
+                o->active = 1;
+                changed = 1;
+            }
+        }
+    } while (changed);
+    return 0;
+}
+
 static int select_globals(void) {
     int i, j;
     for (i = 0; i < symbol_count; i++)
         global_selected[i] = -1;
     for (i = 0; i < symbol_count; i++) {
         struct symbol *s = &symbols[i];
-        if (s->bind == 0 || !s->name[0] || s->shndx == 0)
+        if (s->bind == 0 || !s->name[0] || s->shndx == 0 || !objects[s->object].active)
             continue;
         j = find_global(s->name);
         if (j < 0 || (symbols[j].bind == 2 && s->bind == 1))
@@ -515,6 +562,8 @@ static int parse_archive(const char *path, unsigned char *bytes, u64 length) {
         if (!(name[0] == '/' && (name[1] == ' ' || name[1] == '/'))) {
             if (parse_memory(path, data, size))
                 return 1;
+            objects[object_count - 1].is_archive = 1;
+            objects[object_count - 1].active = 0;
         }
         off = (u64)(data + size - bytes);
         if (off & 1)
@@ -546,9 +595,11 @@ int main(int argc, char **argv) {
             puts("c1link: invalid object");
             return 1;
         }
+    activate_archives();
     select_globals();
     for (i = 0; i < symbol_count; i++)
-        if (symbols[i].bind != 0 && same_name(symbols[i].name, argv[2]) && symbols[i].shndx != 0)
+        if (symbols[i].bind != 0 && same_name(symbols[i].name, argv[2]) &&
+            symbols[i].shndx != 0 && objects[symbols[i].object].active)
             entry_index = i;
     if (entry_index < 0) {
         puts("c1link: missing entry");
