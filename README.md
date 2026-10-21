@@ -191,6 +191,7 @@ bit/
 │   ├── run.sh
 │   ├── run-hosted.sh
 │   ├── run-interop.sh
+│   ├── run-env.sh
 │   ├── sysv/                  # SysV ABI/语言回归测试
 │   ├── hosted/                # glibc hosted 互操作测试
 │   ├── interop/               # C1 <-> gcc ABI 双向互操作测试
@@ -229,7 +230,7 @@ bit/
 - `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
 - `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`；
 - `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
-- `tests/reject/` 验证未实现的 `long double` 会明确报错，而不是生成错误 ABI。
+- `tests/reject/` 验证未实现的 `long double` 会明确报错，而不是生成错误 ABI；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
 
 Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 

@@ -19,6 +19,7 @@ extern void __c1_sysv_exit(long long);
 #define C1_EXIT __c1_sysv_exit
 
 int main(int argc, char **argv);
+char **c1_environment;
 
 void *memcpy(void *destination, const void *source, unsigned long long count) {
     unsigned char *d = (unsigned char *)destination;
@@ -120,6 +121,29 @@ int __c1_linux_CloseHandle(long long handle) {
 }
 
 unsigned int __c1_linux_GetEnvironmentVariableA(char *name, char *buffer, unsigned int size) {
+    int i, j;
+    char *entry;
+    unsigned int length;
+    if (!c1_environment)
+        return 0;
+    for (i = 0; c1_environment[i]; i++) {
+        entry = c1_environment[i];
+        for (j = 0; name[j]; j++)
+            if (entry[j] != name[j])
+                break;
+        if (!name[j] && entry[j] == '=') {
+            entry = entry + j + 1;
+            length = 0;
+            while (entry[length])
+                length++;
+            if (length + 1 > size)
+                return length + 1;
+            for (j = 0; j < (int)length; j++)
+                buffer[j] = entry[j];
+            buffer[length] = 0;
+            return length;
+        }
+    }
     return 0;
 }
 
@@ -162,5 +186,6 @@ int puts(char *text) {
 }
 
 int __c1_start(long long argc, char **argv, char **envp) {
+    c1_environment = envp;
     return main((int)argc, argv);
 }
