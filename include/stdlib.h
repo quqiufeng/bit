@@ -18,4 +18,14 @@ void qsort(void *base, unsigned long count, unsigned long size,
            int (*compare)(const void *, const void *));
 void *bsearch(const void *key, const void *base, unsigned long count, unsigned long size,
               int (*compare)(const void *, const void *));
+int abs(int value);
+long labs(long value);
+long long llabs(long long value);
+typedef struct { int quot; int rem; } div_t;
+typedef struct { long quot; long rem; } ldiv_t;
+div_t div(int numerator, int denominator);
+ldiv_t ldiv(long numerator, long denominator);
+int rand(void);
+void srand(unsigned int seed);
+int system(const char *command);
 #endif

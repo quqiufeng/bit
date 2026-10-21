@@ -13,4 +13,15 @@ FILE *fopen(const char *path, const char *mode);
 int fclose(FILE *file);
 char *fgets(char *text, int size, FILE *file);
 int fputs(const char *text, FILE *file);
+int fgetc(FILE *file);
+int fputc(int c, FILE *file);
+size_t fread(void *buffer, size_t size, size_t count, FILE *file);
+size_t fwrite(const void *buffer, size_t size, size_t count, FILE *file);
+int fseek(FILE *file, long offset, int whence);
+long ftell(FILE *file);
+void rewind(FILE *file);
+int feof(FILE *file);
+int ferror(FILE *file);
+int remove(const char *path);
+int rename(const char *old_path, const char *new_path);
 #endif
