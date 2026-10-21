@@ -51,3 +51,18 @@ echo "PASS: interop C1 main -> gcc long double"
     "$BUILD/interop-gcc-ld-main.o" "$BUILD/interop-c1-ld-impl.o"
 "$BUILD/interop-gcc-ld-main"
 echo "PASS: interop gcc main -> C1 long double"
+
+"$CC" $GCCFLAGS -c "$ROOT/tests/interop/gcc-packed-helper.c" -o "$BUILD/interop-gcc-packed-helper.o"
+"$BUILD/c1-stage2" < "$ROOT/tests/interop/c1-packed-main.c" > "$BUILD/interop-c1-packed-main.o"
+"$LD" $LDFLAGS -o "$BUILD/interop-c1-packed-main" \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
+    "$BUILD/interop-c1-packed-main.o" "$BUILD/interop-gcc-packed-helper.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/interop-c1-packed-main"
+echo "PASS: interop C1 main -> gcc packed structs"
+
+"$BUILD/c1-stage2" < "$ROOT/tests/interop/c1-packed-impl.c" > "$BUILD/interop-c1-packed-impl.o"
+"$CC" $GCCFLAGS -c "$ROOT/tests/interop/gcc-packed-main.c" -o "$BUILD/interop-gcc-packed-main.o"
+"$ROOT/linux/link-hosted.sh" "$BUILD/interop-gcc-packed-main" \
+    "$BUILD/interop-gcc-packed-main.o" "$BUILD/interop-c1-packed-impl.o"
+"$BUILD/interop-gcc-packed-main"
+echo "PASS: interop gcc main -> C1 packed structs"

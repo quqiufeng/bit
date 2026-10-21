@@ -675,7 +675,8 @@ int initialize(void) {
     seed(43, 0x70665f5f, 0x73746962, 0);
     seed(44, 0x31635f5f, 0x695f, 0);
     seed(45, 0x31635f5f, 0x67745f, 0);
-    count = 46;
+    seed(46, 0x31635f5f, 0x6361705f, 0x6b);
+    count = 47;
     line = 1;
     return 0;
 }
@@ -1434,6 +1435,8 @@ int current_va_save_offset;
 int current_named_gpr;
 int current_named_sse;
 int current_named_stack;
+int record_pack;
+int pack_marker(void);
 int long_double_convert(int t);
 int long_double_binary(int op, int left_type, int right_type);
 int long_double_truth(void);
@@ -1441,6 +1444,7 @@ int long_double_negate(void);
 int record_memory_param(int t);
 int record_memory_return(int t);
 int record_has_long_double(int t);
+int record_unaligned(int t);
 int record_has_float(int t);
 int record_chunk_class(int t, int chunk);
 int parameter_offset[128];
@@ -5669,6 +5673,10 @@ int release_runtime_arrays(int saved) {
 int statement_body(void) {
     int target, end, start, old_break, old_continue, saved_break_locals, saved_continue_locals;
     int saved_tags, gpr_i, sse_i, class, k;
+    if (token == 302) {
+        pack_marker();
+        return 0;
+    }
     int condition, increment, body, saved_locals, for_scope = 0, seen_statement = 0;
     if (token == 286)
         return switch_statement();
@@ -6720,6 +6728,19 @@ int enum_specifier(void) {
     return t;
 }
 
+int pack_marker(void) {
+    if (token != 302)
+        return 0;
+    next();
+    if (token != 144)
+        return error();
+    if (value != 0 && value != 1 && value != 2 && value != 4 && value != 8 && value != 16)
+        return error_message("invalid packed alignment");
+    record_pack = value;
+    next();
+    return 1;
+}
+
 int record_specifier(void) {
     int kind = token == 285 ? 1 : 2, tag = -1, t = 0, index, base, mt, id, node, last;
     int width, align, offset = 0, total = 0, maximum = 1, create = 1, flexible = 0, bits, shift,
@@ -6774,6 +6795,12 @@ int record_specifier(void) {
     record_open[index] = 1;
     next();
     while (!failed && token != '}') {
+        if (token == 302) {
+            pack_marker();
+            if (failed)
+                return 0;
+            continue;
+        }
         if (flexible)
             return error_message("flexible array member must be last");
         base = specifiers();
@@ -6806,6 +6833,8 @@ int record_specifier(void) {
                     return error_message("named bit-field has zero width");
                 width = type_size(mt);
                 align = type_align(mt);
+                if (record_pack && align > record_pack)
+                    align = record_pack;
                 if (!bits) {
                     if (previous) {
                         if (align > maximum)
@@ -6833,6 +6862,8 @@ int record_specifier(void) {
                 } else
                     width = type_size(mt);
                 align = type_align(mt);
+                if (record_pack && align > record_pack)
+                    align = record_pack;
             }
             if (failed)
                 return 0;
@@ -7123,11 +7154,11 @@ int record_indirect(int t) {
 }
 
 int record_memory_param(int t) {
-    return is_record(t) && (type_size(t) > 16 || record_has_long_double(t));
+    return is_record(t) && (type_size(t) > 16 || record_has_long_double(t) || record_unaligned(t));
 }
 
 int record_memory_return(int t) {
-    return is_record(t) && type_size(t) > 16;
+    return is_record(t) && (type_size(t) > 16 || record_unaligned(t));
 }
 
 int record_has_float(int t) {
@@ -7163,6 +7194,25 @@ int record_has_long_double(int t) {
     for (node = record_first[(t - 0x20000e) / 256]; node; node = member_next[node]) {
         member = member_type[node];
         if (record_has_long_double(member))
+            return 1;
+    }
+    return 0;
+}
+
+int record_unaligned(int t) {
+    int node, member, element;
+    t = unqualified(t);
+    if (is_array(t)) {
+        element = array_base[(t - 4096) / 256];
+        return record_unaligned(element);
+    }
+    if (!is_record(t))
+        return 0;
+    for (node = record_first[(t - 0x20000e) / 256]; node; node = member_next[node]) {
+        member = member_type[node];
+        if (member_offset[node] % type_align(member) != 0)
+            return 1;
+        if (record_unaligned(member))
             return 1;
     }
     return 0;
@@ -9199,6 +9249,8 @@ int function(void) {
     int id, i, n, t, pt, k2, class, base, known, storage, unnamed = 0, hidden, gpr, sse,
         stack_index, unspecified, old = 0, implicit = 0, declaration_base, declaration_result,
         variadic = 0;
+    if (token == 302)
+        return pack_marker();
     for (i = 0; i < 128; i++)
         parameter_replay_valid[i] = 0;
     vm_current = 0;
@@ -10014,6 +10066,9 @@ int pp_body_start[1024];
 int pp_body_length[1024];
 int pp_defined[1024];
 
+int pp_pack_current;
+int pp_pack_stack[16];
+int pp_pack_depth;
 int pp_depth;
 int pp_enabled;
 int pp_parent[128];
@@ -11547,9 +11602,103 @@ int pp_line_control(void) {
     return 0;
 }
 
+int pp_pack_number(void) {
+    int i, c, n = 0, any = 0;
+    if (pp_kind != 2)
+        return -1;
+    for (i = 0; i < pp_length; i++) {
+        c = pp_char(pp_start, i);
+        if (c < '0' || c > '9')
+            return -1;
+        n = n * 10 + c - '0';
+        if (n > 1000)
+            return -1;
+        any = 1;
+    }
+    return any ? n : -1;
+}
+
+int pp_emit_pack(int n) {
+    char digits[12];
+    char *text = "__c1_pack";
+    int i = 0, k = 0;
+    while (text[i])
+        pp_put(text[i++]);
+    pp_put(' ');
+    if (!n)
+        pp_put('0');
+    else {
+        while (n) {
+            digits[k++] = '0' + n % 10;
+            n = n / 10;
+        }
+        while (k)
+            pp_put(digits[--k]);
+    }
+    pp_put(' ');
+    return 0;
+}
+
+int pp_pack_set(int n) {
+    if (n != 0 && n != 1 && n != 2 && n != 4 && n != 8 && n != 16)
+        return error_message("invalid #pragma pack alignment");
+    pp_pack_current = n;
+    return pp_emit_pack(n);
+}
+
 int pp_pragma_directive(void) {
-    int head = 0, tail = 0, n;
+    int head = 0, tail = 0, n, pack;
     pp_scan();
+    if (pp_word("pack")) {
+        pp_scan();
+        if (!pp_word("("))
+            return error();
+        pp_scan();
+        if (pp_word("pop")) {
+            pp_scan();
+            if (pp_pack_depth)
+                pp_pack_current = pp_pack_stack[--pp_pack_depth];
+            pp_emit_pack(pp_pack_current);
+            if (!pp_word(")"))
+                return error();
+            pp_skip_line();
+            return 0;
+        }
+        if (pp_word("push")) {
+            pp_scan();
+            if (pp_word(",")) {
+                pp_scan();
+                pack = pp_pack_number();
+                if (pack < 0)
+                    return error();
+                pp_scan();
+            } else
+                pack = pp_pack_current;
+            if (pp_pack_depth == 16)
+                return error();
+            pp_pack_stack[pp_pack_depth++] = pp_pack_current;
+            pp_pack_set(pack);
+            if (!pp_word(")"))
+                return error();
+            pp_skip_line();
+            return 0;
+        }
+        if (pp_word(")")) {
+            pp_scan();
+            pp_pack_set(0);
+            pp_skip_line();
+            return 0;
+        }
+        pack = pp_pack_number();
+        if (pack < 0)
+            return error();
+        pp_scan();
+        pp_pack_set(pack);
+        if (!pp_word(")"))
+            return error();
+        pp_skip_line();
+        return 0;
+    }
     if (!pp_word("STDC"))
         return pp_skip_line();
     while (pp_kind && pp_kind != 6 && !failed) {

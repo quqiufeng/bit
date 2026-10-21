@@ -1,7 +1,7 @@
 # BitKindle Native 技术设计
 
 - 版本：0.1（设计基线）
-- 状态：M1 SysV 自举 + M2 hosted glibc 路径已打通；packed/未对齐聚合待补
+- 状态：M1 SysV 自举 + M2 hosted glibc 路径已打通；`_Complex long double` 待补
 - 日期：2026-10-21
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
@@ -764,7 +764,8 @@ bit/
 - 聚合参数/返回已支持 1–16 字节的 INTEGER/SSE eightbyte 分类：整数走 GPR，`float`/`double` 走 XMM，混合 eightbyte 按 INTEGER；>16 字节按 MEMORY（参数走栈、返回用隐藏指针）。
 - `tests/interop/` 已用 gcc 作为 ABI oracle 验证双向调用，覆盖 8/12/16 字节整数与浮点聚合、混合 INTEGER/SSE eightbyte，以及 >16 字节内存聚合。
 - 浮点比较已处理 NaN/无序标志（float/double SSE 与 long double x87）；`long double` 已按 x87 80-bit 实现：16 字节存储、64 位有效数字字面量、混合标量运算、16 字节栈对齐、参数走栈、返回值在 ST0、含单个 long double 的聚合按 X87 返回。
-- 尚未实现：未对齐/packed 聚合、`_Complex long double`。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- `#pragma pack(push/pop, n)` 已支持；未对齐字段的聚合按 SysV MEMORY 类传递/返回。
+- 尚未实现：`_Complex long double`。遇到该构造当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -791,7 +792,7 @@ bit/
 - freestanding 运行时解析 `C1_INCLUDE` 与 `C1_STANDARD`，从 `_start` 的 `envp` 读取，因此 include 搜索不依赖当前工作目录。
 - `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）、`vprintf`、`dlopen`/`dlsym` 调用 `libm`，通过 `__errno_location()` 访问 glibc TLS 的 `errno`，`fopen`/`fgets`/`fputs`/`fclose` 文件 I/O，`assert`，`setjmp`/`longjmp`，`time`/`localtime`/`strftime`，`inttypes` 格式宏，POSIX `open`/`read`/`write`/`lseek`/`close`/`unlink`，`strtol`/`strtoll`/`strtoul`，glibc 调用 C1 函数指针的 signal、`qsort`/`bsearch` 和 `atexit` 回调。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：完整 hosted 头覆盖、更多 errno/TLS 行为、packed/未对齐聚合、`_Complex long double`。
+- 尚未完成：完整 hosted 头覆盖、更多 errno/TLS 行为、`_Complex long double`。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
 - 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 
@@ -952,7 +953,14 @@ bit/
 - 状态：接受
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
-- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。packed/未对齐聚合和 `long double` 自增尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`_Complex long double` 尚未实现，编译该构造会明确报错。后续扩展必须保持 stage1=stage2。
+
+### ADR-017：`#pragma pack` 与未对齐聚合
+
+- 状态：接受
+- 决策：预处理器把 `#pragma pack` 转成内部标记；解析器维护 pack 状态并限制成员对齐；含未对齐字段的聚合按 SysV MEMORY 类传递/返回。
+- 理由：packed 结构在系统头和二进制协议中常见；未对齐字段不能按普通 eightbyte 分类处理。
+- 后果：`#pragma pack(push/pop, 1/2/4/8/16)`、嵌套 packed 结构和 C1↔gcc 双向互操作已有测试。任意字节对齐的属性语法尚未提供。
 
 ### ADR-016：Linux long double 使用 x87 80-bit
 
