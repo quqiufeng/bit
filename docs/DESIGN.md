@@ -957,14 +957,14 @@ bit/
 - 状态：接受
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
-- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`__real__/__imag__` 和复杂类型复合转换尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`__int128` 等未实现类型会明确报错。后续扩展必须保持 stage1=stage2。
 
 ### ADR-019：`_Complex long double` 基本运算
 
 - 状态：接受（基本实现）
 - 决策：`_Complex long double` 使用 32 字节记录/双 long double 布局，按 MEMORY ABI 传递/返回；`+ - * /`、比较、真值、取负、同类型赋值和实部/虚部指针访问走 x87。
 - 理由：先覆盖常见复数运算并保持与 SysV 内存布局一致，避免把 long double 复数降级为 double。
-- 后果：`__real__/__imag__` 尚未实现；complex double↔complex long double 转换和复杂常量构造已通过测试。
+- 后果：`__real__/__imag__`、complex double↔complex long double 转换和复杂常量构造已通过测试。
 
 ### ADR-018：先做静态 ELF 链接器原型
 

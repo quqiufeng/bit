@@ -163,7 +163,9 @@ int initialize(void) {
     seed(44, 0x31635f5f, 0x695f, 0);
     seed(45, 0x31635f5f, 0x67745f, 0);
     seed(46, 0x31635f5f, 0x6361705f, 0x6b);
-    count = 47;
+    seed(47, 0x65725f5f, 0x5f5f6c61, 0);
+    seed(48, 0x6d695f5f, 0x5f5f6761, 0);
+    count = 49;
     line = 1;
     return 0;
 }
@@ -4371,6 +4373,22 @@ int unary(void) {
     expression_ice = 0;
     if (unary_depth > 128)
         return error();
+    if (op == 303 || op == 304) {
+        next();
+        result = unary();
+        t = expression_type;
+        if (!complex_component(t))
+            return error_message("__real__/__imag__ requires a complex operand");
+        t = complex_component(t);
+        if (op == 304) {
+            sequence(0x0548, 2);
+            emit32(type_size(t));
+        }
+        result = indirect_value(t);
+        expression_type = t;
+        unary_depth--;
+        return result;
+    }
     if (op == 297) {
         next();
         expect('(');
