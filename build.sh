@@ -35,6 +35,9 @@ cmp "$BUILD/compiler1.o" "$BUILD/compiler2.o"
     "$BUILD/compiler2.o" "$BUILD/syscalls_sysv.o"
 cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 
+"$BUILD/c1-stage2" < linux/linker.c > "$BUILD/linker.o"
+./linux/link-hosted.sh "$BUILD/c1link" "$BUILD/linker.o"
+
 "$BUILD/c1-stage2" < examples/hello.c > "$BUILD/hello.o"
 "$LD" $LDFLAGS -o "$BUILD/hello" \
     "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \

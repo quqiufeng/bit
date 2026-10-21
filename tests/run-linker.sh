@@ -14,6 +14,22 @@ python3 "$LINK" "$BUILD/linker-c1-stage1" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime1.o" \
     "$BUILD/compiler1.o" "$BUILD/syscalls_sysv.o"
 "$BUILD/linker-c1-stage1" < "$ROOT/examples/hello.c" > "$BUILD/linker-c1-hello.o"
+"$BUILD/c1link" "$BUILD/c-linker-hello" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
+    "$BUILD/hello.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/c-linker-hello"
+echo "PASS: C linker -> hello"
+
+"$BUILD/c1link" "$BUILD/c-linker-c1-stage1" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime1.o" \
+    "$BUILD/compiler1.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/c-linker-c1-stage1" < "$ROOT/examples/hello.c" > "$BUILD/c-linker-c1-hello.o"
+"$BUILD/c1link" "$BUILD/c-linker-c1-hello" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
+    "$BUILD/c-linker-c1-hello.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/c-linker-c1-hello"
+echo "PASS: C linker -> stage1 compiler"
+
 python3 "$LINK" "$BUILD/linker-c1-hello" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
     "$BUILD/linker-c1-hello.o" "$BUILD/syscalls_sysv.o"

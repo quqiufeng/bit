@@ -171,6 +171,7 @@ bit/
 ├── linux/
 │   ├── compiler.c             # 移植后的 C1 编译器主体
 │   ├── elf-output.c           # ELF64 可重定位对象写出
+│   ├── linker.c               # C1 编译的静态 ELF 链接器
 │   ├── runtime.c              # freestanding 运行时 / 12 个平台符号
 │   ├── linuximports.h         # 编译器使用的运行时声明
 │   ├── startup-sysv.S         # SysV 入口（gcc stage0 与 C1 共用）
@@ -241,7 +242,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread 回调已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：自制静态 ELF 链接器原型已能链接 hello 和 C1 自身；纯种子链/PIC 待做 |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：Python 原型 + C1 编译的静态 ELF 链接器均已能链接 hello 和 C1 自身；纯种子链/PIC 待做 |
 
 ## 快速开始
 

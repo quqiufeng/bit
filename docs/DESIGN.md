@@ -837,7 +837,7 @@ bit/
 
 ### M5：可选增强
 
-当前状态：`tools/elflink.py` 静态 ELF 链接器原型已能链接 hello、C1 runtime/compiler 对象并运行；尚未替代系统 `ld`，动态链接、归档和完整 ELF 节/重定位仍待补。
+当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；尚未替代系统 `ld`，动态链接、归档和完整 ELF 节/重定位仍待补。
 
 - 自制 ELF 链接器（静态→动态）。
 - Linux 纯种子链（seed/A0/A1/C0）。
@@ -962,9 +962,9 @@ bit/
 ### ADR-018：先做静态 ELF 链接器原型
 
 - 状态：接受（原型）
-- 决策：先用 `tools/elflink.py` 实现自有对象的静态链接，验证节合并、符号解析、PC32/PLT32 重定位和程序头布局；不替换 `build.sh` 的系统 `ld`。
+- 决策：先用 `tools/elflink.py` 验证，再用 C1 编译的 `linux/linker.c` 实现同一套静态链接；当前不替换 `build.sh` 的系统 `ld`。
 - 理由：自制链接器风险高，先用原型对拍并链接 C1 自身，再决定是否用 C 重写并纳入自举链。
-- 后果：目前可链接 hello 和 stage1 编译器；尚不支持归档、动态链接、完整节表和全部重定位。
+- 后果：Python 原型和 C 版本均可链接 hello 与 stage1 编译器；尚不支持归档、动态链接、完整节表和全部重定位。
 
 ### ADR-017：`#pragma pack` 与未对齐聚合
 

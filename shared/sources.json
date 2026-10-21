@@ -25,6 +25,11 @@
       "path": "shared/diagnostic.c",
       "origin": "src/bootstrap-c99/host/compiler.c (diagnostic buffer/formatter)",
       "note": "Uses the platform hook __c1_diag_write instead of OS I/O."
+    },
+    {
+      "path": "linux/linker.c",
+      "origin": "new",
+      "note": "Static ELF linker compiled by C1, built as a hosted tool."
     }
   ]
 }
