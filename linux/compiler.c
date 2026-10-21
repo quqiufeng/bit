@@ -1782,6 +1782,8 @@ int type_start(int t) {
    Record kinds 13..15 retain distinct real component types, not user tags. */
 int complex_type(int base) {
     int i;
+    if (base == 15)
+        return error_message("complex long double is not implemented");
     for (i = 0; i < record_count; i++)
         if (record_kind[i] == base)
             return 0x20000e + i * 256;
@@ -4493,14 +4495,52 @@ int increment(int left, int op, int postfix) {
     int t = expression_type, step = 1, field = expression_bit;
     if (is_record(t))
         return error();
-    if (unqualified(t) == 15)
-        return error_message("long double increment is not implemented");
     if (left == 0 || expression_array_type)
         return error();
     if (contains_const(t))
         return error_message("increment requires modifiable non-const object");
     if (left == -1)
         emit(0x52);
+    if (unqualified(t) == 15) {
+        int old = temporary(16, 16), fresh = temporary(16, 16);
+        if (left == -1)
+            emit(0x5f);
+        else if (left < -1) {
+            sequence(0x3d8d48, 3);
+            object_reference(-left - 2);
+        } else {
+            sequence(0xbd8d48, 3);
+            emit32(-left);
+        }
+        emit(0xdb);
+        emit(0x2f);
+        emit(0xdb);
+        emit(0xbd);
+        emit32(-old);
+        emit(0xdb);
+        emit(0x2f);
+        sequence(0xe8d9, 2);
+        if (op == 170)
+            sequence(0xc1de, 2);
+        else
+            sequence(0xe9de, 2);
+        emit(0xdb);
+        emit(0xbd);
+        emit32(-fresh);
+        emit(0xdb);
+        emit(0xad);
+        emit32(-fresh);
+        emit(0xdb);
+        emit(0x3f);
+        sequence(0x858d48, 3);
+        emit32(postfix ? -old : -fresh);
+        expression_type = 15;
+        expression_zero = 0;
+        expression_ice = 0;
+        expression_array_bytes = 0;
+        expression_array_type = 0;
+        return 0;
+    }
     if (is_pointer(t))
         step = pointer_stride(t);
     if (postfix) {

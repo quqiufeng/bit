@@ -764,7 +764,7 @@ bit/
 - 聚合参数/返回已支持 1–16 字节的 INTEGER/SSE eightbyte 分类：整数走 GPR，`float`/`double` 走 XMM，混合 eightbyte 按 INTEGER；>16 字节按 MEMORY（参数走栈、返回用隐藏指针）。
 - `tests/interop/` 已用 gcc 作为 ABI oracle 验证双向调用，覆盖 8/12/16 字节整数与浮点聚合、混合 INTEGER/SSE eightbyte，以及 >16 字节内存聚合。
 - `long double` 已按 x87 80-bit 实现：16 字节存储、64 位有效数字字面量、参数走栈、返回值在 ST0、含单个 long double 的聚合按 X87 返回。
-- 尚未实现：未对齐/packed 聚合、`long double` 自增。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- 尚未实现：未对齐/packed 聚合、`_Complex long double`。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -791,7 +791,7 @@ bit/
 - freestanding 运行时解析 `C1_INCLUDE` 与 `C1_STANDARD`，从 `_start` 的 `envp` 读取，因此 include 搜索不依赖当前工作目录。
 - `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）、`vprintf`、`dlopen`/`dlsym` 调用 `libm`，通过 `__errno_location()` 访问 glibc TLS 的 `errno`，`fopen`/`fgets`/`fputs`/`fclose` 文件 I/O，以及 `assert`。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：完整 hosted 头覆盖、更多 errno/TLS 行为、packed/未对齐聚合、`long double` 自增。
+- 尚未完成：完整 hosted 头覆盖、更多 errno/TLS 行为、packed/未对齐聚合、`_Complex long double`。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
 - 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 
@@ -959,7 +959,7 @@ bit/
 - 状态：接受
 - 决策：`long double` 存储 16 字节；字面量用 64 位有效数字解析为 x87 扩展格式；参数在栈上传递，返回值在 ST0；含单个 `long double` 的 16 字节聚合按 X87 返回，含 `long double` 的参数聚合按 MEMORY 传递。
 - 理由：与 SysV AMD64 和 gcc 对齐；避免把 long double 静默降级为 binary64。
-- 后果：算术/比较/转换/varargs/高精度字面量已有测试与 gcc 对拍。`long double` 自增和 packed 聚合仍明确拒绝。
+- 后果：算术/比较/转换/varargs/高精度字面量/自增已有测试与 gcc 对拍。`_Complex long double` 和 packed 聚合仍明确拒绝。
 
 ### ADR-015：聚合 ABI 按 SysV eightbyte 分类实现
 
