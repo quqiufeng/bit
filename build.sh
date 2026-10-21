@@ -46,6 +46,7 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/run-interop.sh
 ./tests/reject/run.sh
 ./tests/run-env.sh
+./tests/run-linker.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker and source checks"

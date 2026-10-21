@@ -837,6 +837,8 @@ bit/
 
 ### M5：可选增强
 
+当前状态：`tools/elflink.py` 静态 ELF 链接器原型已能链接 hello、C1 runtime/compiler 对象并运行；尚未替代系统 `ld`，动态链接、归档和完整 ELF 节/重定位仍待补。
+
 - 自制 ELF 链接器（静态→动态）。
 - Linux 纯种子链（seed/A0/A1/C0）。
 - PIC/PIE。
@@ -956,6 +958,13 @@ bit/
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
 - 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`_Complex long double` 尚未实现，编译该构造会明确报错。后续扩展必须保持 stage1=stage2。
+
+### ADR-018：先做静态 ELF 链接器原型
+
+- 状态：接受（原型）
+- 决策：先用 `tools/elflink.py` 实现自有对象的静态链接，验证节合并、符号解析、PC32/PLT32 重定位和程序头布局；不替换 `build.sh` 的系统 `ld`。
+- 理由：自制链接器风险高，先用原型对拍并链接 C1 自身，再决定是否用 C 重写并纳入自举链。
+- 后果：目前可链接 hello 和 stage1 编译器；尚不支持归档、动态链接、完整节表和全部重定位。
 
 ### ADR-017：`#pragma pack` 与未对齐聚合
 
