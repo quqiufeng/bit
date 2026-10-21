@@ -53,3 +53,17 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Build outputs
+/build/
+/out/
+/__pycache__/
+*.pyc
+.venv/
+.DS_Store
+
+# Bootstrap seeds and syscall stubs are source artifacts
+!**/seed*.hex
+!**/bootstrap/**/*.hex
+!**/bootstrap/**/*.o
+!**/startup/**/*.o
