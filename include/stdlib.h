@@ -4,5 +4,6 @@
 void *malloc(size_t size);
 void free(void *memory);
 void exit(int status);
+void abort(void);
 int atoi(const char *text);
 #endif
