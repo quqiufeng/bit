@@ -1,7 +1,7 @@
 # BitKindle Native 技术设计
 
 - 版本：0.1（设计基线）
-- 状态：M1 SysV 标量自举 + M2 hosted glibc 标量路径已打通；聚合/varargs/long double/PIE 待补
+- 状态：M1 SysV 标量自举 + M2 hosted glibc 路径已打通；聚合/long double/PIE 待补
 - 日期：2026-10-21
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
@@ -760,7 +760,8 @@ bit/
 - 编译器不链接 glibc，只使用 Linux syscall。
 - Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，浮点使用 `XMM0`–`XMM7`，各自独立计数；溢出时按顺序走栈。
 - `tests/sysv/` 覆盖整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。
-- 尚未实现：聚合参数/返回、variadic 定义、`long double` 80-bit、结构体 eightbyte 分类。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- variadic 定义与 `va_list` 已按 SysV 24 字节布局实现；`stdarg.h` 位于 `include/`，`va_arg` 支持整数/指针/`double`。
+- 尚未实现：聚合参数/返回、`long double` 80-bit、结构体 eightbyte 分类、`va_copy`。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -785,8 +786,9 @@ bit/
 - `linux/link-hosted.sh` 已使用系统 `crt1.o`/`crti.o`/`crtn.o` + glibc + 动态链接器完成非 PIE 链接。
 - `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：PIE/PIC、`.so` 显式加载/回调、完整 hosted 头、`errno`/TLS 边界、聚合/varargs 定义。
+- 尚未完成：PIE/PIC、`.so` 显式加载/回调、完整 hosted 头、`errno`/TLS 边界、聚合参数/返回、`long double`。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
+- 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 
 验收：
 
@@ -945,7 +947,14 @@ bit/
 - 状态：接受
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
-- 后果：当前先支持整数、指针和标量 `float`/`double`。聚合参数/返回、variadic 定义、`long double` 80-bit 和结构体 eightbyte 分类尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义和 SysV `va_list`。聚合参数/返回、`long double` 80-bit、结构体 eightbyte 分类和 `va_copy` 尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+
+### ADR-014：Linux `va_list` 采用 SysV 24 字节布局
+
+- 状态：接受
+- 决策：`include/stdarg.h` 将 `va_list` 定义为 24 字节数组；编译器内建 `__va_start` 初始化 `gp_offset`/`fp_offset`/`overflow_arg_area`/`reg_save_area`，`__va_arg` 按整数/SSE 寄存器保存区和溢出区取参。
+- 理由：必须与 glibc 及第三方 SysV 函数交换 `va_list`；自定义 cursor 方案无法通过 `vprintf` 等边界。
+- 后果：`va_arg` 当前支持整数/指针/`double`；`float` 必须按默认提升用 `double` 读取；聚合和 `long double` 待补；`va_copy` 尚未提供。
 
 ---
 

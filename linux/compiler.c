@@ -1398,6 +1398,10 @@ int parameter_name[128];
 int current_variadic;
 int current_oldstyle;
 int current_va_offset;
+int current_va_save_offset;
+int current_named_gpr;
+int current_named_sse;
+int current_named_stack;
 int parameter_offset[128];
 int parameter_decl_type[128];
 int return_address_offset;
@@ -4494,7 +4498,8 @@ int postfix_expression(int result) {
 int unary(void) {
     int op = token;
     int result, t, saved_position, saved_calls, saved_allocation, bytes, register_id, ice,
-        value_type, size_type_name, size_cursor, size_line, size_locals, size_peak;
+        value_type, size_type_name, size_cursor, size_line, size_locals, size_peak, ap_slot, branch,
+        done;
     unsigned long long bits;
     if (failed)
         return 0;
@@ -4506,6 +4511,10 @@ int unary(void) {
     if (op == 297) {
         next();
         expect('(');
+        expression(1);
+        if (!is_pointer(expression_type) || unqualified(pointed_type(expression_type)) != 9)
+            return error_message("va_start requires a va_list object");
+        expect(',');
         register_id = name();
         if (!current_variadic || !parameter_count)
             return error_message("va_start outside variadic definition");
@@ -4515,9 +4524,20 @@ int unary(void) {
             return error_message("va_start requires last named parameter");
         next();
         expect(')');
-        sequence(0x858d48, 3);
-        emit32(current_va_offset);
-        expression_type = 25;
+        sequence(0x00c7, 2);
+        emit32(current_named_gpr * 8);
+        sequence(0x40c7, 2);
+        emit(4);
+        emit32(48 + current_named_sse * 16);
+        sequence(0x8d8d48, 3);
+        emit32(16 + current_named_stack * 8);
+        sequence(0x488948, 3);
+        emit(8);
+        sequence(0x8d8d48, 3);
+        emit32(-current_va_save_offset);
+        sequence(0x488948, 3);
+        emit(0x10);
+        expression_type = 0;
         expression_zero = 0;
         expression_ice = 0;
         expression_register = 0;
@@ -4528,27 +4548,70 @@ int unary(void) {
         next();
         expect('(');
         expression(1);
-        t = expression_type;
-        if (!is_pointer(t) || unqualified(pointed_type(t)) != 25 ||
-            (type_qualifiers(pointed_type(t)) & 1))
-            return error_message("va_arg requires writable va_list");
+        if (!is_pointer(expression_type))
+            return error_message("va_arg requires a va_list object");
+        ap_slot = temporary(8, 8);
+        store(ap_slot, 11);
         expect(',');
-        t = declarator(specifiers(), 1);
+        t = unqualified(declarator(specifiers(), 1));
         expect(')');
-        if (!unqualified(t) || is_array(t) || is_function(t))
+        if (!t || is_array(t) || is_function(t))
             return error_message("invalid va_arg type");
+        if (is_record(t))
+            return error_message("aggregate va_arg is not implemented");
+        if (t == 15)
+            return error_message("long double va_arg is not implemented");
+        if (t == 13)
+            return error_message("va_arg float is promoted to double");
         bytes = type_size(t);
-        sequence(0x108b48, 3);
-        sequence(0x084a8d48, 4);
-        sequence(0x088948, 3);
-        sequence(0xd08948, 3);
-        if (is_record(t)) {
-            if (record_indirect(t))
-                sequence(0x008b48, 3);
-            record_value(unqualified(t));
-        } else
-            load_opcode(unqualified(t), 0);
-        expression_type = unqualified(t);
+        if (floating_type(t)) {
+            sequence(0x04488b, 3);
+            sequence(0xf981, 2);
+            emit32(176);
+            branch = jump(0x83);
+            sequence(0x508b48, 3);
+            emit(16);
+            emit(sysv_xmm_prefix(t));
+            emit(0x0f);
+            emit(0x10);
+            emit(0x04);
+            emit(0x0a);
+            sequence(0x10c183, 3);
+            sequence(0x044889, 3);
+            done = jump(0);
+            patch(branch, position);
+            sequence(0x508b48, 3);
+            emit(8);
+            emit(sysv_xmm_prefix(t));
+            emit(0x0f);
+            emit(0x10);
+            emit(0x02);
+            sequence(0x08408348, 4);
+            emit(8);
+            patch(done, position);
+            floating_from_xmm(t, 0);
+        } else {
+            sequence(0x088b, 2);
+            sequence(0xf983, 2);
+            emit(48);
+            branch = jump(0x83);
+            sequence(0x508b48, 3);
+            emit(16);
+            sequence(0x0a148b48, 4);
+            sequence(0x08c183, 3);
+            sequence(0x0889, 2);
+            sequence(0xd08948, 3);
+            done = jump(0);
+            patch(branch, position);
+            sequence(0x508b48, 3);
+            emit(8);
+            sequence(0x128b48, 3);
+            sequence(0x08408348, 4);
+            emit(8);
+            sequence(0xd08948, 3);
+            patch(done, position);
+        }
+        expression_type = t;
         expression_zero = 0;
         expression_ice = 0;
         expression_register = 0;
@@ -8783,15 +8846,23 @@ function_body:
     frame_peak = local_bytes;
     for (i = 0; i < n; i++)
         parameter_offset[i] = local_offset[parameter_name[i]];
+    if (variadic)
+        current_va_save_offset = temporary(176, 16);
+    else
+        current_va_save_offset = 0;
     prologue();
     hidden = record_indirect(t);
     current_variadic = variadic;
     current_oldstyle = old;
     current_va_offset = 16 + (n + hidden) * 8;
-    if (variadic)
-        return error_message("SysV variadic definitions are not implemented");
     if (hidden)
         return error_message("SysV aggregate returns are not implemented");
+    if (variadic) {
+        for (i = 0; i < 6; i++)
+            sysv_store_gpr(i, -current_va_save_offset + i * 8);
+        for (i = 0; i < 8; i++)
+            sysv_store_xmm(i, 14, -current_va_save_offset + 48 + i * 16);
+    }
     /* Assign incoming arguments to independent integer and SSE register
        classes.  Missing registers spill to the stack in argument order. */
     gpr = 0;
@@ -8820,6 +8891,9 @@ function_body:
             stack_index++;
         }
     }
+    current_named_gpr = gpr;
+    current_named_sse = sse;
+    current_named_stack = stack_index;
     for (i = 0; i < n; i++) {
         if (unqualified(parameter_decl_type[i]) == 12) {
             sequence(0x858b, 2);
