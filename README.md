@@ -199,7 +199,7 @@ bit/
 | --- | --- | --- |
 | M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
 | M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点/varargs/整数与浮点聚合已通过；long double/packed 待完成 |
-| M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE crt/glibc 链接、`malloc`/`strlen`/`puts`/`printf` 已通过；`.so`/`dlopen`/PIE 待完成 |
+| M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接、`malloc`/`strlen`/`puts`/`printf`/`vprintf` 已通过；`.so`/`dlopen` 待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 计划 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
 | M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 后续 |

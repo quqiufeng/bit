@@ -1,7 +1,12 @@
 #!/bin/sh
 set -eu
+PIE=0
+if [ "${1:-}" = "--pie" ]; then
+    PIE=1
+    shift
+fi
 if [ "$#" -lt 2 ]; then
-    echo "usage: link-hosted.sh OUTPUT OBJECT..." >&2
+    echo "usage: link-hosted.sh [--pie] OUTPUT OBJECT..." >&2
     exit 2
 fi
 OUTPUT=$1
@@ -12,11 +17,18 @@ CRTI=${CRTI:-}
 CRTN=${CRTN:-}
 LIBDIR=${LIBDIR:-}
 DYNAMIC_LINKER=${DYNAMIC_LINKER:-}
+if [ "$PIE" -eq 1 ]; then
+    CRT_NAME=Scrt1.o
+    PIE_FLAG=-pie
+else
+    CRT_NAME=crt1.o
+    PIE_FLAG=
+fi
 
 if [ -z "$CRT1" ]; then
     for directory in /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib64 /lib64 /usr/lib /lib; do
-        if [ -f "$directory/crt1.o" ] && [ -f "$directory/crti.o" ] && [ -f "$directory/crtn.o" ]; then
-            CRT1=$directory/crt1.o
+        if [ -f "$directory/$CRT_NAME" ] && [ -f "$directory/crti.o" ] && [ -f "$directory/crtn.o" ]; then
+            CRT1=$directory/$CRT_NAME
             CRTI=$directory/crti.o
             CRTN=$directory/crtn.o
             LIBDIR=$directory
@@ -25,13 +37,13 @@ if [ -z "$CRT1" ]; then
     done
 fi
 if [ -z "$CRT1" ] && command -v gcc >/dev/null 2>&1; then
-    CRT1=$(gcc -print-file-name=crt1.o)
+    CRT1=$(gcc -print-file-name=$CRT_NAME)
     CRTI=$(gcc -print-file-name=crti.o)
     CRTN=$(gcc -print-file-name=crtn.o)
     LIBDIR=$(dirname "$CRT1")
 fi
 if [ -z "$CRT1" ] || [ ! -f "$CRT1" ]; then
-    echo "link-hosted: cannot locate crt1.o" >&2
+    echo "link-hosted: cannot locate $CRT_NAME" >&2
     exit 1
 fi
 if [ -z "$DYNAMIC_LINKER" ]; then
@@ -47,7 +59,7 @@ if [ -z "$DYNAMIC_LINKER" ]; then
     exit 1
 fi
 
-exec "$LD" -o "$OUTPUT" -dynamic-linker "$DYNAMIC_LINKER" -z noexecstack \
+exec "$LD" $PIE_FLAG -o "$OUTPUT" -dynamic-linker "$DYNAMIC_LINKER" -z noexecstack \
     "$CRT1" "$CRTI" "$@" \
     -L"$LIBDIR" -L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu \
     -lc "$CRTN"

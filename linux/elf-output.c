@@ -108,12 +108,16 @@ int elf_section_header(int at, int name, int type, unsigned long long flags,
     return 0;
 }
 
-int elf_relocation(int at, int offset, int symbol, int addend) {
+int elf_relocation_type(int at, int offset, int symbol, int addend, int type) {
     elf_put64(at, offset);
-    elf_put32(at + 8, 2);
+    elf_put32(at + 8, type);
     elf_put32(at + 12, symbol);
     elf_put32(at + 16, addend);
     return elf_put32(at + 20, addend < 0 ? -1 : 0);
+}
+
+int elf_relocation(int at, int offset, int symbol, int addend) {
+    return elf_relocation_type(at, offset, symbol, addend, 2);
 }
 
 int object_prepare(void) {
@@ -215,7 +219,7 @@ int object_prepare(void) {
     elf_put32(62, 6);
     at = rela_off;
     for (i = 0; i < call_count; i++) {
-        elf_relocation(at, call_position[i] - 4096, object_symbol_map[call_symbol[i]], -4);
+        elf_relocation_type(at, call_position[i] - 4096, object_symbol_map[call_symbol[i]], -4, 4);
         at += 24;
     }
     for (i = 0; i < object_ref_count; i++) {
