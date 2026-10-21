@@ -3353,7 +3353,7 @@ int sysv_load_call_arguments(int *types, int n) {
             stack++;
         }
     }
-    return 0;
+    return sse;
 }
 
 int floating_binary(int op, int left_type, int right_type) {
@@ -4918,8 +4918,8 @@ int primary(void) {
 }
 
 int arguments(int id, int signature) {
-    int n = 0, i, stack_args, stack_bytes, frame_size, result, output = 0, hidden = 0, t, copy,
-        target = 0, expected = -1;
+    int n = 0, i, stack_args, stack_bytes, frame_size, sse_count, result, output = 0, hidden = 0,
+        t, copy, target = 0, expected = -1;
     int actual_types[128];
     if (id >= 0) {
         if (!function_exists(id))
@@ -4998,7 +4998,11 @@ int arguments(int id, int signature) {
     emit32(n * 8);
     sequence(0x24848948, 4);
     emit32(stack_bytes);
-    sysv_load_call_arguments(actual_types, n);
+    sse_count = sysv_load_call_arguments(actual_types, n);
+    if (failed)
+        return error();
+    emit(0xb0);
+    emit(sse_count);
     invoke(id, target, n - hidden);
     sequence(0x24a48b48, 4);
     emit32(stack_bytes);
