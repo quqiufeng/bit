@@ -1,7 +1,7 @@
 # BitKindle Native 技术设计
 
 - 版本：0.1（设计基线）
-- 状态：M1 SysV 标量自举已打通；浮点/聚合/varargs 待补
+- 状态：M1 SysV 标量自举已打通；聚合/varargs/long double 待补
 - 日期：2026-10-21
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
@@ -758,9 +758,9 @@ bit/
 - `./build.sh` 已打通 `c1-stage0` → `c1-stage1` → `c1-stage2`。
 - `compiler*.o`、`runtime*.o`、`c1-stage*` 均逐字节一致。
 - 编译器不链接 glibc，只使用 Linux syscall。
-- Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，第 7 个起走栈。
-- `tests/sysv/` 覆盖寄存器/栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。
-- 尚未实现：浮点参数传递、聚合参数/返回、variadic 定义、`long double` 80-bit、结构体 eightbyte 分类。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，浮点使用 `XMM0`–`XMM7`，各自独立计数；溢出时按顺序走栈。
+- `tests/sysv/` 覆盖整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。
+- 尚未实现：聚合参数/返回、variadic 定义、`long double` 80-bit、结构体 eightbyte 分类。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -930,7 +930,7 @@ bit/
 - 状态：接受
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
-- 后果：当前先支持标量整数/指针子集。浮点参数、聚合参数/返回、variadic 定义、`long double` 80-bit 和结构体 eightbyte 分类尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+- 后果：当前先支持整数、指针和标量 `float`/`double`。聚合参数/返回、variadic 定义、`long double` 80-bit 和结构体 eightbyte 分类尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
 
 ---
 

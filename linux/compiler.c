@@ -3225,20 +3225,133 @@ int floating_convert(int t) {
     return ice_set(0, 0);
 }
 
-int floating_arguments(int *types, int n) {
-    int i, t, gpr;
-    for (i = 0; i < n && i < 4; i++) {
+int sysv_store_gpr(int reg, int offset) {
+    if (reg == 0)
+        sequence(0xbd8948, 3);
+    else if (reg == 1)
+        sequence(0xb58948, 3);
+    else if (reg == 2)
+        sequence(0x958948, 3);
+    else if (reg == 3)
+        sequence(0x8d8948, 3);
+    else if (reg == 4)
+        sequence(0x85894c, 3);
+    else if (reg == 5)
+        sequence(0x8d894c, 3);
+    else
+        return error();
+    return emit32(offset);
+}
+
+int sysv_load_gpr(int reg, int disp) {
+    if (reg == 0)
+        sequence(0xbb8b49, 3);
+    else if (reg == 1)
+        sequence(0xb38b49, 3);
+    else if (reg == 2)
+        sequence(0x938b49, 3);
+    else if (reg == 3)
+        sequence(0x8b8b49, 3);
+    else if (reg == 4)
+        sequence(0x838b4d, 3);
+    else if (reg == 5)
+        sequence(0x8b8b4d, 3);
+    else
+        return error();
+    return emit32(disp);
+}
+
+int sysv_xmm_prefix(int t) {
+    return unqualified(t) == 13 ? 0xf3 : 0xf2;
+}
+
+int sysv_store_xmm(int reg, int t, int offset) {
+    emit(sysv_xmm_prefix(t));
+    emit(0x0f);
+    emit(0x11);
+    emit(0x85 + reg * 8);
+    return emit32(offset);
+}
+
+int sysv_load_xmm_r11(int reg, int t, int disp) {
+    emit(sysv_xmm_prefix(t));
+    emit(0x41);
+    emit(0x0f);
+    emit(0x10);
+    emit(0x83 + reg * 8);
+    return emit32(disp);
+}
+
+int sysv_load_xmm_rbp(int reg, int t, int disp) {
+    emit(sysv_xmm_prefix(t));
+    emit(0x0f);
+    emit(0x10);
+    emit(0x85 + reg * 8);
+    return emit32(disp);
+}
+
+int sysv_copy_stack_arg(int dest, int source) {
+    sequence(0x838b49, 3);
+    emit32(source);
+    sequence(0x24848948, 4);
+    return emit32(dest);
+}
+
+int sysv_load_int_stack(int dest, int source) {
+    sequence(0x858b48, 3);
+    emit32(source);
+    sequence(0x858948, 3);
+    return emit32(dest);
+}
+
+int sysv_call_stack_count(int *types, int n) {
+    int i, t, gpr = 0, sse = 0, stack = 0;
+    for (i = 0; i < n; i++) {
         t = unqualified(types[i]);
-        if (!floating_type(t))
-            continue;
-        emit(0x66);
-        if (t != 13)
-            emit(i >= 2 ? 0x49 : 0x48);
-        else if (i >= 2)
-            emit(0x41);
-        gpr = i == 0 ? 1 : (i == 1 ? 2 : i - 2);
-        sequence(0x6e0f, 2);
-        emit(0xc0 + i * 8 + gpr);
+        if (floating_type(t)) {
+            if (t == 15) {
+                error_message("long double arguments are not implemented");
+                return 0;
+            }
+            if (sse < 8)
+                sse++;
+            else
+                stack++;
+        } else if (is_record(t) && record_indirect(t)) {
+            error_message("aggregate arguments are not implemented");
+            return 0;
+        } else if (gpr < 6)
+            gpr++;
+        else
+            stack++;
+    }
+    return stack;
+}
+
+int sysv_load_call_arguments(int *types, int n) {
+    int i, t, disp, gpr = 0, sse = 0, stack = 0;
+    for (i = 0; i < n; i++) {
+        t = unqualified(types[i]);
+        disp = (n - 1 - i) * 8;
+        if (floating_type(t)) {
+            if (t == 15)
+                return error_message("long double arguments are not implemented");
+            if (sse < 8) {
+                sysv_load_xmm_r11(sse, t, disp);
+                sse++;
+            } else {
+                sysv_copy_stack_arg(stack * 8, disp);
+                stack++;
+            }
+        } else if (is_record(t) && record_indirect(t)) {
+            return error_message("aggregate arguments are not implemented");
+        } else if (gpr < 6) {
+            sysv_load_gpr(gpr, disp);
+            gpr++;
+        } else {
+            sysv_copy_stack_arg(stack * 8, disp);
+            stack++;
+        }
     }
     return 0;
 }
@@ -4845,8 +4958,6 @@ int arguments(int id, int signature) {
             convert(default_promoted(expression_type));
         }
         t = expression_type;
-        if (floating_type(t))
-            return error_message("SysV floating arguments are not implemented");
         actual_types[n + hidden] = t;
         if (is_record(t)) {
             if (record_indirect(t)) {
@@ -4872,8 +4983,10 @@ int arguments(int id, int signature) {
         symbol_flags[id] = symbol_flags[id] | 2;
     n += hidden;
     /* Arguments were pushed left-to-right, so R11 points at the last one.
-       Copy them into the SysV integer register set and stack area. */
-    stack_args = n > 6 ? n - 6 : 0;
+       Copy them into the SysV integer/SSE register sets and stack area. */
+    stack_args = sysv_call_stack_count(actual_types, n);
+    if (failed)
+        return error();
     stack_bytes = stack_args * 8;
     frame_size = ((stack_bytes + 8 + 15) / 16) * 16;
     sequence(0xe38949, 3);
@@ -4885,36 +4998,7 @@ int arguments(int id, int signature) {
     emit32(n * 8);
     sequence(0x24848948, 4);
     emit32(stack_bytes);
-    if (n >= 1) {
-        sequence(0xbb8b49, 3);
-        emit32((n - 1) * 8);
-    }
-    if (n >= 2) {
-        sequence(0xb38b49, 3);
-        emit32((n - 2) * 8);
-    }
-    if (n >= 3) {
-        sequence(0x938b49, 3);
-        emit32((n - 3) * 8);
-    }
-    if (n >= 4) {
-        sequence(0x8b8b49, 3);
-        emit32((n - 4) * 8);
-    }
-    if (n >= 5) {
-        sequence(0x838b4d, 3);
-        emit32((n - 5) * 8);
-    }
-    if (n >= 6) {
-        sequence(0x8b8b4d, 3);
-        emit32((n - 6) * 8);
-    }
-    for (i = 6; i < n; i = i + 1) {
-        sequence(0x838b49, 3);
-        emit32((n - i - 1) * 8);
-        sequence(0x24848948, 4);
-        emit32((i - 6) * 8);
-    }
+    sysv_load_call_arguments(actual_types, n);
     invoke(id, target, n - hidden);
     sequence(0x24a48b48, 4);
     emit32(stack_bytes);
@@ -8457,9 +8541,8 @@ int predefined_function_name(int function_id) {
 }
 
 int function(void) {
-    int id, i, n, t, base, known, storage, unnamed = 0, hidden, aggregate, unspecified, old = 0,
-                                           implicit = 0, declaration_base, declaration_result,
-                                           variadic = 0;
+    int id, i, n, t, pt, base, known, storage, unnamed = 0, hidden, gpr, sse, stack_index,
+        unspecified, old = 0, implicit = 0, declaration_base, declaration_result, variadic = 0;
     for (i = 0; i < 128; i++)
         parameter_replay_valid[i] = 0;
     vm_current = 0;
@@ -8698,7 +8781,6 @@ function_body:
         parameter_offset[i] = local_offset[parameter_name[i]];
     prologue();
     hidden = record_indirect(t);
-    aggregate = hidden;
     current_variadic = variadic;
     current_oldstyle = old;
     current_va_offset = 16 + (n + hidden) * 8;
@@ -8706,43 +8788,36 @@ function_body:
         return error_message("SysV variadic definitions are not implemented");
     if (hidden)
         return error_message("SysV aggregate returns are not implemented");
-    for (i = 0; i < n; i++)
-        if (record_indirect(parameter_decl_type[i]) || floating_type(parameter_decl_type[i]))
-            return error_message("SysV aggregate or floating parameters are not implemented");
-    /* SysV integer argument registers: RDI, RSI, RDX, RCX, R8, R9.
-       Stack arguments begin at [rbp+16] after the pushed frame pointer. */
-    if (n >= 1) {
-        sequence(0xbd8948, 3);
-        emit32(-parameter_offset[0]);
-    }
-    if (n >= 2) {
-        sequence(0xb58948, 3);
-        emit32(-parameter_offset[1]);
-    }
-    if (n >= 3) {
-        sequence(0x958948, 3);
-        emit32(-parameter_offset[2]);
-    }
-    if (n >= 4) {
-        sequence(0x8d8948, 3);
-        emit32(-parameter_offset[3]);
-    }
-    if (n >= 5) {
-        sequence(0x85894c, 3);
-        emit32(-parameter_offset[4]);
-    }
-    if (n >= 6) {
-        sequence(0x8d894c, 3);
-        emit32(-parameter_offset[5]);
-    }
-    for (i = 6; i < n; i = i + 1) {
-        sequence(0x858b48, 3);
-        emit32(16 + (i - 6) * 8);
-        sequence(0x858948, 3);
-        emit32(-parameter_offset[i]);
+    /* Assign incoming arguments to independent integer and SSE register
+       classes.  Missing registers spill to the stack in argument order. */
+    gpr = 0;
+    sse = 0;
+    stack_index = 0;
+    for (i = 0; i < n; i++) {
+        pt = unqualified(parameter_decl_type[i]);
+        if (floating_type(pt)) {
+            if (pt == 15)
+                return error_message("long double parameters are not implemented");
+            if (sse < 8) {
+                sysv_store_xmm(sse, pt, -parameter_offset[i]);
+                sse++;
+            } else {
+                sysv_load_xmm_rbp(0, pt, 16 + stack_index * 8);
+                sysv_store_xmm(0, pt, -parameter_offset[i]);
+                stack_index++;
+            }
+        } else if (is_record(pt) && record_indirect(pt)) {
+            return error_message("SysV aggregate parameters are not implemented");
+        } else if (gpr < 6) {
+            sysv_store_gpr(gpr, -parameter_offset[i]);
+            gpr++;
+        } else {
+            sysv_load_int_stack(-parameter_offset[i], 16 + stack_index * 8);
+            stack_index++;
+        }
     }
     for (i = 0; i < n; i++) {
-        if (!aggregate && unqualified(parameter_decl_type[i]) == 12) {
+        if (unqualified(parameter_decl_type[i]) == 12) {
             sequence(0x858b, 2);
             emit32(-parameter_offset[i]);
             expression_type = 1;
