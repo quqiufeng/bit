@@ -9908,6 +9908,20 @@ int pp_builtin(int start, int length) {
         return 7;
     if (c89_identifiers && pp_spelling(start, length, "__C1_C89__"))
         return 8;
+    if (pp_spelling(start, length, "__linux__"))
+        return 9;
+    if (pp_spelling(start, length, "__unix__"))
+        return 10;
+    if (pp_spelling(start, length, "__x86_64__"))
+        return 11;
+    if (pp_spelling(start, length, "__LP64__"))
+        return 12;
+    if (pp_spelling(start, length, "_LP64"))
+        return 13;
+    if (pp_spelling(start, length, "__ELF__"))
+        return 14;
+    if (pp_spelling(start, length, "__C1__"))
+        return 15;
     return 0;
 }
 
@@ -10009,7 +10023,7 @@ int pp_expand_builtin(int n, int kind) {
         pp_node_length[n] = pp_node_file_length[n];
         pp_node_kind[n] = 3;
     } else {
-        if (kind == 5 || kind == 6 || kind == 8)
+        if (kind == 5 || kind == 6 || kind == 8 || (kind >= 9 && kind <= 15))
             value = 1;
         if (kind == 7)
             value = 199901;
