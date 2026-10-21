@@ -1,7 +1,7 @@
 # BitKindle Native
 
 > 以自举为目标的 C 工具链，Linux 与 Windows 各自原生发展。  
-> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 路径已打通 · 整数/浮点/内存类聚合已支持；long double/packed/PIE 待补 · 暂定名
+> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 路径已打通 · 整数/浮点/内存类聚合已支持；long double/packed 待补 · 暂定名
 
 本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把“从零构建自己的 C 工具链”这一目标带到 Linux，同时保留 Windows 的原生实现。两个平台共享语言前端、纯算法和语言测试；不共享 ABI、运行时、目标文件格式和链接器。
 
@@ -192,7 +192,8 @@ bit/
 │   ├── run-interop.sh
 │   ├── sysv/                  # SysV ABI/语言回归测试
 │   ├── hosted/                # glibc hosted 互操作测试
-│   └── interop/               # C1 <-> gcc ABI 双向互操作测试
+│   ├── interop/               # C1 <-> gcc ABI 双向互操作测试
+│   └── reject/                # 明确拒绝的未实现特性
 ├── LICENSE
 └── NOTICE
 ```
@@ -226,7 +227,8 @@ bit/
 - `examples/hello.c` 可编译、链接并运行；
 - `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
 - `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`；
-- `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作。
+- `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
+- `tests/reject/` 验证未实现的 `long double` 会明确报错，而不是生成错误 ABI。
 
 Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 

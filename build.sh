@@ -44,5 +44,6 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/run.sh
 ./tests/run-hosted.sh
 ./tests/run-interop.sh
+./tests/reject/run.sh
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted and interop tests"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop and reject tests"

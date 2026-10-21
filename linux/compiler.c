@@ -2003,6 +2003,8 @@ int default_promoted(int t) {
 
 int type_size(int t) {
     t = bit_value_type(t);
+    if (t == 15)
+        return error_message("long double is not implemented on the Linux target");
     if (is_function(t))
         return error();
     if (is_record(t)) {

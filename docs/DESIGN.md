@@ -763,7 +763,7 @@ bit/
 - variadic 定义与 `va_list` 已按 SysV 24 字节布局实现；`stdarg.h` 位于 `include/`，`va_arg` 支持整数/指针/`double`，`va_copy` 通过头文件辅助函数复制 24 字节状态。
 - 聚合参数/返回已支持 1–16 字节的 INTEGER/SSE eightbyte 分类：整数走 GPR，`float`/`double` 走 XMM，混合 eightbyte 按 INTEGER；>16 字节按 MEMORY（参数走栈、返回用隐藏指针）。
 - `tests/interop/` 已用 gcc 作为 ABI oracle 验证双向调用，覆盖 8/12/16 字节整数与浮点聚合、混合 INTEGER/SSE eightbyte，以及 >16 字节内存聚合。
-- 尚未实现：含 `long double` 的非 MEMORY 聚合、未对齐/packed 聚合、PIE/PIC。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- 尚未实现：`long double`（当前明确拒绝）、未对齐/packed 聚合。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -789,7 +789,7 @@ bit/
 - `include/` 提供最小 hosted ABI 头（`stddef.h`、`stdio.h`、`stdlib.h`、`string.h`、`math.h`、`dlfcn.h`、`stdarg.h`）。
 - `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）、`vprintf` 和 `dlopen`/`dlsym` 调用 `libm`。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：完整 hosted 头覆盖、`errno`/TLS 边界、`long double`、packed 聚合。
+- 尚未完成：完整 hosted 头覆盖、`errno`/TLS 边界、`long double`（明确拒绝）、packed 聚合。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
 - 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 
@@ -950,7 +950,7 @@ bit/
 - 状态：接受
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
-- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`long double` 80-bit、packed/未对齐聚合和 PIE 尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`long double` 80-bit 和 packed/未对齐聚合尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
 
 ### ADR-015：聚合 ABI 按 SysV eightbyte 分类实现
 
