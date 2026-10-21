@@ -6,4 +6,10 @@ typedef char va_list[24];
 #define va_start(ap, last) ((void)__va_start((ap), last))
 #define va_arg(ap, type) (__va_arg((ap), type))
 #define va_end(ap) ((void)0)
+static void __c1_va_copy(char *destination, char *source) {
+    int i;
+    for (i = 0; i < 24; i = i + 1)
+        destination[i] = source[i];
+}
+#define va_copy(destination, source) ((void)__c1_va_copy((destination), (source)))
 #endif

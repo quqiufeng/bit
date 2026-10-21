@@ -760,8 +760,8 @@ bit/
 - 编译器不链接 glibc，只使用 Linux syscall。
 - Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，浮点使用 `XMM0`–`XMM7`，各自独立计数；溢出时按顺序走栈。
 - `tests/sysv/` 覆盖整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。
-- variadic 定义与 `va_list` 已按 SysV 24 字节布局实现；`stdarg.h` 位于 `include/`，`va_arg` 支持整数/指针/`double`。
-- 尚未实现：聚合参数/返回、`long double` 80-bit、结构体 eightbyte 分类、`va_copy`。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- variadic 定义与 `va_list` 已按 SysV 24 字节布局实现；`stdarg.h` 位于 `include/`，`va_arg` 支持整数/指针/`double`，`va_copy` 通过头文件辅助函数复制 24 字节状态。
+- 尚未实现：聚合参数/返回、`long double` 80-bit、结构体 eightbyte 分类。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -954,7 +954,7 @@ bit/
 - 状态：接受
 - 决策：`include/stdarg.h` 将 `va_list` 定义为 24 字节数组；编译器内建 `__va_start` 初始化 `gp_offset`/`fp_offset`/`overflow_arg_area`/`reg_save_area`，`__va_arg` 按整数/SSE 寄存器保存区和溢出区取参。
 - 理由：必须与 glibc 及第三方 SysV 函数交换 `va_list`；自定义 cursor 方案无法通过 `vprintf` 等边界。
-- 后果：`va_arg` 当前支持整数/指针/`double`；`float` 必须按默认提升用 `double` 读取；聚合和 `long double` 待补；`va_copy` 尚未提供。
+- 后果：`va_arg` 当前支持整数/指针/`double`；`float` 必须按默认提升用 `double` 读取；聚合和 `long double` 待补。`va_copy` 由 `stdarg.h` 中的 24 字节复制辅助函数实现。
 
 ---
 
