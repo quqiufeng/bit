@@ -1,11 +1,20 @@
-#include <fcntl.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
+typedef long long ssize_t;
+typedef long long off_t;
+typedef unsigned long long size_t;
+#define NULL ((void *)0)
+#define SEEK_SET 0
+#define SEEK_END 2
 
+extern long long __c1_sysv_open(const char *, long long, long long);
+extern long long __c1_sysv_read(long long, void *, unsigned long long);
+extern long long __c1_sysv_write(long long, const void *, unsigned long long);
+extern long long __c1_sysv_close(long long);
+extern long long __c1_sysv_lseek(long long, long long, long long);
+extern void *__c1_linux_HeapAlloc(long long, unsigned int, unsigned long long);
+extern int __c1_linux_HeapFree(long long, unsigned int, void *);
+extern void *memcpy(void *, const void *, unsigned long long);
+extern void *memset(void *, int, unsigned long long);
+extern int puts(char *);
 typedef unsigned long long u64;
 typedef unsigned int u32;
 
@@ -98,36 +107,35 @@ static int read_file(const char *path, unsigned char **out, u64 *length) {
     off_t size, offset;
     unsigned char *data;
     ssize_t got;
-    fd = open(path, O_RDONLY);
+    fd = (int)__c1_sysv_open(path, 0, 0);
     if (fd < 0) {
-        printf("c1link: cannot open %s\n", path);
+        puts("c1link: cannot open file");
         return 1;
     }
-    size = lseek(fd, 0, SEEK_END);
+    size = (off_t)__c1_sysv_lseek(fd, 0, SEEK_END);
     if (size < 0) {
-        close(fd);
+        __c1_sysv_close(fd);
         return 1;
     }
-    if (lseek(fd, 0, SEEK_SET) < 0) {
-        close(fd);
+    if (__c1_sysv_lseek(fd, 0, SEEK_SET) < 0) {
+        __c1_sysv_close(fd);
         return 1;
     }
-    data = malloc((unsigned long)size + 1);
+    data = __c1_linux_HeapAlloc(0, 0, (unsigned long long)size + 1);
     if (!data) {
-        close(fd);
+        __c1_sysv_close(fd);
         return 1;
     }
     offset = 0;
     while (offset < size) {
-        got = read(fd, data + offset, (unsigned long)(size - offset));
+        got = (ssize_t)__c1_sysv_read(fd, data + offset, (unsigned long long)(size - offset));
         if (got <= 0) {
-            free(data);
-            close(fd);
+            __c1_sysv_close(fd);
             return 1;
         }
         offset += got;
     }
-    close(fd);
+    __c1_sysv_close(fd);
     *out = data;
     *length = (u64)size;
     return 0;
@@ -137,20 +145,20 @@ static int write_file(const char *path, unsigned char *data, u64 length) {
     int fd;
     u64 offset = 0;
     ssize_t written;
-    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0755);
+    fd = (int)__c1_sysv_open(path, 1 | 64 | 512, 493);
     if (fd < 0) {
-        printf("c1link: cannot create %s\n", path);
+        puts("c1link: cannot create output");
         return 1;
     }
     while (offset < length) {
-        written = write(fd, data + offset, (unsigned long)(length - offset));
+        written = (ssize_t)__c1_sysv_write(fd, data + offset, (unsigned long long)(length - offset));
         if (written <= 0) {
-            close(fd);
+            __c1_sysv_close(fd);
             return 1;
         }
         offset += (u64)written;
     }
-    close(fd);
+    __c1_sysv_close(fd);
     return 0;
 }
 
@@ -176,7 +184,6 @@ static int parse_object(const char *path) {
         return 1;
     if (o->length < 64 || o->bytes[0] != 0x7f || o->bytes[1] != 'E' ||
         o->bytes[2] != 'L' || o->bytes[3] != 'F' || o->bytes[4] != 2) {
-        printf("bad header len=%llu\n", (unsigned long long)o->length);
         return 1;
     }
     shoff = get64(o->bytes + 40);
@@ -184,7 +191,6 @@ static int parse_object(const char *path) {
     shnum = (int)get16(o->bytes + 60);
     shstrndx = (int)get16(o->bytes + 62);
     if (shnum > MAX_SECTIONS || shstrndx >= shnum) {
-        printf("bad shnum=%d shstr=%d\n", shnum, shstrndx);
         return 1;
     }
     o->sec_first = section_count;
@@ -228,10 +234,8 @@ static int parse_object(const char *path) {
         for (j = 0; j < ns; j++) {
             unsigned char *p = s->data + j * 24;
             struct symbol *y;
-            if (symbol_count == MAX_SYMBOLS) {
-                printf("too many symbols\n");
+            if (symbol_count == MAX_SYMBOLS)
                 return 1;
-            }
             y = &symbols[symbol_count++];
             y->bind = p[4] >> 4;
             y->type = p[4] & 15;
@@ -270,7 +274,11 @@ static int parse_object(const char *path) {
 }
 
 static int same_name(const char *a, const char *b) {
-    return strcmp(a, b) == 0;
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a == *b;
 }
 
 static int find_global(const char *name) {
@@ -344,8 +352,8 @@ static int layout_sections(void) {
 
 static int build_images(void) {
     int i;
-    text_image = malloc((unsigned long)text_size + 1);
-    data_image = malloc((unsigned long)data_size + 1);
+    text_image = __c1_linux_HeapAlloc(0, 0, text_size + 1);
+    data_image = __c1_linux_HeapAlloc(0, 0, data_size + 1);
     if (!text_image || !data_image)
         return 1;
     memset(text_image, 0, (size_t)text_size);
@@ -380,7 +388,7 @@ static int apply_relocations(void) {
             continue;
         target = symbol_address(r->object, r->symbol);
         if (!target && symbols[o->sym_first + r->symbol].shndx == 0) {
-            printf("c1link: unresolved symbol %s\n", symbols[o->sym_first + r->symbol].name);
+            puts("c1link: unresolved symbol");
             return 1;
         }
         place = section_out_base(gsec) + r->offset;
@@ -389,12 +397,12 @@ static int apply_relocations(void) {
         } else if (r->type == 2 || r->type == 4) {
             value = (long long)(target + (u64)r->addend - place);
             if (value < -2147483647LL - 1 || value > 2147483647LL) {
-                printf("c1link: relocation overflow\n");
+                puts("c1link: relocation overflow");
                 return 1;
             }
             put32(dest + r->offset, (u32)value);
         } else {
-            printf("c1link: unsupported relocation %u\n", r->type);
+            puts("c1link: unsupported relocation");
             return 1;
         }
     }
@@ -422,7 +430,7 @@ static int write_output(const char *path, u64 entry) {
     u64 text_file = 0x1000;
     u64 data_file = align_up(text_file + text_size, 0x1000);
     u64 file_size = data_file + data_size;
-    unsigned char *image = malloc((unsigned long)file_size + 1);
+    unsigned char *image = __c1_linux_HeapAlloc(0, 0, file_size + 1);
     unsigned char *p;
     int i;
     if (!image)
@@ -468,19 +476,19 @@ static int write_output(const char *path, u64 entry) {
     if (data_size)
         memcpy(image + data_file, data_image, (size_t)data_size);
     i = write_file(path, image, file_size);
-    free(image);
+    __c1_linux_HeapFree(0, 0, image);
     return i;
 }
 
 int main(int argc, char **argv) {
     int i, entry_index = -1;
     if (argc < 4) {
-        printf("usage: c1link output entry object...\n");
+        puts("usage: c1link output entry object...");
         return 2;
     }
     for (i = 3; i < argc; i++)
         if (parse_object(argv[i])) {
-            printf("c1link: invalid object %s\n", argv[i]);
+            puts("c1link: invalid object");
             return 1;
         }
     select_globals();
@@ -488,7 +496,7 @@ int main(int argc, char **argv) {
         if (symbols[i].bind != 0 && same_name(symbols[i].name, argv[2]) && symbols[i].shndx != 0)
             entry_index = i;
     if (entry_index < 0) {
-        printf("c1link: missing entry %s\n", argv[2]);
+        puts("c1link: missing entry");
         return 1;
     }
     layout_sections();
@@ -496,8 +504,6 @@ int main(int argc, char **argv) {
         return 1;
     if (write_output(argv[1], selected_address(entry_index)))
         return 1;
-    printf("linked %s entry=0x%llx text=%llu bss=%llu\n", argv[1],
-           (unsigned long long)selected_address(entry_index),
-           (unsigned long long)text_size, (unsigned long long)bss_size);
+    puts("c1link: linked");
     return 0;
 }

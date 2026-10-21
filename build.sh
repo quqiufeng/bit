@@ -19,9 +19,16 @@ mkdir -p "$BUILD"
     "$BUILD/startup_sysv.o" "$BUILD/compiler_gcc.o" \
     "$BUILD/runtime_sysv.o" "$BUILD/syscalls_sysv.o"
 
+# Bootstrap the freestanding linker with the system ld.  Everything after this
+# point that produces a C1 executable uses c1link instead.
+"$BUILD/c1-stage0" < linux/linker.c > "$BUILD/linker0.o"
+"$LD" $LDFLAGS -o "$BUILD/c1link" \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime_sysv.o" \
+    "$BUILD/linker0.o" "$BUILD/syscalls_sysv.o"
+
 "$BUILD/c1-stage0" < linux/runtime.c > "$BUILD/runtime1.o"
 "$BUILD/c1-stage0" < linux/compiler.c > "$BUILD/compiler1.o"
-"$LD" $LDFLAGS -o "$BUILD/c1-stage1" \
+"$BUILD/c1link" "$BUILD/c1-stage1" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime1.o" \
     "$BUILD/compiler1.o" "$BUILD/syscalls_sysv.o"
 
@@ -30,16 +37,13 @@ mkdir -p "$BUILD"
 cmp "$BUILD/runtime1.o" "$BUILD/runtime2.o"
 cmp "$BUILD/compiler1.o" "$BUILD/compiler2.o"
 
-"$LD" $LDFLAGS -o "$BUILD/c1-stage2" \
+"$BUILD/c1link" "$BUILD/c1-stage2" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
     "$BUILD/compiler2.o" "$BUILD/syscalls_sysv.o"
 cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 
-"$BUILD/c1-stage2" < linux/linker.c > "$BUILD/linker.o"
-./linux/link-hosted.sh "$BUILD/c1link" "$BUILD/linker.o"
-
 "$BUILD/c1-stage2" < examples/hello.c > "$BUILD/hello.o"
-"$LD" $LDFLAGS -o "$BUILD/hello" \
+"$BUILD/c1link" "$BUILD/hello" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
     "$BUILD/hello.o" "$BUILD/syscalls_sysv.o"
 "$BUILD/hello"
@@ -51,6 +55,7 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/run-env.sh
 ./tests/run-linker.sh
 ./tests/run-selflink.sh
+./tests/run-linker-selfhost.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost and source checks"

@@ -32,6 +32,7 @@ __c1_sysv_close:
 .globl __c1_sysv_mmap
 .type __c1_sysv_mmap,@function
 __c1_sysv_mmap:
+    mov %rcx, %r10
     mov $9, %eax
     syscall
     ret
@@ -49,5 +50,12 @@ __c1_sysv_exit:
     mov $60, %eax
     syscall
     hlt
+
+.globl __c1_sysv_lseek
+.type __c1_sysv_lseek,@function
+__c1_sysv_lseek:
+    mov $8, %eax
+    syscall
+    ret
 
 .section .note.GNU-stack,"",@progbits
