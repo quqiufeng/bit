@@ -171,7 +171,7 @@ static void copy_name(char *to, unsigned char *from, int max) {
     to[i] = 0;
 }
 
-static int parse_object(const char *path) {
+static int parse_memory(const char *path, unsigned char *bytes, u64 length) {
     struct object *o;
     unsigned char *shstr;
     u64 shstr_size;
@@ -180,8 +180,8 @@ static int parse_object(const char *path) {
     if (object_count == MAX_OBJECTS)
         return 1;
     o = &objects[object_count];
-    if (read_file(path, &o->bytes, &o->length))
-        return 1;
+    o->bytes = bytes;
+    o->length = length;
     if (o->length < 64 || o->bytes[0] != 0x7f || o->bytes[1] != 'E' ||
         o->bytes[2] != 'L' || o->bytes[3] != 'F' || o->bytes[4] != 2) {
         return 1;
@@ -480,6 +480,61 @@ static int write_output(const char *path, u64 entry) {
     return i;
 }
 
+static int parse_object(const char *path) {
+    unsigned char *bytes;
+    u64 length;
+    if (read_file(path, &bytes, &length))
+        return 1;
+    return parse_memory(path, bytes, length);
+}
+
+static u64 ar_number(unsigned char *p) {
+    int i;
+    u64 n = 0;
+    for (i = 0; i < 10 && p[i] >= '0' && p[i] <= '9'; i++)
+        n = n * 10 + (u64)(p[i] - '0');
+    return n;
+}
+
+static int parse_archive(const char *path, unsigned char *bytes, u64 length) {
+    u64 off, size;
+    unsigned char *header, *data;
+    char name[64];
+    if (length < 8)
+        return 1;
+    off = 8;
+    while (off + 60 <= length) {
+        header = bytes + off;
+        if (header[58] != '`' || header[59] != 10)
+            return 1;
+        size = ar_number(header + 48);
+        data = header + 60;
+        if (data + size > bytes + length)
+            return 1;
+        copy_name(name, header, 16);
+        if (!(name[0] == '/' && (name[1] == ' ' || name[1] == '/'))) {
+            if (parse_memory(path, data, size))
+                return 1;
+        }
+        off = (u64)(data + size - bytes);
+        if (off & 1)
+            off++;
+    }
+    return 0;
+}
+
+static int parse_input(const char *path) {
+    unsigned char *bytes;
+    u64 length;
+    if (read_file(path, &bytes, &length))
+        return 1;
+    if (length >= 8 && bytes[0] == '!' && bytes[1] == '<' && bytes[2] == 'a' &&
+        bytes[3] == 'r' && bytes[4] == 'c' && bytes[5] == 'h' && bytes[6] == '>' &&
+        bytes[7] == 10)
+        return parse_archive(path, bytes, length);
+    return parse_memory(path, bytes, length);
+}
+
 int main(int argc, char **argv) {
     int i, entry_index = -1;
     if (argc < 4) {
@@ -487,7 +542,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     for (i = 3; i < argc; i++)
-        if (parse_object(argv[i])) {
+        if (parse_input(argv[i])) {
             puts("c1link: invalid object");
             return 1;
         }
