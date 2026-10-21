@@ -1,10 +1,10 @@
 /* Derived from tombkeeper/BitKindle C1 (MIT). See NOTICE. */
 #include "linux/linuximports.h"
-/* Integer-only conversion of C floating tokens to IEEE binary32/binary64.
-   Built by the existing custom C compiler. No host floating arithmetic.
+/* Integer-only conversion of C floating tokens to IEEE binary32/binary64
+   and x87 80-bit extended. No host floating arithmetic.
    fp_parse accepts an ASCII int array without a sign or whitespace.
    Return: 0 success, 1 invalid token, 2 overflow, 3 resource limit.
-   fp_type: 13 float, 14 double, 15 long double (Windows binary64).
+   fp_type: 13 float, 14 double, 15 long double (64-bit significand).
    fp_inexact and fp_underflow describe rounding; tininess is after rounding.
    Limits: 1 MiB token, 8192 significant mantissa digits, 32800-bit workspace.
    The workspaces make this helper non-reentrant. */
@@ -16,6 +16,10 @@ int fp_type;
 int fp_inexact;
 int fp_underflow;
 unsigned long long fp_bits;
+unsigned long long fp_ext_significand;
+int fp_ext_exponent;
+unsigned long long literal_ld_significand;
+int literal_ld_exponent;
 
 int fp_digit(int c, int base) {
     int d = -1;
@@ -107,8 +111,10 @@ int fp_subtract(int *a, int an, int *b, int bn, int shift) {
 }
 
 int fp_round(int binary_exponent) {
-    int p = fp_type == 13 ? 24 : 53, emin = fp_type == 13 ? -126 : -1022;
-    int emax = fp_type == 13 ? 127 : 1023, bias = fp_type == 13 ? 127 : 1023;
+    int p = fp_type == 13 ? 24 : fp_type == 15 ? 64 : 53;
+    int emin = fp_type == 13 ? -126 : fp_type == 15 ? -16382 : -1022;
+    int emax = fp_type == 13 ? 127 : fp_type == 15 ? 16383 : 1023;
+    int bias = fp_type == 13 ? 127 : fp_type == 15 ? 16383 : 1023;
     int e, ratio, cmp, qexp, shift, i;
     unsigned long long q = 0, leading = 1ULL << (p - 1);
     ratio = fp_bit_length(fp_num, fp_nn) - fp_bit_length(fp_den, fp_dn);
@@ -124,6 +130,9 @@ int fp_round(int binary_exponent) {
     if (e < emin - p) {
         fp_inexact = 1;
         fp_underflow = 1;
+        fp_bits = 0;
+        fp_ext_significand = 0;
+        fp_ext_exponent = 0;
         return 0;
     }
     qexp = (e < emin ? emin : e) - (p - 1);
@@ -135,8 +144,12 @@ int fp_round(int binary_exponent) {
     if (!fp_nn || !fp_dn)
         return 3;
     i = fp_bit_length(fp_num, fp_nn) - fp_bit_length(fp_den, fp_dn);
-    if (i > 63)
-        return 3;
+    if (i > 63) {
+        if (fp_type == 15 && i == 64)
+            i = 63;
+        else
+            return 3;
+    }
     for (; i >= 0; i--) {
         if (fp_compare(fp_num, fp_nn, 0, fp_den, fp_dn, i) >= 0) {
             fp_nn = fp_subtract(fp_num, fp_nn, fp_den, fp_dn, i);
@@ -145,19 +158,31 @@ int fp_round(int binary_exponent) {
     }
     fp_inexact = fp_bit_length(fp_num, fp_nn) != 0;
     cmp = fp_compare(fp_num, fp_nn, 1, fp_den, fp_dn, 0);
-    if (cmp > 0 || (cmp == 0 && (q & 1)))
-        q++;
+    if (cmp > 0 || (cmp == 0 && (q & 1))) {
+        if (q == 0xffffffffffffffffULL) {
+            q = leading;
+            e++;
+        } else
+            q++;
+    }
     if (e < emin) {
         fp_bits = q;
+        fp_ext_significand = q;
+        fp_ext_exponent = 0;
         fp_underflow = fp_inexact && q < leading;
     } else {
-        if (q == (leading << 1)) {
+        if (p != 64 && q == (leading << 1)) {
             q >>= 1;
             e++;
         }
         if (e > emax)
             return 2;
-        fp_bits = ((unsigned long long)(e + bias) << (p - 1)) | (q - leading);
+        if (fp_type == 15) {
+            fp_ext_significand = q;
+            fp_ext_exponent = e + bias;
+            fp_bits = q;
+        } else
+            fp_bits = ((unsigned long long)(e + bias) << (p - 1)) | (q - leading);
     }
     return 0;
 }
@@ -167,6 +192,8 @@ int fp_parse(int *s, int length) {
     int significant = 0, first = 0, oversized = 0, d, c, exponent = 0, negative = 0;
     int k, order, top, precision, minimum, maximum;
     fp_bits = 0;
+    fp_ext_significand = 0;
+    fp_ext_exponent = 0;
     fp_type = 14;
     fp_inexact = 0;
     fp_underflow = 0;
@@ -244,13 +271,17 @@ int fp_parse(int *s, int length) {
     }
     if (i != length)
         return 1;
-    if (!significant)
+    if (!significant) {
+        fp_bits = 0;
+        fp_ext_significand = 0;
+        fp_ext_exponent = 0;
         return 0;
+    }
     if (negative)
         exponent = -exponent;
-    precision = fp_type == 13 ? 24 : 53;
-    minimum = fp_type == 13 ? -126 : -1022;
-    maximum = fp_type == 13 ? 127 : 1023;
+    precision = fp_type == 13 ? 24 : fp_type == 15 ? 64 : 53;
+    minimum = fp_type == 13 ? -126 : fp_type == 15 ? -16382 : -1022;
+    maximum = fp_type == 13 ? 127 : fp_type == 15 ? 16383 : 1023;
     if (base == 16) {
         k = exponent - fractional * 4;
         top = 0;
@@ -272,9 +303,9 @@ int fp_parse(int *s, int length) {
     }
     k = exponent - fractional;
     order = significant - 1 + k;
-    if (order > (fp_type == 13 ? 38 : 308))
+    if (order > (fp_type == 13 ? 38 : fp_type == 15 ? 4932 : 308))
         return 2;
-    if (order < (fp_type == 13 ? -46 : -324)) {
+    if (order < (fp_type == 13 ? -46 : fp_type == 15 ? -4950 : -324)) {
         fp_inexact = 1;
         fp_underflow = 1;
         return 0;
@@ -872,6 +903,10 @@ int floating_number(void) {
     literal_type = fp_type;
     value = (int)fp_bits;
     literal_high = (int)(fp_bits >> 32);
+    if (literal_type == 15) {
+        literal_ld_significand = fp_ext_significand;
+        literal_ld_exponent = fp_ext_exponent;
+    }
     return 144;
 }
 
@@ -1399,6 +1434,15 @@ int current_va_save_offset;
 int current_named_gpr;
 int current_named_sse;
 int current_named_stack;
+int long_double_convert(int t);
+int long_double_binary(int op, int left_type, int right_type);
+int long_double_truth(void);
+int long_double_negate(void);
+int record_memory_param(int t);
+int record_memory_return(int t);
+int record_has_long_double(int t);
+int record_has_float(int t);
+int record_chunk_class(int t, int chunk);
 int parameter_offset[128];
 int parameter_decl_type[128];
 int return_address_offset;
@@ -2000,8 +2044,6 @@ int default_promoted(int t) {
 
 int type_size(int t) {
     t = bit_value_type(t);
-    if (t == 15)
-        return error_message("long double is not implemented on the Linux target");
     if (is_function(t))
         return error();
     if (is_record(t)) {
@@ -2021,6 +2063,8 @@ int type_size(int t) {
             return error_message("array size is not statically known");
         return t;
     }
+    if (t == 15)
+        return 16;
     if (wide_type(t))
         return 8;
     if (t == 5 || t == 6 || t == 9 || t == 12)
@@ -2790,6 +2834,8 @@ int complex_convert(int t) {
 
 int convert(int t) {
     int a, b;
+    if (unqualified(t) == 15 || unqualified(expression_type) == 15)
+        return long_double_convert(t);
     record_read();
     t = bit_value_type(t);
     expression_type = bit_value_type(expression_type);
@@ -2969,6 +3015,16 @@ int indirect_value(int t) {
     if (is_function(t))
         return function_value(t);
     expression_register = 0;
+    if (unqualified(t) == 15) {
+        sequence(0xc28948, 3);
+        expression_type = 15;
+        expression_zero = 0;
+        expression_ice = 0;
+        expression_array_bytes = 0;
+        expression_array_type = 0;
+        expression_load = position;
+        return -1;
+    }
     sequence(0xc28948, 3);
     if (is_record(t))
         record_value(t);
@@ -3024,6 +3080,18 @@ int load(int id) {
     int start = position;
     expression_register = local_offset[id] > 0 && register_object[id];
     if (local_offset[id] > 0) {
+        if (unqualified(local_type[id]) == 15) {
+            sequence(0x858d48, 3);
+            emit32(-local_offset[id]);
+            expression_type = 15;
+            expression_zero = 0;
+            expression_ice = 0;
+            expression_register = 0;
+            expression_array_bytes = 0;
+            expression_array_type = 0;
+            expression_load = start;
+            return local_offset[id];
+        }
         if (is_record(local_type[id])) {
             sequence(0x858d48, 3);
             emit32(-local_offset[id]);
@@ -3050,6 +3118,18 @@ int load(int id) {
         return local_offset[id];
     }
     if (object_exists(id)) {
+        if (unqualified(object_type(id)) == 15) {
+            sequence(0x058d48, 3);
+            object_reference(id);
+            expression_type = 15;
+            expression_zero = 0;
+            expression_ice = 0;
+            expression_register = 0;
+            expression_array_bytes = 0;
+            expression_array_type = 0;
+            expression_load = start;
+            return -id - 2;
+        }
         if (is_record(object_type(id))) {
             sequence(0x058d48, 3);
             object_reference(id);
@@ -3073,7 +3153,7 @@ int load(int id) {
 
 int store(int lvalue, int t) {
     int n = type_size(t), opcode = 0x89;
-    if (is_record(t))
+    if (is_record(t) || unqualified(t) == 15)
         return store_record(lvalue, t);
     if (n == 1)
         opcode = 0x88;
@@ -3429,6 +3509,10 @@ int boolean(int cc) {
         complex_truth();
     if (!expression_type || is_record(expression_type))
         return error();
+    if (unqualified(expression_type) == 15) {
+        long_double_truth();
+        return sequence(0xc085, 2);
+    }
     if (floating_type(expression_type))
         floating_absolute_bits(expression_type);
     if (wide_type(expression_type))
@@ -4176,6 +4260,8 @@ int binary(int op, int left_type, int right_type, int left_zero) {
         return complex_binary(op, left_type, right_type);
     if (is_record(left_type) || is_record(right_type))
         return error();
+    if (unqualified(left_type) == 15 || unqualified(right_type) == 15)
+        return long_double_binary(op, left_type, right_type);
     if (floating_type(left_type) || floating_type(right_type))
         return floating_binary(op, left_type, right_type);
     if (is_pointer(left_type) || is_pointer(right_type))
@@ -4407,6 +4493,8 @@ int increment(int left, int op, int postfix) {
     int t = expression_type, step = 1, field = expression_bit;
     if (is_record(t))
         return error();
+    if (unqualified(t) == 15)
+        return error_message("long double increment is not implemented");
     if (left == 0 || expression_array_type)
         return error();
     if (contains_const(t))
@@ -4504,7 +4592,7 @@ int unary(void) {
     int op = token;
     int result, t, saved_position, saved_calls, saved_allocation, bytes, register_id, ice,
         value_type, size_type_name, size_cursor, size_line, size_locals, size_peak, ap_slot, branch,
-        done;
+        done, ld_temp;
     unsigned long long bits;
     if (failed)
         return 0;
@@ -4564,12 +4652,39 @@ int unary(void) {
             return error_message("invalid va_arg type");
         if (is_record(t))
             return error_message("aggregate va_arg is not implemented");
-        if (t == 15)
-            return error_message("long double va_arg is not implemented");
-        if (t == 13)
-            return error_message("va_arg float is promoted to double");
-        bytes = type_size(t);
-        if (floating_type(t)) {
+        if (t == 15) {
+            sequence(0x858b48, 3);
+            emit32(-ap_slot);
+            sequence(0x508b48, 3);
+            emit(8);
+            sequence(0xc28348, 3);
+            emit(15);
+            sequence(0xe28348, 3);
+            emit(0xf0);
+            emit(0xdb);
+            emit(0x2a);
+            sequence(0xc28348, 3);
+            emit(16);
+            sequence(0x508948, 3);
+            emit(8);
+            ld_temp = temporary(16, 16);
+            emit(0xdb);
+            emit(0xbd);
+            emit32(-ld_temp);
+            sequence(0x858d48, 3);
+            emit32(-ld_temp);
+            expression_type = 15;
+            expression_zero = 0;
+            expression_ice = 0;
+            expression_register = 0;
+            expression_array_bytes = 0;
+            expression_array_type = 0;
+            result = 0;
+        } else {
+            if (t == 13)
+                return error_message("va_arg float is promoted to double");
+            bytes = type_size(t);
+            if (floating_type(t)) {
             sequence(0x04488b, 3);
             sequence(0xf981, 2);
             emit32(176);
@@ -4615,14 +4730,15 @@ int unary(void) {
             emit(8);
             sequence(0xd08948, 3);
             patch(done, position);
+            }
+            expression_type = t;
+            expression_zero = 0;
+            expression_ice = 0;
+            expression_register = 0;
+            expression_array_bytes = 0;
+            expression_array_type = 0;
+            result = 0;
         }
-        expression_type = t;
-        expression_zero = 0;
-        expression_ice = 0;
-        expression_register = 0;
-        expression_array_bytes = 0;
-        expression_array_type = 0;
-        result = 0;
     } else if (op == 296) {
         bytes = offset_expression();
         constant(bytes);
@@ -4776,7 +4892,15 @@ int unary(void) {
         ice = expression_ice;
         bits = expression_value;
         value_type = expression_type;
-        if (floating_type(expression_type)) {
+        if (unqualified(expression_type) == 15) {
+            if (op == '~')
+                return error();
+            if (op == '-')
+                long_double_negate();
+            if (op == '!')
+                long_double_truth();
+            ice_set(0, 0);
+        } else if (floating_type(expression_type)) {
             if (op == '~')
                 return error();
             if (op == '-')
@@ -4927,6 +5051,26 @@ int primary(void) {
         return emit_string();
     }
     if (token == 144) {
+        if (unqualified(literal_type) == 15) {
+            int t16 = temporary(16, 16);
+            sequence(0xb848, 2);
+            emit32((int)literal_ld_significand);
+            emit32((int)(literal_ld_significand >> 32));
+            sequence(0x858948, 3);
+            emit32(-t16);
+            emit(0xb8);
+            emit32(literal_ld_exponent);
+            sequence(0x858948, 3);
+            emit32(-t16 + 8);
+            sequence(0x858d48, 3);
+            emit32(-t16);
+            expression_type = 15;
+            expression_value = 0;
+            expression_ice = 4;
+            expression_zero = 0;
+            next();
+            return 0;
+        }
         if (wide_type(literal_type)) {
             sequence(0xb848, 2);
             emit32(value);
@@ -5003,15 +5147,13 @@ int arguments(int id, int signature) {
     }
     if (is_record(result)) {
         output = temporary(type_size(result) + 8, 16);
-        hidden = record_memory(result);
+        hidden = record_memory_return(result);
         if (hidden) {
             sequence(0x858d48, 3);
             emit32(-output);
             emit(0x50);
             abi_types[abi_count++] = 11;
         }
-        if (record_has_long_double(result))
-            return error_message("aggregate returns containing long double are not implemented");
     }
     expect('(');
     while (!failed && token != ')') {
@@ -5028,9 +5170,21 @@ int arguments(int id, int signature) {
             convert(default_promoted(expression_type));
         }
         t = expression_type;
-        if (is_record(t)) {
+        if (unqualified(t) == 15) {
+            copy = temporary(24, 16);
+            store_record(copy, t);
+            for (k = 0; k < 2; k++) {
+                if (abi_count == 256)
+                    return error();
+                sequence(0x858d48, 3);
+                emit32(-copy + k * 8);
+                sequence(0x008b48, 3);
+                emit(0x50);
+                abi_types[abi_count++] = -1;
+            }
+        } else if (is_record(t)) {
             size = type_size(t);
-            if (record_memory(t)) {
+            if (record_memory_param(t)) {
                 copy = temporary(size + 8, 16);
                 store_record(copy, t);
                 chunks = (size + 7) / 8;
@@ -5104,7 +5258,7 @@ int arguments(int id, int signature) {
     sequence(0xec8148, 3);
     emit32(frame_size);
     sequence(0x838d49, 3);
-    emit32(n * 8);
+    emit32(abi_count * 8);
     sequence(0x24848948, 4);
     emit32(stack_bytes);
     sse_count = sysv_load_call_arguments(abi_types, abi_count);
@@ -5115,10 +5269,23 @@ int arguments(int id, int signature) {
     invoke(id, target, n - hidden);
     sequence(0x24a48b48, 4);
     emit32(stack_bytes);
-    if (floating_type(result))
+    if (unqualified(result) == 15) {
+        copy = temporary(16, 16);
+        emit(0xdb);
+        emit(0xbd);
+        emit32(-copy);
+        sequence(0x858d48, 3);
+        emit32(-copy);
+    } else if (floating_type(result))
         floating_from_xmm(result, 0);
     if (output) {
         if (hidden) {
+            sequence(0x858d48, 3);
+            emit32(-output);
+        } else if (record_has_long_double(result)) {
+            emit(0xdb);
+            emit(0xbd);
+            emit32(-output);
             sequence(0x858d48, 3);
             emit32(-output);
         } else if (record_indirect(result)) {
@@ -5406,6 +5573,10 @@ int scalar_test(void) {
         complex_truth();
     if (!expression_type || is_record(expression_type))
         return error();
+    if (unqualified(expression_type) == 15) {
+        long_double_truth();
+        return sequence(0xc085, 2);
+    }
     if (floating_type(expression_type))
         floating_absolute_bits(expression_type);
     if (wide_type(expression_type))
@@ -5509,16 +5680,22 @@ int statement_body(void) {
             return error();
         full_expression();
         convert(return_type);
-        if (floating_type(return_type))
+        if (unqualified(return_type) == 15) {
+            emit(0xdb);
+            emit(0x28);
+        } else if (floating_type(return_type))
             floating_to_xmm(return_type, 0, 0);
         if (is_record(return_type)) {
-            if (record_memory(return_type)) {
+            if (record_memory_return(return_type)) {
                 sequence(0x8d8b48, 3);
                 emit32(-return_address_offset);
                 emit(0x51);
                 store_record(-1, return_type);
                 sequence(0x858b48, 3);
                 emit32(-return_address_offset);
+            } else if (record_has_long_double(return_type)) {
+                emit(0xdb);
+                emit(0x28);
             } else if (record_indirect(return_type)) {
                 sequence(0xc18948, 3);
                 gpr_i = 0;
@@ -6885,7 +7062,11 @@ int record_indirect(int t) {
     return n != 1 && n != 2 && n != 4 && n != 8;
 }
 
-int record_memory(int t) {
+int record_memory_param(int t) {
+    return is_record(t) && (type_size(t) > 16 || record_has_long_double(t));
+}
+
+int record_memory_return(int t) {
     return is_record(t) && type_size(t) > 16;
 }
 
@@ -6987,6 +7168,149 @@ int temporary(int bytes, int align) {
     if (local_bytes > frame_peak)
         frame_peak = local_bytes;
     return local_bytes;
+}
+
+int long_double_convert(int to) {
+    int from = unqualified(expression_type), t8, t16;
+    to = unqualified(to);
+    if (!to) {
+        expression_type = 0;
+        return 0;
+    }
+    if (from == 15 && to == 15) {
+        expression_type = 15;
+        return 0;
+    }
+    if (from == 15) {
+        if (is_pointer(to) || is_record(to) || is_array(to) || is_function(to))
+            return error();
+        t8 = temporary(8, 8);
+        emit(0xdb);
+        emit(0x28);
+        sequence(0x958d48, 3);
+        emit32(-t8);
+        emit(0xdd);
+        emit(0x1a);
+        sequence(0x858b48, 3);
+        emit32(-t8);
+        expression_type = 14;
+        return convert(to);
+    }
+    if (to == 15) {
+        if (!from || is_pointer(from) || is_record(from) || is_array(from) || is_function(from))
+            return error();
+        if (from != 14)
+            convert(14);
+        t8 = temporary(8, 8);
+        sequence(0x858948, 3);
+        emit32(-t8);
+        t16 = temporary(16, 16);
+        emit(0xdd);
+        emit(0x85);
+        emit32(-t8);
+        emit(0xdb);
+        emit(0xbd);
+        emit32(-t16);
+        sequence(0x858d48, 3);
+        emit32(-t16);
+        expression_type = 15;
+        return 0;
+    }
+    return 0;
+}
+
+int long_double_negate(void) {
+    int t = temporary(16, 16);
+    emit(0xdb);
+    emit(0x28);
+    sequence(0xe0d9, 2);
+    sequence(0x858d48, 3);
+    emit32(-t);
+    emit(0xdb);
+    emit(0x38);
+    expression_type = 15;
+    expression_zero = 0;
+    expression_ice = 0;
+    expression_register = 0;
+    expression_array_bytes = 0;
+    expression_array_type = 0;
+    return 0;
+}
+
+int long_double_truth(void) {
+    emit(0xdb);
+    emit(0x28);
+    sequence(0xeed9, 2);
+    sequence(0xe9df, 2);
+    sequence(0xd8dd, 2);
+    emit(0x0f);
+    emit(0x95);
+    emit(0xc0);
+    expression_type = 1;
+    expression_zero = 0;
+    expression_ice = 0;
+    expression_register = 0;
+    expression_array_bytes = 0;
+    expression_array_type = 0;
+    return sequence(0xc0b60f, 3);
+}
+
+int long_double_binary(int op, int left_type, int right_type) {
+    int result, cc;
+    if (unqualified(left_type) != 15 || unqualified(right_type) != 15)
+        return error_message("mixed long double arithmetic is not implemented");
+    result = temporary(16, 16);
+    if (failed)
+        return 0;
+    emit(0x59);
+    sequence(0xc28948, 3);
+    emit(0xdb);
+    emit(0x29);
+    emit(0xdb);
+    emit(0x2a);
+    if (op == '+' || op == '-' || op == '*' || op == '/') {
+        if (op == '+')
+            sequence(0xc1de, 2);
+        else if (op == '-')
+            sequence(0xe9de, 2);
+        else if (op == '*')
+            sequence(0xc9de, 2);
+        else
+            sequence(0xf9de, 2);
+        sequence(0x858d48, 3);
+        emit32(-result);
+        emit(0xdb);
+        emit(0x38);
+        expression_type = 15;
+    } else {
+        if (op == 128)
+            cc = 0x94;
+        else if (op == 129)
+            cc = 0x95;
+        else if (op == '<')
+            cc = 0x97;
+        else if (op == '>')
+            cc = 0x92;
+        else if (op == 130)
+            cc = 0x93;
+        else if (op == 131)
+            cc = 0x96;
+        else
+            return error_message("operator requires long double arithmetic operands");
+        sequence(0xe9df, 2);
+        sequence(0xd8dd, 2);
+        emit(0x0f);
+        emit(cc);
+        emit(0xc0);
+        sequence(0xc0b60f, 3);
+        expression_type = 1;
+    }
+    expression_zero = 0;
+    expression_ice = 0;
+    expression_register = 0;
+    expression_array_bytes = 0;
+    expression_array_type = 0;
+    return 0;
 }
 
 int aggregate_parameters(int n, int hidden) {
@@ -9025,9 +9349,7 @@ function_body:
     frame_peak = local_bytes;
     for (i = 0; i < n; i++)
         parameter_offset[i] = local_offset[parameter_name[i]];
-    hidden = record_memory(t);
-    if (is_record(t) && !hidden && record_has_long_double(t))
-        return error_message("aggregate returns containing long double are not implemented");
+    hidden = record_memory_return(t);
     if (hidden)
         return_address_offset = temporary(8, 8);
     if (variadic)
@@ -9053,7 +9375,7 @@ function_body:
     stack_index = 0;
     for (i = 0; i < n; i++) {
         pt = unqualified(parameter_decl_type[i]);
-        if (record_memory(pt)) {
+        if (record_memory_param(pt)) {
             sequence(0x858d48, 3);
             emit32(16 + stack_index * 8);
             store_record(parameter_offset[i], pt);
@@ -9080,9 +9402,12 @@ function_body:
                     stack_index++;
                 }
             }
+        } else if (pt == 15) {
+            sequence(0x858d48, 3);
+            emit32(16 + stack_index * 8);
+            store_record(parameter_offset[i], pt);
+            stack_index = stack_index + 2;
         } else if (floating_type(pt)) {
-            if (pt == 15)
-                return error_message("long double parameters are not implemented");
             if (sse < 8) {
                 sysv_store_xmm(sse, pt, -parameter_offset[i]);
                 sse++;

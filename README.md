@@ -1,7 +1,7 @@
 # BitKindle Native
 
 > 以自举为目标的 C 工具链，Linux 与 Windows 各自原生发展。  
-> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 路径已打通 · 整数/浮点/内存类聚合已支持；long double/packed 待补 · 暂定名
+> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 路径已打通 · 整数/浮点/聚合/80-bit long double 已支持；packed/边界头待补 · 暂定名
 
 本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把“从零构建自己的 C 工具链”这一目标带到 Linux，同时保留 Windows 的原生实现。两个平台共享语言前端、纯算法和语言测试；不共享 ABI、运行时、目标文件格式和链接器。
 
@@ -213,7 +213,7 @@ bit/
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
-| M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点/varargs/整数与浮点聚合已通过；long double/packed 待完成 |
+| M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点/varargs/聚合/80-bit long double 已通过；packed/未对齐聚合待完成 |
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert` 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 计划 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
@@ -236,7 +236,7 @@ bit/
 - `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64/`stdint.h`/`limits.h`、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
 - `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`；
 - `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
-- `tests/reject/` 验证未实现的 `long double` 会明确报错，而不是生成错误 ABI；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
+- `tests/reject/` 验证未实现的 `long double` 自增等构造会明确报错；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
 
 Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 
