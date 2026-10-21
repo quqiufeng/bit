@@ -3311,7 +3311,12 @@ int sysv_load_int_stack(int dest, int source) {
 int sysv_call_stack_count(int *types, int n) {
     int i, t, gpr = 0, sse = 0, stack = 0;
     for (i = 0; i < n; i++) {
-        t = unqualified(types[i]);
+        t = types[i];
+        if (t < 0) {
+            stack++;
+            continue;
+        }
+        t = unqualified(t);
         if (floating_type(t)) {
             if (t == 15) {
                 error_message("long double arguments are not implemented");
@@ -3321,9 +3326,6 @@ int sysv_call_stack_count(int *types, int n) {
                 sse++;
             else
                 stack++;
-        } else if (is_record(t) && record_indirect(t)) {
-            error_message("aggregate arguments are not implemented");
-            return 0;
         } else if (gpr < 6)
             gpr++;
         else
@@ -3335,8 +3337,14 @@ int sysv_call_stack_count(int *types, int n) {
 int sysv_load_call_arguments(int *types, int n) {
     int i, t, disp, gpr = 0, sse = 0, stack = 0;
     for (i = 0; i < n; i++) {
-        t = unqualified(types[i]);
+        t = types[i];
         disp = (n - 1 - i) * 8;
+        if (t < 0) {
+            sysv_copy_stack_arg(stack * 8, disp);
+            stack++;
+            continue;
+        }
+        t = unqualified(t);
         if (floating_type(t)) {
             if (t == 15)
                 return error_message("long double arguments are not implemented");
@@ -3347,8 +3355,6 @@ int sysv_load_call_arguments(int *types, int n) {
                 sysv_copy_stack_arg(stack * 8, disp);
                 stack++;
             }
-        } else if (is_record(t) && record_indirect(t)) {
-            return error_message("aggregate arguments are not implemented");
         } else if (gpr < 6) {
             sysv_load_gpr(gpr, disp);
             gpr++;
@@ -4982,8 +4988,8 @@ int primary(void) {
 
 int arguments(int id, int signature) {
     int n = 0, i, stack_args, stack_bytes, frame_size, sse_count, result, output = 0, hidden = 0,
-        t, copy, target = 0, expected = -1;
-    int actual_types[128];
+        t, copy, target = 0, expected = -1, size, chunks, k, abi_count = 0;
+    int abi_types[256];
     if (id >= 0) {
         if (!function_exists(id))
             return error();
@@ -4997,14 +5003,17 @@ int arguments(int id, int signature) {
         store(target, expression_type);
     }
     if (is_record(result)) {
-        output = temporary(type_size(result), 16);
-        hidden = record_indirect(result);
+        output = temporary(type_size(result) + 8, 16);
+        hidden = record_memory(result);
         if (hidden) {
             sequence(0x858d48, 3);
             emit32(-output);
             emit(0x50);
-            actual_types[0] = 11;
-        }
+            abi_types[abi_count++] = 11;
+        } else if (record_indirect(result) && record_has_float(result))
+            return error_message("SysV 9-16 byte aggregate returns with floating members are not implemented");
+        else if (!record_indirect(result) && record_has_float(result))
+            return error_message("small aggregate returns with floating members are not implemented");
     }
     expect('(');
     while (!failed && token != ')') {
@@ -5021,17 +5030,47 @@ int arguments(int id, int signature) {
             convert(default_promoted(expression_type));
         }
         t = expression_type;
-        actual_types[n + hidden] = t;
         if (is_record(t)) {
-            if (record_indirect(t)) {
-                copy = temporary(type_size(t), 16);
+            size = type_size(t);
+            if (record_memory(t)) {
+                copy = temporary(size + 8, 16);
                 store_record(copy, t);
-                sequence(0x858d48, 3);
-                emit32(-copy);
-            } else
+                chunks = (size + 7) / 8;
+                for (k = 0; k < chunks; k++) {
+                    if (abi_count == 256)
+                        return error();
+                    sequence(0x858d48, 3);
+                    emit32(-copy + k * 8);
+                    sequence(0x008b48, 3);
+                    emit(0x50);
+                    abi_types[abi_count++] = -1;
+                }
+            } else if (record_indirect(t)) {
+                if (record_has_float(t))
+                    return error_message(
+                        "SysV 9-16 byte aggregate parameters with floating members are not implemented");
+                copy = temporary(size + 8, 16);
+                store_record(copy, t);
+                for (k = 0; k < 2; k++) {
+                    if (abi_count == 256)
+                        return error();
+                    sequence(0x858d48, 3);
+                    emit32(-copy + k * 8);
+                    sequence(0x008b48, 3);
+                    emit(0x50);
+                    abi_types[abi_count++] = 11;
+                }
+            } else {
+                if (record_has_float(t))
+                    return error_message("small aggregate parameters with floating members are not implemented");
                 load_opcode(record_word(t), 0);
+                emit(0x50);
+                abi_types[abi_count++] = t;
+            }
+        } else {
+            emit(0x50);
+            abi_types[abi_count++] = t;
         }
-        emit(0x50);
         n = n + 1;
         if (token != ',')
             break;
@@ -5047,7 +5086,7 @@ int arguments(int id, int signature) {
     n += hidden;
     /* Arguments were pushed left-to-right, so R11 points at the last one.
        Copy them into the SysV integer/SSE register sets and stack area. */
-    stack_args = sysv_call_stack_count(actual_types, n);
+    stack_args = sysv_call_stack_count(abi_types, abi_count);
     if (failed)
         return error();
     stack_bytes = stack_args * 8;
@@ -5061,7 +5100,7 @@ int arguments(int id, int signature) {
     emit32(n * 8);
     sequence(0x24848948, 4);
     emit32(stack_bytes);
-    sse_count = sysv_load_call_arguments(actual_types, n);
+    sse_count = sysv_load_call_arguments(abi_types, abi_count);
     if (failed)
         return error();
     emit(0xb0);
@@ -5072,10 +5111,21 @@ int arguments(int id, int signature) {
     if (floating_type(result))
         floating_from_xmm(result, 0);
     if (output) {
-        if (!hidden)
+        if (hidden) {
+            sequence(0x858d48, 3);
+            emit32(-output);
+        } else if (record_indirect(result)) {
+            sequence(0x858948, 3);
+            emit32(-output);
+            sequence(0x958948, 3);
+            emit32(-output + 8);
+            sequence(0x858d48, 3);
+            emit32(-output);
+        } else {
             store(output, record_word(result));
-        sequence(0x858d48, 3);
-        emit32(-output);
+            sequence(0x858d48, 3);
+            emit32(-output);
+        }
         record_value(result);
         expression_record_ready = 1;
     }
@@ -5439,13 +5489,18 @@ int statement_body(void) {
         if (floating_type(return_type))
             floating_to_xmm(return_type, 0, 0);
         if (is_record(return_type)) {
-            if (record_indirect(return_type)) {
+            if (record_memory(return_type)) {
                 sequence(0x8d8b48, 3);
                 emit32(-return_address_offset);
                 emit(0x51);
                 store_record(-1, return_type);
                 sequence(0x858b48, 3);
                 emit32(-return_address_offset);
+            } else if (record_indirect(return_type)) {
+                sequence(0xc18948, 3);
+                sequence(0x018b48, 3);
+                sequence(0x518b48, 3);
+                emit(8);
             } else
                 load_opcode(record_word(return_type), 0);
         }
@@ -6783,6 +6838,29 @@ int record_indirect(int t) {
         return 0;
     n = type_size(t);
     return n != 1 && n != 2 && n != 4 && n != 8;
+}
+
+int record_memory(int t) {
+    return is_record(t) && type_size(t) > 16;
+}
+
+int record_has_float(int t) {
+    int node, member, element;
+    t = unqualified(t);
+    if (floating_type(t))
+        return 1;
+    if (is_array(t)) {
+        element = array_base[(t - 4096) / 256];
+        return record_has_float(element);
+    }
+    if (!is_record(t))
+        return 0;
+    for (node = record_first[(t - 0x20000e) / 256]; node; node = member_next[node]) {
+        member = member_type[node];
+        if (record_has_float(member))
+            return 1;
+    }
+    return 0;
 }
 
 int record_word(int t) {
@@ -8608,7 +8686,7 @@ int predefined_function_name(int function_id) {
 }
 
 int function(void) {
-    int id, i, n, t, pt, base, known, storage, unnamed = 0, hidden, gpr, sse, stack_index,
+    int id, i, n, t, pt, k2, base, known, storage, unnamed = 0, hidden, gpr, sse, stack_index,
         unspecified, old = 0, implicit = 0, declaration_base, declaration_result, variadic = 0;
     for (i = 0; i < 128; i++)
         parameter_replay_valid[i] = 0;
@@ -8846,31 +8924,55 @@ function_body:
     frame_peak = local_bytes;
     for (i = 0; i < n; i++)
         parameter_offset[i] = local_offset[parameter_name[i]];
+    hidden = record_memory(t);
+    if (is_record(t) && record_indirect(t) && !hidden && record_has_float(t))
+        return error_message("SysV 9-16 byte aggregate returns with floating members are not implemented");
+    if (is_record(t) && !record_indirect(t) && record_has_float(t))
+        return error_message("small aggregate returns with floating members are not implemented");
+    if (hidden)
+        return_address_offset = temporary(8, 8);
     if (variadic)
         current_va_save_offset = temporary(176, 16);
     else
         current_va_save_offset = 0;
     prologue();
-    hidden = record_indirect(t);
     current_variadic = variadic;
     current_oldstyle = old;
     current_va_offset = 16 + (n + hidden) * 8;
-    if (hidden)
-        return error_message("SysV aggregate returns are not implemented");
     if (variadic) {
         for (i = 0; i < 6; i++)
             sysv_store_gpr(i, -current_va_save_offset + i * 8);
         for (i = 0; i < 8; i++)
             sysv_store_xmm(i, 14, -current_va_save_offset + 48 + i * 16);
     }
+    if (hidden)
+        sysv_store_gpr(0, -return_address_offset);
     /* Assign incoming arguments to independent integer and SSE register
        classes.  Missing registers spill to the stack in argument order. */
-    gpr = 0;
+    gpr = hidden ? 1 : 0;
     sse = 0;
     stack_index = 0;
     for (i = 0; i < n; i++) {
         pt = unqualified(parameter_decl_type[i]);
-        if (floating_type(pt)) {
+        if (record_memory(pt)) {
+            sequence(0x858d48, 3);
+            emit32(16 + stack_index * 8);
+            store_record(parameter_offset[i], pt);
+            stack_index = stack_index + (type_size(pt) + 7) / 8;
+        } else if (is_record(pt) && record_indirect(pt)) {
+            if (record_has_float(pt))
+                return error_message(
+                    "SysV 9-16 byte aggregate parameters with floating members are not implemented");
+            for (k2 = 0; k2 < 2; k2++) {
+                if (gpr < 6) {
+                    sysv_store_gpr(gpr, -parameter_offset[i] + k2 * 8);
+                    gpr++;
+                } else {
+                    sysv_load_int_stack(-parameter_offset[i] + k2 * 8, 16 + stack_index * 8);
+                    stack_index++;
+                }
+            }
+        } else if (floating_type(pt)) {
             if (pt == 15)
                 return error_message("long double parameters are not implemented");
             if (sse < 8) {
@@ -8881,14 +8983,16 @@ function_body:
                 sysv_store_xmm(0, pt, -parameter_offset[i]);
                 stack_index++;
             }
-        } else if (is_record(pt) && record_indirect(pt)) {
-            return error_message("SysV aggregate parameters are not implemented");
-        } else if (gpr < 6) {
-            sysv_store_gpr(gpr, -parameter_offset[i]);
-            gpr++;
         } else {
-            sysv_load_int_stack(-parameter_offset[i], 16 + stack_index * 8);
-            stack_index++;
+            if (is_record(pt) && record_has_float(pt))
+                return error_message("small aggregate parameters with floating members are not implemented");
+            if (gpr < 6) {
+                sysv_store_gpr(gpr, -parameter_offset[i]);
+                gpr++;
+            } else {
+                sysv_load_int_stack(-parameter_offset[i], 16 + stack_index * 8);
+                stack_index++;
+            }
         }
     }
     current_named_gpr = gpr;
