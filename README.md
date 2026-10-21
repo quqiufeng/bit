@@ -179,9 +179,12 @@ bit/
 ├── include/
 │   ├── stdarg.h               # SysV va_list / va_start / va_arg
 │   ├── stddef.h
+│   ├── stdint.h
+│   ├── limits.h
 │   ├── stdio.h
 │   ├── stdlib.h
 │   ├── string.h
+│   ├── ctype.h
 │   ├── math.h
 │   ├── dlfcn.h
 │   └── errno.h
@@ -227,7 +230,7 @@ bit/
 - `runtime1.o` 与 `runtime2.o` 逐字节一致；
 - `c1-stage1` 与 `c1-stage2` 逐字节一致；
 - `examples/hello.c` 可编译、链接并运行；
-- `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
+- `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64/`stdint.h`/`limits.h`、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
 - `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`；
 - `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
 - `tests/reject/` 验证未实现的 `long double` 会明确报错，而不是生成错误 ABI；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
