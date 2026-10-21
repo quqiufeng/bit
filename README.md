@@ -52,7 +52,7 @@
 | 数据模型 | LP64 | LLP64 |
 | 可执行格式 | ELF64 | PE32+ |
 | 用户程序标准库 | glibc（hosted） | 自带 CRT |
-| 链接 | 初期使用系统 `ld`，自制 ELF 链接器后置 | 自制 PE 链接器 |
+| 链接 | 自制 `c1link`（Python 原型 bootstrap）；hosted 测试仍用系统 `ld` | 自制 PE 链接器 |
 | 编译器自身 | freestanding（syscall + 自带最小运行时） | freestanding（kernel32 导入 + 自带运行时） |
 | 升级路径 | gcc stage0 → C1 自举 → 纯种子链（后置） | 现有 BitKindle 链 → 自举 |
 | 第三方库 | `.so` ABI 级调用 | DLL 导出 ABI 级调用（含 MinGW 编出的 DLL） |
@@ -134,7 +134,7 @@ flowchart LR
 - **stage0** 可以使用平台原生 C 编译器，这是允许的“前期依赖”。
 - **stage1** 由 C1 自己编译；**stage2** 再编译一次；要求 stage1 与 stage2 逐字节一致。
 - 自举完成后，构建 C1 不再需要 gcc/MinGW GCC。
-- Linux 初版保留系统 `ld` 作为链接依赖；这与 Rust 早期/当前使用系统链接器的做法一致。自制链接器是可选的后续目标。
+- Linux freestanding 链已改用自制 `c1link`：Python ELF 原型只负责 bootstrap，stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
 - Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）是后置目标，不在第一版阻塞自举。
 
 ## 能做什么 / 不能做什么
@@ -245,7 +245,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread 回调已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：C1 编译的静态 ELF 链接器已自举（c1link1 = c1link2），stage1/stage2 均由 c1link 链接；仅纯种子链/PIC 待做 |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2）；仅纯种子链/PIC 待做，hosted 测试仍用系统 `ld` |
 
 ## 快速开始
 

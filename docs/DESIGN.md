@@ -837,7 +837,7 @@ bit/
 
 ### M5：可选增强
 
-当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 只用于构建最初的 bootstrap c1link。动态链接、归档和完整 ELF 节/重定位待补。
+当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 已不参与 freestanding 构建，bootstrap 由 `tools/elflink.py` 完成。动态链接、归档和完整 ELF 节/重定位待补；hosted glibc 测试仍用系统 `ld`。
 
 - 自制 ELF 链接器（静态→动态）。
 - Linux 纯种子链（seed/A0/A1/C0）。

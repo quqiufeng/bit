@@ -63,7 +63,7 @@ def link(output,entry_name,paths):
                 o.setdefault('text_off',{})[i]=align(text_size,s['align'] or 1); text_size=o['text_off'][i]+s['size']
             elif s['type']==SHT_NOBITS:
                 o.setdefault('bss_off',{})[i]=align(bss_size,s['align'] or 1); bss_size=o['bss_off'][i]+s['size']
-            elif s['type']==SHT_PROGBITS and (s['flags']&SHF_WRITE):
+            elif s['type']==SHT_PROGBITS:
                 o.setdefault('data_off',{})[i]=align(data_size,s['align'] or 1); data_size=o['data_off'][i]+s['size']
     base=0x400000; text_v=0x401000; text_f=0x1000
     data_v=align(text_v+text_size,0x1000); data_f=align(text_f+text_size,0x1000)
@@ -119,10 +119,20 @@ def link(output,entry_name,paths):
                 s=o['syms'][r['sym']]
                 raise SystemExit(f"unresolved {s['name']} in {o['path']}")
             P=sec_base(o,r['target_sec'])+r['offset']
+            if r['type']==1: # ABS64
+                val=taddr+r['addend']
+                dest[off:off+8]=struct.pack('<Q',val); continue
+            if r['type']==10: # ABS32
+                val=taddr+r['addend']
+                if val < 0 or val >= 2**32:
+                    raise SystemExit(f"abs32 overflow {o['path']}")
+                dest[off:off+4]=struct.pack('<I',val); continue
+            if r['type']==11: # ABS32S
+                val=taddr+r['addend']
+                if val < -2**31 or val >= 2**31:
+                    raise SystemExit(f"abs32s overflow {o['path']}")
+                dest[off:off+4]=struct.pack('<i',val); continue
             if r['type'] not in (R_X86_64_PC32,R_X86_64_PLT32):
-                if r['type']==1: # ABS64
-                    val=taddr+r['addend']
-                    dest[off:off+8]=struct.pack('<Q',val); continue
                 raise SystemExit(f"unsupported reloc {r['type']} in {o['path']}")
             val=taddr+r['addend']-P
             if val < -2**31 or val >= 2**31:
@@ -135,8 +145,7 @@ def link(output,entry_name,paths):
     ehsize=64; phentsize=56; phnum=4
     phoff=ehsize
     hdr_size=ehsize+phentsize*phnum
-    file_size=text_f+len(text)
-    if data_size: file_size=align(file_size,0x1000)
+    file_size=data_f+len(data)
     # segments
     ph=[]
     # PHDR
@@ -145,7 +154,7 @@ def link(output,entry_name,paths):
     ph.append(struct.pack('<IIQQQQQQ',PT_LOAD,5,0,base,base,text_f+len(text),text_f+len(text),0x1000))
     # data load
     if data_size or bss_size:
-        ph.append(struct.pack('<IIQQQQQQ',PT_LOAD,6,text_f+len(text),data_v,data_v,len(data),len(data)+bss_size,0x1000))
+        ph.append(struct.pack('<IIQQQQQQ',PT_LOAD,6,data_f,data_v,data_v,len(data),len(data)+bss_size,0x1000))
     else:
         ph.append(struct.pack('<IIQQQQQQ',PT_LOAD,6,0,0,0,0,0,0x1000))
     ph.append(struct.pack('<IIQQQQQQ',PT_GNU_STACK,6,0,0,0,0,0,0x10))

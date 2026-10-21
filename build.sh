@@ -3,10 +3,8 @@ set -eu
 cd "$(dirname "$0")"
 
 CC=${CC:-gcc}
-LD=${LD:-ld}
 BUILD=build
 CFLAGS="-std=gnu89 -O2 -ffreestanding -fno-builtin -fno-pic -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -I."
-LDFLAGS="-static -nostdlib -z noexecstack -e _start"
 
 mkdir -p "$BUILD"
 
@@ -15,14 +13,15 @@ mkdir -p "$BUILD"
 "$CC" -c linux/syscalls-sysv.S -o "$BUILD/syscalls_sysv.o"
 "$CC" -c linux/startup-sysv.S -o "$BUILD/startup_sysv.o"
 
-"$LD" $LDFLAGS -o "$BUILD/c1-stage0" \
+python3 tools/elflink.py "$BUILD/c1-stage0" _start \
     "$BUILD/startup_sysv.o" "$BUILD/compiler_gcc.o" \
     "$BUILD/runtime_sysv.o" "$BUILD/syscalls_sysv.o"
 
-# Bootstrap the freestanding linker with the system ld.  Everything after this
-# point that produces a C1 executable uses c1link instead.
+# Bootstrap c1link with the Python ELF linker prototype.  Everything after this
+# point that produces a C1 executable uses c1link; system ld is only used by
+# the hosted glibc tests.
 "$BUILD/c1-stage0" < linux/linker.c > "$BUILD/linker0.o"
-"$LD" $LDFLAGS -o "$BUILD/c1link" \
+python3 tools/elflink.py "$BUILD/c1link" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime_sysv.o" \
     "$BUILD/linker0.o" "$BUILD/syscalls_sysv.o"
 
