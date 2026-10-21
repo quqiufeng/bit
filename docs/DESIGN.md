@@ -786,9 +786,10 @@ bit/
 当前状态：
 
 - `linux/link-hosted.sh` 已使用系统 `crt1.o`/`crti.o`/`crtn.o` + glibc + 动态链接器完成非 PIE 链接；`--pie` 使用 `Scrt1.o` 生成 PIE。
+- `include/` 提供最小 hosted ABI 头（`stddef.h`、`stdio.h`、`stdlib.h`、`string.h`、`math.h`、`dlfcn.h`、`stdarg.h`）。
 - `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）、`vprintf` 和 `dlopen`/`dlsym` 调用 `libm`。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：完整 hosted 头、`errno`/TLS 边界、`long double`、packed 聚合。
+- 尚未完成：完整 hosted 头覆盖、`errno`/TLS 边界、`long double`、packed 聚合。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
 - 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 

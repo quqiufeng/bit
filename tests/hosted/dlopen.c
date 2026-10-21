@@ -1,8 +1,7 @@
-void *dlopen(char *name, int flags);
-void *dlsym(void *handle, char *name);
-int dlclose(void *handle);
+#include <dlfcn.h>
+
 int main(void) {
-    void *handle = dlopen("libm.so.6", 1);
+    void *handle = dlopen("libm.so.6", RTLD_LAZY);
     double (*cosine)(double);
     if (!handle)
         return 1;

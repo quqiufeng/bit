@@ -1,7 +1,6 @@
-int puts(char *text);
-unsigned long strlen(const char *text);
-void *malloc(unsigned long bytes);
-void free(void *memory);
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int main(void) {
     char *text = malloc(16);

@@ -1,4 +1,4 @@
-int printf(char *format, ...);
+#include <stdio.h>
 
 int main(void) {
     printf("integer=%d float=%f\n", 42, 1.5);

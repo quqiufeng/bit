@@ -1,4 +1,4 @@
-int puts(char *text);
+#include <stdio.h>
 
 int main(void) {
     puts("hello from hosted glibc");

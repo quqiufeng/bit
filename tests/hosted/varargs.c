@@ -1,7 +1,7 @@
 #include <stdarg.h>
-int vprintf(char *format, va_list ap);
+#include <stdio.h>
 
-int log_values(char *format, ...) {
+int log_values(const char *format, ...) {
     va_list ap;
     int result;
     va_start(ap, format);
