@@ -183,6 +183,7 @@ bit/
 │   ├── stdint.h
 │   ├── inttypes.h
 │   ├── stdbool.h
+│   ├── complex.h
 │   ├── limits.h
 │   ├── float.h
 │   ├── assert.h
@@ -240,7 +241,7 @@ bit/
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
-| M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点（含 NaN）/varargs/聚合/80-bit long double/packed/_Complex long double 基本运算已通过；`__real__/__imag__`、复合转换、纯种子链待补 |
+| M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点（含 NaN）/varargs/聚合/80-bit long double/packed/_Complex long double（含实部/虚部与 complex double 转换）已通过；`__real__/__imag__`、纯种子链待补 |
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread 回调已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |

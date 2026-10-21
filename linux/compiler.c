@@ -3852,6 +3852,51 @@ int cld_convert(int t, int from, int to) {
         expression_type = t;
         return 0;
     }
+    if (to == 15 && (from == 13 || from == 14)) {
+        int i, part = from;
+        slot = temporary(8, 8);
+        store(slot, 11);
+        result = temporary(32, 16);
+        for (i = 0; i < 2; i++) {
+            complex_part(slot, part, i);
+            expression_type = part;
+            convert(15);
+            sequence(0xc18948, 3);
+            sequence(0x958d48, 3);
+            emit32(-result + i * 16);
+            sequence(0x018b48, 3);
+            sequence(0x028948, 3);
+            sequence(0x418b48, 3);
+            emit(8);
+            sequence(0x428948, 3);
+            emit(8);
+        }
+        sequence(0x858d48, 3);
+        emit32(-result);
+        expression_type = t;
+        return 0;
+    }
+    if (from == 15 && (to == 13 || to == 14)) {
+        int i, part = to;
+        slot = temporary(8, 8);
+        store(slot, 11);
+        result = temporary(type_size(t), type_align(t));
+        for (i = 0; i < 2; i++) {
+            sequence(0x858b48, 3);
+            emit32(-slot);
+            if (i) {
+                sequence(0xc08348, 3);
+                emit(16);
+            }
+            expression_type = 15;
+            convert(part);
+            store(result - i * type_size(part), part);
+        }
+        sequence(0x858d48, 3);
+        emit32(-result);
+        expression_type = t;
+        return 0;
+    }
     if (from == 15 && to == 15) {
         expression_type = t;
         return 0;

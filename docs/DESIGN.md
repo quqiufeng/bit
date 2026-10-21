@@ -964,7 +964,7 @@ bit/
 - 状态：接受（基本实现）
 - 决策：`_Complex long double` 使用 32 字节记录/双 long double 布局，按 MEMORY ABI 传递/返回；`+ - * /`、比较、真值、取负、同类型赋值和实部/虚部指针访问走 x87。
 - 理由：先覆盖常见复数运算并保持与 SysV 内存布局一致，避免把 long double 复数降级为 double。
-- 后果：`__real__/__imag__`、complex double↔complex long double 转换、复杂常量构造尚未实现；`tests/reject/` 对其明确报错。
+- 后果：`__real__/__imag__` 尚未实现；complex double↔complex long double 转换和复杂常量构造已通过测试。
 
 ### ADR-018：先做静态 ELF 链接器原型
 
