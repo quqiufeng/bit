@@ -786,9 +786,9 @@ bit/
 当前状态：
 
 - `linux/link-hosted.sh` 已使用系统 `crt1.o`/`crti.o`/`crtn.o` + glibc + 动态链接器完成非 PIE 链接；`--pie` 使用 `Scrt1.o` 生成 PIE。
-- `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）。
+- `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）、`vprintf` 和 `dlopen`/`dlsym` 调用 `libm`。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：显式 `.so` 加载/回调、完整 hosted 头、`errno`/TLS 边界、`long double`、packed 聚合。
+- 尚未完成：完整 hosted 头、`errno`/TLS 边界、`long double`、packed 聚合。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
 - 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 
@@ -942,7 +942,7 @@ bit/
 - 状态：接受
 - 决策：hosted 用户程序由 `link-hosted.sh` 调用系统 `crt1.o`/`crti.o`/`crtn.o`、glibc 和动态链接器；项目不把自己的 freestanding 运行时链进 hosted 程序。`--pie` 使用 `Scrt1.o` 并生成 PIE。
 - 理由：验证 SysV ABI 与真实 glibc 的互操作，避免同时实现完整 hosted CRT；与设计中的 M2 顺序一致。
-- 后果：`crt*.o`、glibc 和动态链接器路径是外部依赖；显式 `.so` 加载、hosted 头子集和完整 PIC/GOT 仍待补。编译器自举产物仍走非 PIE 链接。
+- 后果：`crt*.o`、glibc 和动态链接器路径是外部依赖；hosted 头子集和完整 PIC/GOT 仍待补。编译器自举产物仍走非 PIE 链接。
 
 ### ADR-012：Linux 自举统一使用 SysV 标量 ABI
 
