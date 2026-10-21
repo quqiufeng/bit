@@ -11,4 +11,8 @@ unsigned long strtoul(const char *text, char **end, int base);
 long long strtoll(const char *text, char **end, int base);
 unsigned long long strtoull(const char *text, char **end, int base);
 double strtod(const char *text, char **end);
+void qsort(void *base, unsigned long count, unsigned long size,
+           int (*compare)(const void *, const void *));
+void *bsearch(const void *key, const void *base, unsigned long count, unsigned long size,
+              int (*compare)(const void *, const void *));
 #endif
