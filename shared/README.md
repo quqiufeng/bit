@@ -15,6 +15,8 @@ extraction can be checked instead of silently drifting.
 - Linux and Windows fork ABI, runtime, object writer, linker and startup code.
 - Upstream-derived files keep their provenance and the MIT notice in `NOTICE`.
 - The Linux compiler must not regain the retired PE/Win64 import path.
+- `float_parse.c` is the first extracted shared module: floating-token decoding,
+  rounding and x86-64 bit conversion.
 
 Run the manifest check with:
 

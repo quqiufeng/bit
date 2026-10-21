@@ -805,7 +805,7 @@ bit/
 
 ### M3：共享层抽取与 Windows 冻结
 
-当前状态：已加入 `shared/README.md`、`shared/sources.json` 和 `tools/check_sources.py`，用于记录边界、上游来源和阻止 PE/Win64 路径回流；前端物理抽取和 Windows 参考树导入尚未完成。
+当前状态：已加入 `shared/README.md`、`shared/sources.json` 和 `tools/check_sources.py`；浮点常量解析/舍入模块已抽取到 `shared/float_parse.c`。Windows 参考树导入和其余前端抽取尚未完成。
 
 交付：
 

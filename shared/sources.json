@@ -15,6 +15,11 @@
       "path": "linux/elf-output.c",
       "origin": "new",
       "note": "ELF64 relocatable writer replacing the C1O1/PE writer."
+    },
+    {
+      "path": "shared/float_parse.c",
+      "origin": "src/bootstrap-c99/host/compiler.c (floating constant parser/encoder)",
+      "note": "First extracted target-independent module; uses x86-64 bit algorithms only."
     }
   ]
 }
