@@ -3393,6 +3393,12 @@ int sysv_call_stack_count(int *types, int n) {
     int i, t, gpr = 0, sse = 0, stack = 0;
     for (i = 0; i < n; i++) {
         t = types[i];
+        if (t == -2) {
+            if (stack & 1)
+                stack++;
+            stack++;
+            continue;
+        }
         if (t < 0) {
             stack++;
             continue;
@@ -3420,6 +3426,13 @@ int sysv_load_call_arguments(int *types, int n) {
     for (i = 0; i < n; i++) {
         t = types[i];
         disp = (n - 1 - i) * 8;
+        if (t == -2) {
+            if (stack & 1)
+                stack++;
+            sysv_copy_stack_arg(stack * 8, disp);
+            stack++;
+            continue;
+        }
         if (t < 0) {
             sysv_copy_stack_arg(stack * 8, disp);
             stack++;
@@ -4937,8 +4950,11 @@ int unary(void) {
                 return error();
             if (op == '-')
                 long_double_negate();
-            if (op == '!')
+            if (op == '!') {
                 long_double_truth();
+                sequence(0xf083, 2);
+                emit(1);
+            }
             ice_set(0, 0);
         } else if (floating_type(expression_type)) {
             if (op == '~')
@@ -5220,7 +5236,7 @@ int arguments(int id, int signature) {
                 emit32(-copy + k * 8);
                 sequence(0x008b48, 3);
                 emit(0x50);
-                abi_types[abi_count++] = -1;
+                abi_types[abi_count++] = k == 0 ? -2 : -1;
             }
         } else if (is_record(t)) {
             size = type_size(t);
@@ -7286,6 +7302,11 @@ int long_double_truth(void) {
     emit(0x0f);
     emit(0x95);
     emit(0xc0);
+    emit(0x0f);
+    emit(0x9a);
+    emit(0xc2);
+    emit(0x0a);
+    emit(0xc2);
     expression_type = 1;
     expression_zero = 0;
     expression_ice = 0;
@@ -7296,14 +7317,29 @@ int long_double_truth(void) {
 }
 
 int long_double_binary(int op, int left_type, int right_type) {
-    int result, cc;
-    if (unqualified(left_type) != 15 || unqualified(right_type) != 15)
-        return error_message("mixed long double arithmetic is not implemented");
+    int result, cc, left_ptr, right_ptr, unordered, done;
     result = temporary(16, 16);
+    left_ptr = temporary(8, 8);
+    right_ptr = temporary(8, 8);
     if (failed)
         return 0;
-    emit(0x59);
-    sequence(0xc28948, 3);
+    if (unqualified(right_type) != 15) {
+        expression_type = right_type;
+        long_double_convert(15);
+    }
+    sequence(0x858948, 3);
+    emit32(-right_ptr);
+    emit(0x58);
+    if (unqualified(left_type) != 15) {
+        expression_type = left_type;
+        long_double_convert(15);
+    }
+    sequence(0x858948, 3);
+    emit32(-left_ptr);
+    sequence(0x8d8b48, 3);
+    emit32(-left_ptr);
+    sequence(0x958b48, 3);
+    emit32(-right_ptr);
     emit(0xdb);
     emit(0x29);
     emit(0xdb);
@@ -7339,9 +7375,15 @@ int long_double_binary(int op, int left_type, int right_type) {
             return error_message("operator requires long double arithmetic operands");
         sequence(0xe9df, 2);
         sequence(0xd8dd, 2);
+        unordered = jump(0x8a);
         emit(0x0f);
         emit(cc);
         emit(0xc0);
+        done = jump(0);
+        patch(unordered, position);
+        emit(0xb0);
+        emit(op == 129 ? 1 : 0);
+        patch(done, position);
         sequence(0xc0b60f, 3);
         expression_type = 1;
     }
@@ -9443,6 +9485,8 @@ function_body:
                 }
             }
         } else if (pt == 15) {
+            if (stack_index & 1)
+                stack_index++;
             sequence(0x858d48, 3);
             emit32(16 + stack_index * 8);
             store_record(parameter_offset[i], pt);
