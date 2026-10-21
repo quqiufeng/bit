@@ -1,6 +1,9 @@
 #ifndef __C1_TIME_H
 #define __C1_TIME_H
+#ifndef __C1_TIME_T_DEFINED
+#define __C1_TIME_T_DEFINED
 typedef long time_t;
+#endif
 typedef long clock_t;
 struct tm {
     int tm_sec;
