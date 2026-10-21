@@ -77,4 +77,4 @@ fi
 exec "$LD" $PIE_FLAG -o "$OUTPUT" -dynamic-linker "$DYNAMIC_LINKER" -z noexecstack \
     "$CRT1" "$CRTI" "$CRTBEGIN" "$@" \
     -L"$LIBDIR" -L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu \
-    -lc "$CRTEND" "$CRTN"
+    -lm -lc "$CRTEND" "$CRTN"
