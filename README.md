@@ -1,7 +1,7 @@
 # BitKindle Native
 
 > 以自举为目标的 C 工具链，Linux 与 Windows 各自原生发展。  
-> 状态：设计阶段（v0.1）· 暂定名 · 尚未开始实现
+> 状态：M1 自举管道已打通（Linux，`stage1` = `stage2`）· SysV 用户 ABI 迁移进行中 · 暂定名
 
 本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把“从零构建自己的 C 工具链”这一目标带到 Linux，同时保留 Windows 的原生实现。两个平台共享语言前端、纯算法和语言测试；不共享 ABI、运行时、目标文件格式和链接器。
 
@@ -160,69 +160,58 @@ flowchart LR
 - 本项目把上游的 Windows 实现作为**参考实现**和可移植算法/测试的来源；Linux 侧是新的原生实现。
 - 本项目不是上游的官方分支，与上游作者无隶属关系。上游代码与文档按 MIT License 使用，保留版权与许可声明。
 
-## 目录结构（规划）
+## 目录结构（当前）
 
 ```text
 bit/
-├── README.md                  # 本文件
+├── build.sh                   # Linux 自举构建入口
+├── README.md
 ├── docs/
 │   └── DESIGN.md              # 技术设计
-├── shared/
-│   ├── frontend/              # 预处理、词法、语法、语义、诊断
-│   ├── lib/                   # 纯算法
-│   ├── include/               # 共享的抽象类型/接口
-│   └── tests/                 # 语言一致性测试
 ├── linux/
-│   ├── bootstrap/             # 未来的 ELF seed / A0 / A1 / C0
-│   ├── target/                # LP64、SysV ABI 描述
-│   ├── codegen/               # Linux 代码生成
-│   ├── object/                # ELF64 目标文件
-│   ├── runtime/               # freestanding 运行时；hosted 头/胶水
-│   ├── startup/               # _start / crt 胶水
-│   ├── driver/                # 原生构建驱动
-│   └── tests/                 # 平台测试与期望
-├── windows/
-│   ├── bootstrap/             # 上游 seed / A0 / A1 / C0
-│   ├── target/                # LLP64、Microsoft x64 ABI 描述
-│   ├── codegen/               # Windows 代码生成
-│   ├── object/                # .c1o 目标文件
-│   ├── linker/                # 自制 PE 链接器
-│   ├── runtime/               # 自带 CRT + kernel32 导入
-│   ├── driver/                # PowerShell 驱动
-│   └── tests/                 # 平台测试与期望
-├── tools/                     # 同步检查、测试运行器、辅助脚本
-└── tests/                     # 跨平台共享语料与编排
+│   ├── compiler.c             # 移植后的 C1 编译器主体
+│   ├── elf-output.c           # ELF64 可重定位对象写出
+│   ├── runtime.c              # freestanding 运行时 / 12 个平台符号
+│   ├── linuximports.h         # 编译器使用的运行时声明
+│   ├── startup-sysv.S         # gcc stage0 入口
+│   ├── startup-win64.S        # C1 stage1/stage2 入口
+│   ├── syscalls-sysv.S        # SysV syscall stub
+│   └── syscalls-win64.S       # Win64 syscall stub
+├── examples/
+│   └── hello.c
+├── LICENSE
+└── NOTICE
 ```
 
-目录是设计基线，实施时可以调整；调整必须同步更新本文件与 `docs/DESIGN.md`。
+共享前端、hosted 运行时、Windows 目录等仍按设计逐步加入。
 
 ## 路线图
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 进行中 |
-| M1 | Linux freestanding：gcc stage0、SysV、ELF `.o`、系统 `ld`、hello、自举 | 计划 |
+| M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
+| M1 | Linux freestanding：gcc stage0、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2` 已通过；SysV 用户 ABI 待完成 |
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 计划 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 计划 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
 | M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 后续 |
 
-## 快速开始（规划）
+## 快速开始
 
-以下命令尚未实现，仅用于说明未来的使用方式：
+当前 Linux 自举链：
 
 ```bash
-# Linux：从 stage0 构建并自举
-./linux/build.sh bootstrap
-./linux/build.sh self-host
-./linux/build.sh test
-
-# Linux：编译一个用户程序（hosted，链接 glibc）
-./linux/build.sh compile examples/hello.c -o hello
-
-# Windows：沿用上游构建方式
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\build-all.ps1
+./build.sh
 ```
+
+脚本会构建 gcc stage0，产出 `build/c1-stage0`、`build/c1-stage1`、`build/c1-stage2`，并检查：
+
+- `compiler1.o` 与 `compiler2.o` 逐字节一致；
+- `runtime1.o` 与 `runtime2.o` 逐字节一致；
+- `c1-stage1` 与 `c1-stage2` 逐字节一致；
+- `examples/hello.c` 可编译、链接并运行。
+
+Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 
 ## 文档
 

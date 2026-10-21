@@ -1,7 +1,7 @@
 # BitKindle Native 技术设计
 
 - 版本：0.1（设计基线）
-- 状态：设计阶段，尚未开始实现
+- 状态：M1 自举管道已打通；SysV 用户 ABI 迁移进行中
 - 日期：2026-10-21
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
@@ -746,19 +746,27 @@ bit/
 
 交付：
 
-- SysV 目标模型与代码生成。
 - ELF64 `.o` 写出。
 - 系统 `ld` 链接（`-nostdlib`）。
 - 自带 `_start`、syscall stub、最小运行时。
 - gcc stage0 → stage1 → stage2。
 - hello 与语言测试子集。
+- SysV 目标模型与代码生成（待完成）。
+
+当前状态：
+
+- `./build.sh` 已打通 `c1-stage0` → `c1-stage1` → `c1-stage2`。
+- `compiler*.o`、`runtime*.o`、`c1-stage*` 均逐字节一致。
+- 编译器不链接 glibc，只使用 Linux syscall。
+- 为尽快打通自举，M1 暂时复用上游的 Microsoft x64 代码生成和调用约定；ELF 只替换对象容器、运行时与启动/链接层。详见 ADR-011。
+- 因此当前产物尚不能直接按 SysV ABI 链接 glibc；SysV 后端是 M1 剩余工作。
 
 验收：
 
-- stage1/stage2 逐字节一致。
-- 构建 stage1/stage2 不需要 gcc。
-- 测试通过；无崩溃/挂起。
-- 编译器不链接 glibc。
+- stage1/stage2 逐字节一致。已通过。
+- 构建 stage1/stage2 不需要 gcc。已通过。
+- 编译器不链接 glibc。已通过。
+- SysV ABI 与 hosted/用户程序测试。待完成。
 
 ### M2：Linux hosted 与互操作
 
@@ -908,6 +916,13 @@ bit/
 - 决策：不实现 C++ ABI/STL/异常；不作为游戏引擎编译器。
 - 理由：范围；C++ ABI 复杂；当前目标是 C 自举。
 - 后果：C++ 游戏/引擎不能编译；现成 C++ 二进制仍由平台运行。
+
+### ADR-011：M1 先用上游 Win64 代码生成打通 ELF 自举
+
+- 状态：接受（临时）
+- 决策：M1 复用上游 `compiler.c` 的机器码生成与 Microsoft x64 调用约定；只替换对象写出（C1O1 → ELF64）、运行时符号、启动与 syscall stub。gcc stage0 按 SysV 编译，stage1/stage2 内部使用 Win64 ABI。
+- 理由：上游编译器只依赖 12 个运行时符号，且代码生成、寄存器分配和栈布局已经稳定。先打通自举可把 SysV ABI、结构体分类、varargs 等高风险工作隔离到后续增量，而不是同时改代码生成和对象/链接层。
+- 后果：当前 `c1-stage*` 产出的 ELF 可执行文件使用 Win64 内部 ABI，不能直接链接 glibc，也不满足最终 SysV 用户 ABI 契约。M1 完成前必须实现 SysV 后端，或明确把当前阶段限定为“编译器自举专用 ABI”。此偏离已记录，不能悄悄变成默认设计。
 
 ---
 
