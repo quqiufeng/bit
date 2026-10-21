@@ -1213,8 +1213,6 @@ int type_start(int t) {
    Record kinds 13..15 retain distinct real component types, not user tags. */
 int complex_type(int base) {
     int i;
-    if (base == 15)
-        return error_message("complex long double is not implemented");
     for (i = 0; i < record_count; i++)
         if (record_kind[i] == base)
             return 0x20000e + i * 256;
@@ -1222,8 +1220,8 @@ int complex_type(int base) {
         return error();
     i = record_count++;
     record_kind[i] = base;
-    record_size[i] = base == 13 ? 8 : 16;
-    record_align[i] = base == 13 ? 4 : 8;
+    record_size[i] = base == 13 ? 8 : base == 14 ? 16 : 32;
+    record_align[i] = base == 13 ? 4 : base == 14 ? 8 : 16;
     record_first[i] = 0;
     record_last[i] = 0;
     record_open[i] = 0;
@@ -2211,6 +2209,8 @@ int complex_truth(void) {
     record_read();
     slot = temporary(8, 8);
     store(slot, 11);
+    if (component == 15)
+        return cld_truth(slot);
     complex_part(slot, component, 0);
     floating_absolute_bits(component);
     emit(0x50);
@@ -2226,6 +2226,8 @@ int complex_truth(void) {
 
 int complex_convert(int t) {
     int from = complex_component(expression_type), to = complex_component(t), slot = 0, result;
+    if (from == 15 || to == 15)
+        return cld_convert(t, from, to);
     if (!t) {
         expression_type = 0;
         expression_zero = 0;
@@ -2267,14 +2269,14 @@ int complex_convert(int t) {
 
 int convert(int t) {
     int a, b;
-    if (unqualified(t) == 15 || unqualified(expression_type) == 15)
-        return long_double_convert(t);
     record_read();
     t = bit_value_type(t);
     expression_type = bit_value_type(expression_type);
     expression_bit = 0;
     if (complex_component(t) || complex_component(expression_type))
         return complex_convert(t);
+    if (unqualified(t) == 15 || unqualified(expression_type) == 15)
+        return long_double_convert(t);
     if (is_function(t) || is_function(expression_type))
         return error();
     if ((void_pointer(t) && function_pointer(expression_type)) ||
@@ -3168,6 +3170,8 @@ int complex_unary(int op) {
     source = temporary(8, 8);
     store(source, 11);
     result = temporary(type_size(t), type_align(t));
+    if (part == 15)
+        return cld_unary(source, result, t);
     for (i = 0; i < 2; i++) {
         complex_part(source, part, i);
         if (op == '-')
@@ -3632,6 +3636,237 @@ int complex_divide(int left, int right, int part, int result) {
     return 0;
 }
 
+int cld_binary(int op, int left, int right, int result, int t) {
+    int i, eq, den;
+    sequence(0xbd8b48, 3);
+    emit32(-left);
+    sequence(0xb58b48, 3);
+    emit32(-right);
+    if (op == '+' || op == '-') {
+        for (i = 0; i < 2; i++) {
+            emit(0xdb);
+            emit(i ? 0x6f : 0x2f);
+            if (i)
+                emit(16);
+            emit(0xdb);
+            emit(i ? 0x6e : 0x2e);
+            if (i)
+                emit(16);
+            if (op == '+')
+                sequence(0xc1de, 2);
+            else
+                sequence(0xe9de, 2);
+            sequence(0x858d48, 3);
+            emit32(-result + i * 16);
+            emit(0xdb);
+            emit(0x38);
+        }
+    } else if (op == '*') {
+        emit(0xdb); emit(0x2f);
+        emit(0xdb); emit(0x2e);
+        sequence(0xc9de, 2);
+        emit(0xdb); emit(0x6f); emit(16);
+        emit(0xdb); emit(0x6e); emit(16);
+        sequence(0xc9de, 2);
+        sequence(0xe9de, 2);
+        sequence(0x858d48, 3);
+        emit32(-result);
+        emit(0xdb); emit(0x38);
+        emit(0xdb); emit(0x2f);
+        emit(0xdb); emit(0x6e); emit(16);
+        sequence(0xc9de, 2);
+        emit(0xdb); emit(0x6f); emit(16);
+        emit(0xdb); emit(0x2e);
+        sequence(0xc9de, 2);
+        sequence(0xc1de, 2);
+        sequence(0x858d48, 3);
+        emit32(-result + 16);
+        emit(0xdb); emit(0x38);
+    } else if (op == '/') {
+        den = temporary(16, 16);
+        emit(0xdb); emit(0x2e);
+        emit(0xdb); emit(0x2e);
+        sequence(0xc9de, 2);
+        emit(0xdb); emit(0x6e); emit(16);
+        emit(0xdb); emit(0x6e); emit(16);
+        sequence(0xc9de, 2);
+        sequence(0xc1de, 2);
+        emit(0xdb); emit(0xbd); emit32(-den);
+        emit(0xdb); emit(0x2f);
+        emit(0xdb); emit(0x2e);
+        sequence(0xc9de, 2);
+        emit(0xdb); emit(0x6f); emit(16);
+        emit(0xdb); emit(0x6e); emit(16);
+        sequence(0xc9de, 2);
+        sequence(0xc1de, 2);
+        emit(0xdb); emit(0xad); emit32(-den);
+        sequence(0xf9de, 2);
+        sequence(0x858d48, 3);
+        emit32(-result);
+        emit(0xdb); emit(0x38);
+        emit(0xdb); emit(0x6f); emit(16);
+        emit(0xdb); emit(0x2e);
+        sequence(0xc9de, 2);
+        emit(0xdb); emit(0x2f);
+        emit(0xdb); emit(0x6e); emit(16);
+        sequence(0xc9de, 2);
+        sequence(0xe9de, 2);
+        emit(0xdb); emit(0xad); emit32(-den);
+        sequence(0xf9de, 2);
+        sequence(0x858d48, 3);
+        emit32(-result + 16);
+        emit(0xdb); emit(0x38);
+    } else if (op == 128 || op == 129) {
+        eq = temporary(8, 8);
+        for (i = 0; i < 2; i++) {
+            emit(0xdb);
+            emit(i ? 0x6f : 0x2f);
+            if (i)
+                emit(16);
+            emit(0xdb);
+            emit(i ? 0x6e : 0x2e);
+            if (i)
+                emit(16);
+            sequence(0xe9df, 2);
+            sequence(0xd8dd, 2);
+            emit(0x0f); emit(0x94); emit(0xc0);
+            emit(0x0f); emit(0x9b); emit(0xc2);
+            sequence(0xc222, 2);
+            sequence(0xc0b60f, 3);
+            if (i) {
+                sequence(0x8523, 2);
+                emit32(-eq);
+            } else {
+                sequence(0x8589, 2);
+                emit32(-eq);
+            }
+        }
+        if (op == 129) {
+            sequence(0xf083, 2);
+            emit(1);
+        }
+        expression_type = 1;
+        expression_zero = 0;
+        expression_ice = 0;
+        expression_register = 0;
+        expression_array_bytes = 0;
+        expression_array_type = 0;
+        return 0;
+    } else
+        return error_message("unsupported complex long double operator");
+    sequence(0x858d48, 3);
+    emit32(-result);
+    expression_type = t;
+    expression_zero = 0;
+    expression_ice = 0;
+    expression_register = 0;
+    expression_array_bytes = 0;
+    expression_array_type = 0;
+    return 0;
+}
+
+int cld_unary(int source, int result, int t) {
+    int i;
+    sequence(0x8d8b48, 3);
+    emit32(-source);
+    for (i = 0; i < 2; i++) {
+        emit(0xdb);
+        emit(i ? 0x69 : 0x29);
+        if (i)
+            emit(16);
+        sequence(0xe0d9, 2);
+        sequence(0x858d48, 3);
+        emit32(-result + i * 16);
+        emit(0xdb); emit(0x38);
+    }
+    sequence(0x858d48, 3);
+    emit32(-result);
+    expression_type = t;
+    expression_zero = 0;
+    expression_ice = 0;
+    expression_register = 0;
+    expression_array_bytes = 0;
+    expression_array_type = 0;
+    return 0;
+}
+
+int cld_truth(int slot) {
+    int i, eq;
+    eq = temporary(8, 8);
+    sequence(0x8d8b48, 3);
+    emit32(-slot);
+    for (i = 0; i < 2; i++) {
+        emit(0xdb);
+        emit(i ? 0x69 : 0x29);
+        if (i)
+            emit(16);
+        sequence(0xeed9, 2);
+        sequence(0xe9df, 2);
+        sequence(0xd8dd, 2);
+        emit(0x0f); emit(0x95); emit(0xc0);
+        emit(0x0f); emit(0x9a); emit(0xc2);
+        sequence(0xc20a, 2);
+        sequence(0xc0b60f, 3);
+        if (i) {
+            sequence(0x850b, 2);
+            emit32(-eq);
+        } else {
+            sequence(0x8589, 2);
+            emit32(-eq);
+        }
+    }
+    expression_type = 11;
+    expression_zero = 0;
+    expression_ice = 0;
+    expression_register = 0;
+    expression_array_bytes = 0;
+    expression_array_type = 0;
+    return 0;
+}
+
+int cld_convert(int t, int from, int to) {
+    int slot, result, real;
+    if (to == 15 && !is_record(expression_type)) {
+        real = unqualified(expression_type);
+        if (!real || is_pointer(real) || is_record(real) || is_array(real) || is_function(real))
+            return error_message("invalid complex long double conversion");
+        convert(15);
+        result = temporary(32, 16);
+        sequence(0xc18948, 3);
+        sequence(0x958d48, 3);
+        emit32(-result);
+        sequence(0x018b48, 3);
+        sequence(0x028948, 3);
+        sequence(0x418b48, 3);
+        emit(8);
+        sequence(0x428948, 3);
+        emit(8);
+        sequence(0x42c748, 3);
+        emit(16);
+        emit32(0);
+        sequence(0x42c748, 3);
+        emit(24);
+        emit32(0);
+        sequence(0x858d48, 3);
+        emit32(-result);
+        expression_type = t;
+        return 0;
+    }
+    if (from == 15 && to == 15) {
+        expression_type = t;
+        return 0;
+    }
+    if (from == 15) {
+        slot = temporary(8, 8);
+        store(slot, 11);
+        sequence(0x858b48, 3);
+        emit32(-slot);
+        expression_type = 15;
+        return convert(t);
+    }
+    return error_message("invalid complex long double conversion");
+}
+
 int complex_binary(int op, int a, int b) {
     int t, part, left, right, result, i, finite = 0, equality = op == 128 || op == 129;
     if (op != '+' && op != '-' && op != '*' && op != '/' && !equality)
@@ -3650,6 +3885,8 @@ int complex_binary(int op, int a, int b) {
     convert(t);
     store(left, 11);
     result = temporary(type_size(t), type_align(t));
+    if (part == 15)
+        return cld_binary(op, left, right, result, t);
     if (op == '/' && complex_component(b)) {
         complex_divide(left, right, part, result);
         sequence(0x858d48, 3);
