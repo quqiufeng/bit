@@ -4988,7 +4988,7 @@ int primary(void) {
 
 int arguments(int id, int signature) {
     int n = 0, i, stack_args, stack_bytes, frame_size, sse_count, result, output = 0, hidden = 0,
-        t, copy, target = 0, expected = -1, size, chunks, k, abi_count = 0;
+        t, copy, target = 0, expected = -1, size, chunks, k, abi_count = 0, gpr_i, sse_i, class;
     int abi_types[256];
     if (id >= 0) {
         if (!function_exists(id))
@@ -5010,10 +5010,9 @@ int arguments(int id, int signature) {
             emit32(-output);
             emit(0x50);
             abi_types[abi_count++] = 11;
-        } else if (record_indirect(result) && record_has_float(result))
-            return error_message("SysV 9-16 byte aggregate returns with floating members are not implemented");
-        else if (!record_indirect(result) && record_has_float(result))
-            return error_message("small aggregate returns with floating members are not implemented");
+        }
+        if (record_has_long_double(result))
+            return error_message("aggregate returns containing long double are not implemented");
     }
     expect('(');
     while (!failed && token != ')') {
@@ -5046,9 +5045,8 @@ int arguments(int id, int signature) {
                     abi_types[abi_count++] = -1;
                 }
             } else if (record_indirect(t)) {
-                if (record_has_float(t))
-                    return error_message(
-                        "SysV 9-16 byte aggregate parameters with floating members are not implemented");
+                if (record_has_long_double(t))
+                    return error_message("aggregate parameters containing long double are not implemented");
                 copy = temporary(size + 8, 16);
                 store_record(copy, t);
                 for (k = 0; k < 2; k++) {
@@ -5058,14 +5056,24 @@ int arguments(int id, int signature) {
                     emit32(-copy + k * 8);
                     sequence(0x008b48, 3);
                     emit(0x50);
-                    abi_types[abi_count++] = 11;
+                    abi_types[abi_count++] = record_chunk_class(t, k) == 2 ? 14 : 11;
                 }
             } else {
-                if (record_has_float(t))
-                    return error_message("small aggregate parameters with floating members are not implemented");
-                load_opcode(record_word(t), 0);
-                emit(0x50);
-                abi_types[abi_count++] = t;
+                if (record_has_long_double(t))
+                    return error_message("aggregate parameters containing long double are not implemented");
+                if (record_chunk_class(t, 0) == 2) {
+                    copy = temporary(size + 8, 16);
+                    store_record(copy, t);
+                    sequence(0x858d48, 3);
+                    emit32(-copy);
+                    sequence(0x008b48, 3);
+                    emit(0x50);
+                    abi_types[abi_count++] = 14;
+                } else {
+                    load_opcode(record_word(t), 0);
+                    emit(0x50);
+                    abi_types[abi_count++] = t;
+                }
             }
         } else {
             emit(0x50);
@@ -5115,10 +5123,26 @@ int arguments(int id, int signature) {
             sequence(0x858d48, 3);
             emit32(-output);
         } else if (record_indirect(result)) {
-            sequence(0x858948, 3);
+            gpr_i = 0;
+            sse_i = 0;
+            for (k = 0; k < 2; k++) {
+                class = record_chunk_class(result, k);
+                if (class == 2) {
+                    sysv_store_xmm(sse_i, 14, -output + k * 8);
+                    sse_i++;
+                } else {
+                    if (gpr_i == 0)
+                        sequence(0x858948, 3);
+                    else
+                        sequence(0x958948, 3);
+                    emit32(-output + k * 8);
+                    gpr_i++;
+                }
+            }
+            sequence(0x858d48, 3);
             emit32(-output);
-            sequence(0x958948, 3);
-            emit32(-output + 8);
+        } else if (record_chunk_class(result, 0) == 2) {
+            sysv_store_xmm(0, 14, -output);
             sequence(0x858d48, 3);
             emit32(-output);
         } else {
@@ -5414,7 +5438,7 @@ int release_runtime_arrays(int saved) {
 
 int statement_body(void) {
     int target, end, start, old_break, old_continue, saved_break_locals, saved_continue_locals;
-    int saved_tags;
+    int saved_tags, gpr_i, sse_i, class, k;
     int condition, increment, body, saved_locals, for_scope = 0, seen_statement = 0;
     if (token == 286)
         return switch_statement();
@@ -5498,9 +5522,31 @@ int statement_body(void) {
                 emit32(-return_address_offset);
             } else if (record_indirect(return_type)) {
                 sequence(0xc18948, 3);
-                sequence(0x018b48, 3);
-                sequence(0x518b48, 3);
-                emit(8);
+                gpr_i = 0;
+                sse_i = 0;
+                for (k = 0; k < 2; k++) {
+                    class = record_chunk_class(return_type, k);
+                    if (class == 2) {
+                        emit(0xf2);
+                        emit(0x0f);
+                        emit(0x10);
+                        emit(0x41 + sse_i * 8);
+                        emit(k * 8);
+                        sse_i++;
+                    } else {
+                        if (gpr_i == 0)
+                            sequence(0x418b48, 3);
+                        else
+                            sequence(0x518b48, 3);
+                        emit(k * 8);
+                        gpr_i++;
+                    }
+                }
+            } else if (record_chunk_class(return_type, 0) == 2) {
+                emit(0xf2);
+                emit(0x0f);
+                emit(0x10);
+                emit(0x00);
             } else
                 load_opcode(record_word(return_type), 0);
         }
@@ -6861,6 +6907,61 @@ int record_has_float(int t) {
             return 1;
     }
     return 0;
+}
+
+int record_has_long_double(int t) {
+    int node, member, element;
+    t = unqualified(t);
+    if (floating_type(t))
+        return t == 15;
+    if (is_array(t)) {
+        element = array_base[(t - 4096) / 256];
+        return record_has_long_double(element);
+    }
+    if (!is_record(t))
+        return 0;
+    for (node = record_first[(t - 0x20000e) / 256]; node; node = member_next[node]) {
+        member = member_type[node];
+        if (record_has_long_double(member))
+            return 1;
+    }
+    return 0;
+}
+
+int record_class_mask(int t, int base, int chunk) {
+    int size, node, member, element, width, i, mask = 0;
+    t = unqualified(t);
+    size = type_size(t);
+    if (size <= 0)
+        return 0;
+    if (base >= chunk * 8 + 8 || base + size <= chunk * 8)
+        return 0;
+    if (is_array(t)) {
+        element = array_base[(t - 4096) / 256];
+        width = type_size(element);
+        if (width <= 0)
+            return 0;
+        for (i = 0; i < size / width; i++)
+            mask = mask | record_class_mask(element, base + i * width, chunk);
+        return mask;
+    }
+    if (is_record(t)) {
+        for (node = record_first[(t - 0x20000e) / 256]; node; node = member_next[node])
+            mask = mask | record_class_mask(member_type[node], base + member_offset[node], chunk);
+        return mask;
+    }
+    if (floating_type(t))
+        return 2;
+    return 1;
+}
+
+int record_chunk_class(int t, int chunk) {
+    int mask = record_class_mask(t, 0, chunk);
+    if (mask & 1)
+        return 1;
+    if (mask & 2)
+        return 2;
+    return 1;
 }
 
 int record_word(int t) {
@@ -8686,8 +8787,9 @@ int predefined_function_name(int function_id) {
 }
 
 int function(void) {
-    int id, i, n, t, pt, k2, base, known, storage, unnamed = 0, hidden, gpr, sse, stack_index,
-        unspecified, old = 0, implicit = 0, declaration_base, declaration_result, variadic = 0;
+    int id, i, n, t, pt, k2, class, base, known, storage, unnamed = 0, hidden, gpr, sse,
+        stack_index, unspecified, old = 0, implicit = 0, declaration_base, declaration_result,
+        variadic = 0;
     for (i = 0; i < 128; i++)
         parameter_replay_valid[i] = 0;
     vm_current = 0;
@@ -8925,10 +9027,8 @@ function_body:
     for (i = 0; i < n; i++)
         parameter_offset[i] = local_offset[parameter_name[i]];
     hidden = record_memory(t);
-    if (is_record(t) && record_indirect(t) && !hidden && record_has_float(t))
-        return error_message("SysV 9-16 byte aggregate returns with floating members are not implemented");
-    if (is_record(t) && !record_indirect(t) && record_has_float(t))
-        return error_message("small aggregate returns with floating members are not implemented");
+    if (is_record(t) && !hidden && record_has_long_double(t))
+        return error_message("aggregate returns containing long double are not implemented");
     if (hidden)
         return_address_offset = temporary(8, 8);
     if (variadic)
@@ -8960,11 +9060,20 @@ function_body:
             store_record(parameter_offset[i], pt);
             stack_index = stack_index + (type_size(pt) + 7) / 8;
         } else if (is_record(pt) && record_indirect(pt)) {
-            if (record_has_float(pt))
-                return error_message(
-                    "SysV 9-16 byte aggregate parameters with floating members are not implemented");
+            if (record_has_long_double(pt))
+                return error_message("aggregate parameters containing long double are not implemented");
             for (k2 = 0; k2 < 2; k2++) {
-                if (gpr < 6) {
+                class = record_chunk_class(pt, k2);
+                if (class == 2) {
+                    if (sse < 8) {
+                        sysv_store_xmm(sse, 14, -parameter_offset[i] + k2 * 8);
+                        sse++;
+                    } else {
+                        sysv_load_xmm_rbp(0, 14, 16 + stack_index * 8);
+                        sysv_store_xmm(0, 14, -parameter_offset[i] + k2 * 8);
+                        stack_index++;
+                    }
+                } else if (gpr < 6) {
                     sysv_store_gpr(gpr, -parameter_offset[i] + k2 * 8);
                     gpr++;
                 } else {
@@ -8984,8 +9093,21 @@ function_body:
                 stack_index++;
             }
         } else {
-            if (is_record(pt) && record_has_float(pt))
-                return error_message("small aggregate parameters with floating members are not implemented");
+            if (is_record(pt)) {
+                if (record_has_long_double(pt))
+                    return error_message("aggregate parameters containing long double are not implemented");
+                if (record_chunk_class(pt, 0) == 2) {
+                    if (sse < 8) {
+                        sysv_store_xmm(sse, 14, -parameter_offset[i]);
+                        sse++;
+                    } else {
+                        sysv_load_xmm_rbp(0, 14, 16 + stack_index * 8);
+                        sysv_store_xmm(0, 14, -parameter_offset[i]);
+                        stack_index++;
+                    }
+                    continue;
+                }
+            }
             if (gpr < 6) {
                 sysv_store_gpr(gpr, -parameter_offset[i]);
                 gpr++;

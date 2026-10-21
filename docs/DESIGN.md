@@ -1,7 +1,7 @@
 # BitKindle Native 技术设计
 
 - 版本：0.1（设计基线）
-- 状态：M1 SysV 标量自举 + M2 hosted glibc 路径已打通；浮点聚合/long double/PIE 待补
+- 状态：M1 SysV 自举 + M2 hosted glibc 路径已打通；long double/packed/PIE 待补
 - 日期：2026-10-21
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
@@ -761,9 +761,9 @@ bit/
 - Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，浮点使用 `XMM0`–`XMM7`，各自独立计数；溢出时按顺序走栈。
 - `tests/sysv/` 覆盖整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。
 - variadic 定义与 `va_list` 已按 SysV 24 字节布局实现；`stdarg.h` 位于 `include/`，`va_arg` 支持整数/指针/`double`，`va_copy` 通过头文件辅助函数复制 24 字节状态。
-- 聚合参数/返回已支持整数成员子集：<=8 字节按单整数寄存器，9–16 字节按两个整数 eightbyte，>16 字节按 MEMORY（参数走栈、返回用隐藏指针）。
-- `tests/interop/` 已用 gcc 作为 ABI oracle 验证双向调用，覆盖 8/12/16 字节整数聚合和 >16 字节内存聚合。
-- 尚未实现：含浮点成员的 1–16 字节聚合、`long double` 80-bit、PIE/PIC。遇到这些情况当前会明确报错，而不是生成错误 ABI。
+- 聚合参数/返回已支持 1–16 字节的 INTEGER/SSE eightbyte 分类：整数走 GPR，`float`/`double` 走 XMM，混合 eightbyte 按 INTEGER；>16 字节按 MEMORY（参数走栈、返回用隐藏指针）。
+- `tests/interop/` 已用 gcc 作为 ABI oracle 验证双向调用，覆盖 8/12/16 字节整数与浮点聚合、混合 INTEGER/SSE eightbyte，以及 >16 字节内存聚合。
+- 尚未实现：含 `long double` 的非 MEMORY 聚合、未对齐/packed 聚合、PIE/PIC。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
 
@@ -788,7 +788,7 @@ bit/
 - `linux/link-hosted.sh` 已使用系统 `crt1.o`/`crti.o`/`crtn.o` + glibc + 动态链接器完成非 PIE 链接。
 - `tests/hosted/` 已覆盖 `puts`、`malloc`/`free`、`strlen`、`printf`（整数与浮点可变参数调用）。
 - 调用约定为 SysV 标量；调用方在变参调用前设置 `AL` 为使用的 XMM 寄存器数。
-- 尚未完成：PIE/PIC、`.so` 显式加载/回调、完整 hosted 头、`errno`/TLS 边界、浮点聚合、`long double`。
+- 尚未完成：PIE/PIC、`.so` 显式加载/回调、完整 hosted 头、`errno`/TLS 边界、`long double`、packed 聚合。
 - hosted 程序不链接项目自带运行时；启动和 libc 全部来自系统。
 - 已用 glibc `vprintf` 验证 SysV `va_list` 布局和跨函数传递。
 
@@ -949,14 +949,14 @@ bit/
 - 状态：接受
 - 决策：Linux 目标的编译器自身、运行时和当前 ELF 对象统一使用 SysV AMD64/LP64；整数/指针参数走 `RDI`、`RSI`、`RDX`、`RCX`、`R8`、`R9`，第 7 个起走栈；stage0 与 stage1/stage2 不再分叉 ABI。
 - 理由：stage0 gcc 与 C1 产物使用同一调用约定，避免自举链内部出现两套 ABI；同时为后续 hosted/glibc 和 `.so` 调用建立正确基线。
-- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及整数/内存类聚合。含浮点成员的 1–16 字节聚合、`long double` 80-bit 和 PIE 尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
+- 后果：当前支持整数、指针、标量 `float`/`double`、variadic 定义、SysV `va_list`，以及 1–16 字节 INTEGER/SSE 分类聚合和 >16 字节 MEMORY 聚合。`long double` 80-bit、packed/未对齐聚合和 PIE 尚未实现，编译这些构造会明确报错。后续扩展必须保持 stage1=stage2。
 
-### ADR-015：聚合 ABI 先支持整数与 MEMORY 类
+### ADR-015：聚合 ABI 按 SysV eightbyte 分类实现
 
-- 状态：接受（分阶段）
-- 决策：Linux SysV 聚合先实现整数成员子集：<=8 字节走单 GPR，9–16 字节走两个 GPR eightbyte，>16 字节走 MEMORY（参数在栈上按值传递，返回用隐藏指针）。含浮点成员的 1–16 字节聚合暂时报错。
-- 理由：先覆盖最常见的结构体传递/返回并与 gcc 对拍，避免在没有分类测试的情况下生成错误的 SSE/INTEGER 混合 ABI。
-- 后果：`tests/interop/` 已验证 8/12/16 字节整数聚合和 >16 字节内存聚合的双向互操作；浮点聚合、未对齐/packed 聚合和 `long double` 仍待补。
+- 状态：接受
+- 决策：1–16 字节聚合按 SysV eightbyte 分为 INTEGER/SSE；同一 eightbyte 混合整数与浮点时取 INTEGER。<=8 字节走 1 个寄存器，9–16 字节走 2 个；>16 字节走 MEMORY（参数在栈上按值传递，返回用隐藏指针）。
+- 理由：覆盖整数、浮点和混合聚合的常见 ABI，并用 gcc 双向对拍避免分类错误。
+- 后果：`tests/interop/` 已验证整数/浮点/混合聚合及 >16 字节内存聚合。未对齐/packed 聚合、含 `long double` 的非 MEMORY 聚合仍待补。
 
 ### ADR-014：Linux `va_list` 采用 SysV 24 字节布局
 

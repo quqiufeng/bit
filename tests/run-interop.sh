@@ -21,3 +21,18 @@ echo "PASS: interop C1 main -> gcc structs"
     "$BUILD/interop-gcc-main.o" "$BUILD/interop-c1-impl.o"
 "$BUILD/interop-gcc-main"
 echo "PASS: interop gcc main -> C1 structs"
+
+"$CC" $GCCFLAGS -c "$ROOT/tests/interop/gcc-float-helper.c" -o "$BUILD/interop-gcc-float-helper.o"
+"$BUILD/c1-stage2" < "$ROOT/tests/interop/c1-float-main.c" > "$BUILD/interop-c1-float-main.o"
+"$LD" $LDFLAGS -o "$BUILD/interop-c1-float-main" \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
+    "$BUILD/interop-c1-float-main.o" "$BUILD/interop-gcc-float-helper.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/interop-c1-float-main"
+echo "PASS: interop C1 main -> gcc float structs"
+
+"$BUILD/c1-stage2" < "$ROOT/tests/interop/c1-float-impl.c" > "$BUILD/interop-c1-float-impl.o"
+"$CC" $GCCFLAGS -c "$ROOT/tests/interop/gcc-float-main.c" -o "$BUILD/interop-gcc-float-main.o"
+"$ROOT/linux/link-hosted.sh" "$BUILD/interop-gcc-float-main" \
+    "$BUILD/interop-gcc-float-main.o" "$BUILD/interop-c1-float-impl.o"
+"$BUILD/interop-gcc-float-main"
+echo "PASS: interop gcc main -> C1 float structs"
