@@ -3506,13 +3506,17 @@ int floating_binary(int op, int left_type, int right_type) {
         emit(0x0f);
         emit(cc);
         emit(0xc0);
-        emit(0x0f);
-        emit(op == 129 ? 0x9a : 0x9b);
-        emit(0xc2);
-        if (op == 129)
-            sequence(0xd008, 2);
-        else
-            sequence(0xd020, 2);
+        if (op == 129) {
+            emit(0x0f);
+            emit(0x9a);
+            emit(0xc2);
+            sequence(0xc20a, 2);
+        } else {
+            emit(0x0f);
+            emit(0x9b);
+            emit(0xc2);
+            sequence(0xc222, 2);
+        }
         sequence(0xc0b60f, 3);
         expression_type = 1;
     }

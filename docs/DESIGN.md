@@ -763,7 +763,7 @@ bit/
 - variadic 定义与 `va_list` 已按 SysV 24 字节布局实现；`stdarg.h` 位于 `include/`，`va_arg` 支持整数/指针/`double`，`va_copy` 通过头文件辅助函数复制 24 字节状态。
 - 聚合参数/返回已支持 1–16 字节的 INTEGER/SSE eightbyte 分类：整数走 GPR，`float`/`double` 走 XMM，混合 eightbyte 按 INTEGER；>16 字节按 MEMORY（参数走栈、返回用隐藏指针）。
 - `tests/interop/` 已用 gcc 作为 ABI oracle 验证双向调用，覆盖 8/12/16 字节整数与浮点聚合、混合 INTEGER/SSE eightbyte，以及 >16 字节内存聚合。
-- `long double` 已按 x87 80-bit 实现：16 字节存储、64 位有效数字字面量、混合标量运算、16 字节栈对齐、参数走栈、返回值在 ST0、含单个 long double 的聚合按 X87 返回。
+- 浮点比较已处理 NaN/无序标志（float/double SSE 与 long double x87）；`long double` 已按 x87 80-bit 实现：16 字节存储、64 位有效数字字面量、混合标量运算、16 字节栈对齐、参数走栈、返回值在 ST0、含单个 long double 的聚合按 X87 返回。
 - 尚未实现：未对齐/packed 聚合、`_Complex long double`。遇到这些情况当前会明确报错，而不是生成错误 ABI。
 
 验收：
