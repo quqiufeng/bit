@@ -805,7 +805,7 @@ bit/
 
 ### M3：共享层抽取与 Windows 冻结
 
-当前状态：已加入 `shared/README.md`、`shared/sources.json` 和 `tools/check_sources.py`；浮点常量解析/舍入模块已抽取到 `shared/float_parse.c`。上游 Windows 参考树已导入 `windows/upstream/bootstrap-c99` 并由 `windows/upstream.lock` 固定提交；其余共享前端抽取和 Windows ABI 测试尚未完成。
+当前状态：已加入 `shared/README.md`、`shared/sources.json` 和 `tools/check_sources.py`；浮点常量解析/舍入模块已抽取到 `shared/float_parse.c`，诊断缓冲/格式化已抽取到 `shared/diagnostic.c`。上游 Windows 参考树已导入 `windows/upstream/bootstrap-c99` 并由 `windows/upstream.lock` 固定提交；其余共享前端抽取和 Windows ABI 测试尚未完成。
 
 交付：
 

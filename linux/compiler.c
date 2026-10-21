@@ -982,67 +982,7 @@ unsigned long long case_value[4096];
 
 typedef long long DiagnosticHandle(int);
 typedef int DiagnosticWrite(long long, char *, int, int *, void *);
-char diagnostic_buffer[4096];
-int diagnostic_used;
-int diagnostic_sent;
-
-int diagnostic_broken;
-
-int diagnostic_flush(void) {
-    DiagnosticHandle *get = (DiagnosticHandle *)__c1_linux_GetStdHandle;
-    DiagnosticWrite *write = (DiagnosticWrite *)__c1_linux_WriteFile;
-    long long handle;
-    int offset = 0, done, ok;
-    if (!diagnostic_used || diagnostic_broken)
-        return 0;
-    handle = get(-12);
-    while (offset < diagnostic_used) {
-        done = 0;
-        ok = write(handle, diagnostic_buffer + offset, diagnostic_used - offset, &done, 0);
-        if (!ok || done <= 0 || done > diagnostic_used - offset) {
-            diagnostic_broken = 1;
-            break;
-        }
-        offset += done;
-    }
-    diagnostic_used = 0;
-    return 0;
-}
-
-int diagnostic_put(int c) {
-    if (diagnostic_broken)
-        return 0;
-    diagnostic_buffer[diagnostic_used++] = (char)c;
-    if (diagnostic_used == 4096)
-        diagnostic_flush();
-    return 0;
-}
-
-int diagnostic_text(char *text) {
-    int i = 0;
-    while (text[i])
-        diagnostic_put(text[i++]);
-    return 0;
-}
-
-int diagnostic_number(unsigned int number) {
-    char digits[10];
-    int n = 0;
-    do {
-        digits[n++] = (char)('0' + number % 10);
-        number /= 10;
-    } while (number);
-    while (n)
-        diagnostic_put(digits[--n]);
-    return 0;
-}
-
-int diagnostic_end(void) {
-    diagnostic_put(10);
-    diagnostic_flush();
-    diagnostic_sent = 1;
-    return 0;
-}
+#include "shared/diagnostic.c"
 
 int c89_extension(char *message) {
     if (c89_identifiers) {

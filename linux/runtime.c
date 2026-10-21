@@ -92,6 +92,18 @@ int __c1_linux_ReadFile(long long handle, char *buffer, int length, int *done, v
     return 1;
 }
 
+int __c1_diag_write(char *buffer, int length) {
+    int offset = 0;
+    long long n;
+    while (offset < length) {
+        n = C1_WRITE(2, buffer + offset, (unsigned long long)(length - offset));
+        if (n <= 0)
+            return -1;
+        offset = offset + (int)n;
+    }
+    return length;
+}
+
 int __c1_linux_WriteFile(long long handle, char *buffer, int length, int *done, void *overlap) {
     long long n, fd;
     fd = handle < 0 ? -handle - 10 : handle;
