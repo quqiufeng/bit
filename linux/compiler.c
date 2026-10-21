@@ -485,14 +485,12 @@ int fpe_convert(int from, int to, unsigned long long bits) {
 }
 
 /* C1 compiler, built by the frozen C-written bootstrap compiler.
-   Reads C from stdin and directly emits a Windows x64 PE image on stdout. */
+   Reads C from stdin and emits an ELF64 relocatable object on stdout. */
 int source[1048576];
 int pp_condition;
 int c99_mode;
-int hosted_startup_call;
 int c89_identifiers;
-char *
-    hosted_startup_source = "/* Self-contained startup component: only the existing kernel32 imports. */\nstatic int __c1_parse_arguments_cp(const char *text,int *count,char ***arguments,unsigned int cp){\n typedef int Lead(unsigned int,unsigned char);\n Lead *lead=*(Lead **)0x401118;\n typedef void *Heap(void);\n typedef void *Allocate(void *,unsigned int,unsigned long long);\n Heap *heap=*(Heap **)0x401080;\n Allocate *allocate=*(Allocate **)0x401088;\n unsigned long long length=0;\n const char *p;\n char **v,*out;\n int n=0,quoted=0,slashes,i;\n if(!text||!count||!arguments)return 1;\n while(text[length]){if(length==2147483646)return 1;length++;}\n v=allocate(heap(),0,(length+2)*9);\n if(!v)return 1;\n out=(char *)(v+length+2);p=text;\n /* argv[0] treats quotes specially, but backslashes literally. */\n v[n++]=out;\n while(*p){\n  if(*p=='\"'){quoted=!quoted;p++;continue;}\n  if(!quoted&&(*p==' '||*p=='\\t'))break;\n  if((unsigned char)*p>=128 && p[1] && lead(cp,(unsigned char)*p))*out++=*p++;\n  *out++=*p++;\n }\n *out++=0;\n for(;;){\n  while(*p==' '||*p=='\\t')p++;\n  if(!*p)break;\n  v[n++]=out;quoted=0;\n  while(*p){\n   if(!quoted&&(*p==' '||*p=='\\t'))break;\n   slashes=0;\n   while(*p=='\\\\'){slashes++;p++;}\n   if(*p=='\"'){\n    for(i=0;i<slashes/2;i++)*out++='\\\\';\n    if(slashes&1){*out++='\"';p++;}\n    else if(quoted&&p[1]=='\"'){*out++='\"';p+=2;}\n    else{quoted=!quoted;p++;}\n   }else{\n    for(i=0;i<slashes;i++)*out++='\\\\';\n    if(!*p||(!quoted&&(*p==' '||*p=='\\t')))break;\n    if((unsigned char)*p>=128 && p[1] && lead(cp,(unsigned char)*p))*out++=*p++;\n  *out++=*p++;\n   }\n  }\n  *out++=0;\n }\n v[n]=0;*count=n;*arguments=v;return 0;\n}\nstatic int __c1_parse_arguments(const char *text,int *count,char ***arguments){return __c1_parse_arguments_cp(text,count,arguments,0);}\nstatic int __c1_get_arguments(int *count,char ***arguments){\n typedef char *CommandLine(void);\n CommandLine *command=*(CommandLine **)0x4010d8;\n return __c1_parse_arguments(command(),count,arguments);\n}\n\nstatic int __c1_host_main(void){\n int argc; char **argv;\n typedef void Stop(unsigned int);\n Stop *stop=*(Stop **)0x401058;\n if(__c1_get_arguments(&argc,&argv)){stop(1);return 1;}\n return main(argc,argv);\n}";
+
 unsigned char names[524288];
 int lengths[2048];
 int spelling_start[2048];
@@ -1322,7 +1320,6 @@ int initializer_probe;
 int inferred_elements;
 int initializer_start;
 int initializer_tail;
-int initializer_call;
 int array_base[2048];
 int array_length[2048];
 int array_bytes[2048];
@@ -9158,181 +9155,6 @@ function_body:
     return 0;
 }
 
-int pe_name(int offset, char *name) {
-    while (*name)
-        image[offset++] = *name++;
-    return 0;
-}
-
-int pe_import(int index, char *name, int cursor) {
-    int n;
-    write32(0x240 + index * 8, cursor + 0xe00);
-    write32(0x480 + index * 8, cursor + 0xe00);
-    pe_name(cursor + 2, name);
-    n = 0;
-    while (name[n])
-        n++;
-    return (cursor + n + 4) & -2;
-}
-
-int pe_header(void) {
-    int i;
-    write32(0, 0x5a4d);
-    write32(0x3c, 0x80);
-    write32(0x80, 0x4550);
-    write32(0x84, 0x28664);
-    write32(0x94, 0x2300f0);
-    write32(0x98, 0x20b);
-    write32(0xa4, 0x1a01000);
-    write32(0xa8, 0x1e00);
-    write32(0xac, 0x1000);
-    write32(0xb0, 0x400000);
-    write32(0xb8, 0x1000);
-    write32(0xbc, 0x200);
-    write32(0xc0, 6);
-    write32(0xc8, 6);
-    write32(0xd0, 0x1c01000);
-    write32(0xd4, 0x200);
-    write32(0xdc, 0x1000003);
-    write32(0xe0, 0x100000);
-    write32(0xe8, 0x1000);
-    write32(0xf0, 0x100000);
-    write32(0xf8, 0x1000);
-    write32(0x104, 16);
-    write32(0x110, 0x1000);
-    write32(0x114, 40);
-    write32(0x168, 0x1040);
-    write32(0x16c, 312);
-    write32(0x188, 0x7865742e);
-    write32(0x18c, 0x74);
-    write32(0x190, 0x1ff000);
-    write32(0x194, 0x1000);
-    write32(0x19c, 0x200);
-    write32(0x1ac, -536870880);
-    write32(0x1b0, 0x7373622e);
-    write32(0x1b8, 0x1a01000);
-    write32(0x1bc, 0x200000);
-    write32(0x1d4, -1073741696);
-    write32(0x200, 0x1280);
-    write32(0x20c, 0x14a0);
-    write32(0x210, 0x1040);
-    pe_name(0x6a0, "KERNEL32.dll");
-    i = 0x6c0;
-    i = pe_import(0, "GetStdHandle", i);
-    i = pe_import(1, "ReadFile", i);
-    i = pe_import(2, "WriteFile", i);
-    i = pe_import(3, "ExitProcess", i);
-    i = pe_import(4, "CreateFileA", i);
-    i = pe_import(5, "CloseHandle", i);
-    i = pe_import(6, "GetEnvironmentVariableA", i);
-    i = pe_import(7, "GetLocalTime", i);
-    i = pe_import(8, "GetProcessHeap", i);
-    i = pe_import(9, "HeapAlloc", i);
-    i = pe_import(10, "HeapReAlloc", i);
-    i = pe_import(11, "HeapFree", i);
-    i = pe_import(12, "SetFilePointerEx", i);
-    i = pe_import(13, "GetFileSizeEx", i);
-    i = pe_import(14, "DeleteFileA", i);
-    i = pe_import(15, "MoveFileExA", i);
-    i = pe_import(16, "FlushFileBuffers", i);
-    i = pe_import(17, "GetFileType", i);
-    i = pe_import(18, "GetLastError", i);
-    i = pe_import(19, "GetCommandLineA", i);
-    i = pe_import(20, "GetSystemTimeAsFileTime", i);
-    i = pe_import(21, "GetTimeZoneInformation", i);
-    i = pe_import(22, "GetTickCount64", i);
-    i = pe_import(23, "GetCurrentProcessId", i);
-    i = pe_import(24, "GetTempPathA", i);
-    i = pe_import(25, "GetTempFileNameA", i);
-    i = pe_import(26, "GetConsoleMode", i);
-    i = pe_import(27, "IsDBCSLeadByteEx", i);
-    i = pe_import(28, "GetProcessTimes", i);
-    i = pe_import(29, "GetCurrentProcess", i);
-    i = pe_import(30, "GetDynamicTimeZoneInformation", i);
-    i = pe_import(31, "GetTimeZoneInformationForYear", i);
-    i = pe_import(32, "RemoveDirectoryA", i);
-    i = pe_import(33, "GetFileAttributesA", i);
-    i = pe_import(34, "GetSystemDirectoryA", i);
-    i = pe_import(35, "CreateProcessA", i);
-    i = pe_import(36, "WaitForSingleObject", i);
-    i = pe_import(37, "GetExitCodeProcess", i);
-    if (i > 0x1000)
-        return error();
-    position = 0x1000;
-    sequence(0x28ec8348, 4);
-    emit(0xe8);
-    initializer_call = position;
-    emit32(0);
-    /* The reserved BSS callback runs after main, preserving its exit status.
-       Libraries install a void(void) dispatcher at 0x2000010 when needed. */
-    hosted_startup_call = call_count;
-    call(6);
-    sequence(0x20244489, 4);
-    sequence(0x058b48, 3);
-    relative(0x2000010);
-    sequence(0xc08548, 3);
-    i = jump(0x84);
-    sequence(0xd0ff, 2);
-    patch(i, position);
-    sequence(0x20244c8b, 4);
-    indirect(0x401058);
-    emit(0xcc);
-    return 0;
-}
-
-int runtime_function(int id) {
-    int first, second;
-    function_address[id] = position;
-    sequence(0x38ec8348, 4);
-    if (id == 11) {
-        sequence(0x30244c89, 4);
-        sequence(0x0d88, 2);
-        relative(0x2000000);
-        emit(0xb9);
-        emit32(-11);
-    } else {
-        emit(0xb9);
-        emit32(-10);
-    }
-    indirect(0x401040);
-    sequence(0xc18948, 3);
-    sequence(0x158d48, 3);
-    relative(0x2000000);
-    sequence(0xb841, 2);
-    emit32(1);
-    sequence(0x0d8d4c, 3);
-    relative(0x2000004);
-    sequence(0x2444c748, 4);
-    emit(0x20);
-    emit32(0);
-    if (id == 11)
-        indirect(0x401050);
-    else
-        indirect(0x401048);
-    sequence(0xc085, 2);
-    first = jump(0x84);
-    sequence(0x058b, 2);
-    relative(0x2000004);
-    sequence(0x01f883, 3);
-    second = jump(0x85);
-    if (id == 11) {
-        sequence(0x3024448b, 4);
-        emit(0x25);
-        emit32(255);
-    } else {
-        sequence(0x05b60f, 3);
-        relative(0x2000000);
-    }
-    sequence(0x38c48348, 4);
-    emit(0xc3);
-    patch(first, position);
-    patch(second, position);
-    constant(-1);
-    sequence(0x38c48348, 4);
-    emit(0xc3);
-    return 0;
-}
-
 /* Transactional type-aware pass for automatic inferred aggregate arrays.
    Interned identifier text is retained; semantic bindings and emitted code are restored. */
 int initializer_backup[309248];
@@ -11509,32 +11331,6 @@ int preprocess(void) {
     return 0;
 }
 
-int hosted_startup(void) {
-    int i, id, match;
-    char *p = hosted_startup_source, *spelling = "__c1_host_main";
-    if (arity[6] != 2 || failed)
-        return 0;
-    size = 0;
-    cursor = 0;
-    line = 1;
-    while (*p)
-        source[size++] = *p++;
-    next();
-    while (token && !failed)
-        function();
-    for (id = 0; id < count; id++) {
-        match = lengths[id] == 14;
-        for (i = 0; i < 14 && match; i++)
-            if (names[id * 256 + i] != spelling[i])
-                match = 0;
-        if (match) {
-            call_symbol[hosted_startup_call] = id;
-            return 0;
-        }
-    }
-    return error();
-}
-
 int configure_standard(void) {
     PP_Environment *environment;
     char setting[8];
@@ -11601,10 +11397,8 @@ int main(void) {
     symbol_flags[10] = 5;
     symbol_flags[11] = 5;
     arity[11] = 1;
-    if (object_mode) {
-        symbol_flags[10] = 4;
-        symbol_flags[11] = 4;
-    }
+    symbol_flags[10] = 4;
+    symbol_flags[11] = 4;
     global_type[10] = 1;
     global_type[11] = 1;
     parameter_type[1408] = 1;
@@ -11622,10 +11416,7 @@ int main(void) {
     }
     source_phases();
     preprocess();
-    if (object_mode)
-        position = 4096;
-    else
-        pe_header();
+    position = 4096;
     next();
     if (!failed && token == 0)
         error_message("empty translation unit");
@@ -11638,52 +11429,15 @@ int main(void) {
                     "external inline definition uses internal linkage or non-const static object");
             symbol_flags[i] = symbol_flags[i] & ~1;
         }
-    if (object_mode) {
-        if (!failed)
-            finish_objects();
-        total = failed ? 0 : object_prepare();
-        if (failed) {
-            diagnostic_text("C1 error: ");
-            diagnostic_text(diagnostic_reason ? diagnostic_reason
-                                              : "invalid object translation unit");
-            diagnostic_end();
-            return 1;
-        }
-        return compiler_output(total);
-    }
-    if ((symbol_flags[6] & 1) == 0)
-        error();
-    hosted_startup();
-    if (initializer_tail)
-        patch(initializer_tail, position);
-    if (!initializer_start)
-        initializer_start = position;
-    emit(0xc3);
-    patch(initializer_call, initializer_start);
-    runtime_function(10);
-    runtime_function(11);
-    for (i = 0; i < call_count && !failed; i = i + 1) {
-        id = call_symbol[i];
-        if ((symbol_flags[id] & 1) == 0)
-            error();
-        else {
-            if (call_arity[i] >= 0 && !arity_matches(arity[id], call_arity[i]))
-                error();
-            patch(call_position[i], function_address[id]);
-        }
-    }
-    finish_objects();
+    if (!failed)
+        finish_objects();
+    total = failed ? 0 : object_prepare();
     if (failed) {
-        if (!diagnostic_sent) {
-            diagnostic_text("C1 error: ");
-            diagnostic_text(diagnostic_reason ? diagnostic_reason
-                                              : "invalid or unsupported translation unit");
-            diagnostic_end();
-        }
+        diagnostic_text("C1 error: ");
+        diagnostic_text(diagnostic_reason ? diagnostic_reason
+                                          : "invalid object translation unit");
+        diagnostic_end();
         return 1;
     }
-    total = ((position + 511) / 512) * 512;
-    write32(0x9c, total - 512);
-    write32(0x198, total - 512);
     return compiler_output(total);
 }
