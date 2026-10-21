@@ -15,6 +15,8 @@ LD=${LD:-ld}
 CRT1=${CRT1:-}
 CRTI=${CRTI:-}
 CRTN=${CRTN:-}
+CRTBEGIN=${CRTBEGIN:-}
+CRTEND=${CRTEND:-}
 LIBDIR=${LIBDIR:-}
 DYNAMIC_LINKER=${DYNAMIC_LINKER:-}
 if [ "$PIE" -eq 1 ]; then
@@ -46,6 +48,19 @@ if [ -z "$CRT1" ] || [ ! -f "$CRT1" ]; then
     echo "link-hosted: cannot locate $CRT_NAME" >&2
     exit 1
 fi
+if [ -z "$CRTBEGIN" ] && command -v gcc >/dev/null 2>&1; then
+    if [ "$PIE" -eq 1 ]; then
+        CRTBEGIN=$(gcc -print-file-name=crtbeginS.o)
+        CRTEND=$(gcc -print-file-name=crtendS.o)
+    else
+        CRTBEGIN=$(gcc -print-file-name=crtbegin.o)
+        CRTEND=$(gcc -print-file-name=crtend.o)
+    fi
+fi
+if [ -z "$CRTBEGIN" ] || [ ! -f "$CRTBEGIN" ] || [ -z "$CRTEND" ] || [ ! -f "$CRTEND" ]; then
+    echo "link-hosted: cannot locate crtbegin/crtend" >&2
+    exit 1
+fi
 if [ -z "$DYNAMIC_LINKER" ]; then
     for linker in /lib64/ld-linux-x86-64.so.2 /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2; do
         if [ -f "$linker" ]; then
@@ -60,6 +75,6 @@ if [ -z "$DYNAMIC_LINKER" ]; then
 fi
 
 exec "$LD" $PIE_FLAG -o "$OUTPUT" -dynamic-linker "$DYNAMIC_LINKER" -z noexecstack \
-    "$CRT1" "$CRTI" "$@" \
+    "$CRT1" "$CRTI" "$CRTBEGIN" "$@" \
     -L"$LIBDIR" -L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu \
-    -lc "$CRTN"
+    -lc "$CRTEND" "$CRTN"
