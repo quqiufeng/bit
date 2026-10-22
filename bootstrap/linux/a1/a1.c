@@ -5,7 +5,7 @@ extern long long __c1_sysv_read(long long, void *, unsigned long long);
 extern long long __c1_sysv_write(long long, const void *, unsigned long long);
 extern void __c1_sysv_exit(long long);
 
-#define MAX_LABELS 1024
+#define MAX_LABELS 8192
 #define MAX_NAME 64
 #define BUF_SIZE (1u << 20)
 #define OUT_SIZE (8u << 20)
@@ -25,7 +25,14 @@ static u64 src_len, pos, base_vaddr, cur_vaddr;
 static u64 cur_offset, max_offset;
 
 static void fail(void) {
-    __c1_sysv_write(2, "a1 error\n", 9);
+    char b[32];
+    int n = 0;
+    u64 v = pos;
+    __c1_sysv_write(2, "a1 error at ", 12);
+    if (!v) b[n++] = '0';
+    while (v) { b[n++] = (char)('0' + (v % 10)); v /= 10; }
+    while (n) __c1_sysv_write(2, b + --n, 1);
+    __c1_sysv_write(2, "\n", 1);
     __c1_sysv_exit(1);
 }
 

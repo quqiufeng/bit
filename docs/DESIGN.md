@@ -669,7 +669,7 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 - 条件统一为 `expression -> RAX -> cmp rax,0 -> je`，不依赖比较 flags
 - `%label` 由 A1 写成 4 字节小端 PC 相对位移
 
-当前 C0 已支持全局 `int`/`int[]` 和 `int main(void){ return N; }`；A1 新增十进制 `.org N` 以便数据段从偏移 65536 开始。函数、局部变量、控制流和表达式仍是下一轮实现的边界。
+当前 C0 已支持函数、参数、局部变量、全局 `int`/`int[]`、`if/else`、`while`、`for`、`break/continue`、函数调用、递归、算术/比较/逻辑/位运算和数组寻址。C0 已能把单体 `bootstrap.c`（2594 行）编译成约 191KB A1 文本；A1 能装配出约 4.7MB ELF。运行该 ELF 仍返回 1，说明 C0 生成的 bootstrap 语义还有 bug，正在定位。
 
 ---
 
