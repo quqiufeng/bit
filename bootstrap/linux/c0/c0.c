@@ -5,8 +5,7 @@ extern long long __c1_sysv_read(long long, void *, unsigned long long);
 extern long long __c1_sysv_write(long long, const void *, unsigned long long);
 extern void __c1_sysv_exit(long long);
 
-#define BUF_SIZE (1u << 20)
-static char src[BUF_SIZE];
+static char src[1048576];
 static u64 src_len, pos, generated_bytes;
 static int label_seq = 0x2000;
 static char g_name[256][64];
@@ -239,6 +238,15 @@ static int word(const char *w) {
         }
     }
     return 1;
+}
+
+static int type_word(void) {
+    if (word("int")) return 1;
+    if (word("char")) return 2;
+    if (word("void")) return 3;
+    if (word("u64")) return 4;
+    if (word("u32")) return 5;
+    return 0;
 }
 
 static int ch(char c) {
@@ -713,8 +721,10 @@ static void ex_stmt(void) {
     skip();
     last_pos = pos;
     if (word("return")) {
-        ex_expr();
-        ch(';');
+        if (!ch(';')) {
+            ex_expr();
+            ch(';');
+        }
         emit_hex("48 89 EC 5D C3");
         emit_text("\n");
         return;
@@ -830,7 +840,7 @@ static void ex_stmt(void) {
         ex_block();
         return;
     }
-    if (word("int")) {
+    if (type_word()) {
         for (;;) {
             char name[64];
             if (!ident(name)) fail();
@@ -869,7 +879,7 @@ static void ex_function(char *name) {
     ch('(');
     word("void");
     while (!ch(')')) {
-        if (word("int")) {
+        if (type_word()) {
             char pn[64];
             if (!ident(pn)) fail();
             add_local(pn, 4);
@@ -946,16 +956,25 @@ static void emit_header(void) {
 int main(void) {
     long long n;
     src_len = 0;
-    while ((n = __c1_sysv_read(0, src + src_len, BUF_SIZE - src_len)) > 0) {
+    while ((n = __c1_sysv_read(0, src + src_len, 1048576 - src_len)) > 0) {
         src_len += (u64)n;
-        if (src_len == BUF_SIZE) break;
+        if (src_len == 1048576) break;
     }
     emit_header();
     for (;;) {
         skip();
         stage = 1;
         if (src_len - pos <= 2) break;
-        if (!word("int")) {
+        while (word("static")) skip();
+        if (word("extern")) {
+            while (pos < src_len && !ch(';')) pos++;
+            continue;
+        }
+        if (word("typedef")) {
+            while (pos < src_len && !ch(';')) pos++;
+            continue;
+        }
+        if (!type_word()) {
             if (rest_end()) break;
             fail();
         }

@@ -45,16 +45,19 @@ from `c0.seed.hex`.
 
 ## Source-level selfhost audit
 
-`selfsource.sh` feeds `c0.c` back into C0.  It currently fails at the first
-token because `c0.c` uses `typedef`, while C0 only parses `int` declarations.
-The remaining source-level blockers are:
+`selfsource.sh` feeds `c0.c` back into C0.  C0 now parses `typedef`, `static`, `extern` prototypes, `void` functions and
+empty `return;` far enough to reach the first real data-layout blocker:
 
-- `typedef` and type aliases
-- `static` globals/functions
-- `char` scalars, `char` arrays and `char *`
+```text
+static char g_name[256][64];
+```
+
+Remaining source-level blockers:
+
 - 2D arrays (`char name[256][64]`)
+- `char` scalar/array width and pointer types
 - pointer arithmetic, `*p`, `p[i]` for non-int pointers
-- `void` functions and `return;`
+- `char *` function parameters/returns
 - string/char helpers used by `c0.c`
 
 These are language-extension work, not chain-closure work.
