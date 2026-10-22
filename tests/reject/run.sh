@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
-C1=${C1:-$C1}
+C1=${C1:-"$BUILD/c1-stage2"}
 for source in "$ROOT"/tests/reject/*.c; do
     name=$(basename "$source" .c)
     if $C1 < "$source" > "$BUILD/reject-$name.o" 2> "$BUILD/reject-$name.err"; then

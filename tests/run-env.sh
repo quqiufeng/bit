@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
-C1=${C1:-$C1}
+C1=${C1:-"$BUILD/c1-stage2"}
 BUILD=$(CDPATH= cd -- "$BUILD" && pwd)
 LD=${LD:-ld}
 LDFLAGS="-static -nostdlib -z noexecstack -e _start"
