@@ -265,7 +265,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP loopback/select/poll/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2，支持 `.a` 选择性成员抽取、节表/符号表输出、静态 PIE 自举）；仅纯种子链待做，hosted 测试仍用系统 `ld` |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2，支持 `.a` 选择性成员抽取、节表/符号表、静态 PIE 和 `--shared` ELF `.so`）；仅纯种子链待做，hosted 测试仍用系统 `ld` |
 
 ## 快速开始
 
@@ -282,7 +282,7 @@ bit/
 - `c1-stage1` 与 `c1-stage2` 逐字节一致；
 - `examples/hello.c` 可编译、链接并运行；
 - `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64/`stdint.h`/`limits.h`、预定义目标宏、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
-- `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 C1 对象作为 `.so` 被 `dlopen`，以及 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`；
+- `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 c1link `--shared` 生成的 C1 `.so` 被 `dlopen`，以及 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`；
 - `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
 - `tests/reject/` 验证未实现的 `__int128` 会明确报错；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
 

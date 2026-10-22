@@ -70,6 +70,7 @@ static unsigned char *text_image, *data_image;
 static u64 text_base, data_base, bss_base;
 static int global_selected[MAX_SYMBOLS];
 static int output_pie;
+static int output_shared;
 
 static u32 get16(unsigned char *p) {
     return (u32)p[0] | ((u32)p[1] << 8);
@@ -349,7 +350,7 @@ static int layout_sections(void) {
             data_size = s->out_off + s->size;
         }
     }
-    text_base = output_pie ? 0x1000 : 0x401000;
+    text_base = (output_pie || output_shared) ? 0x1000 : 0x401000;
     data_base = align_up(text_base + text_size, 0x1000);
     bss_base = data_base + data_size;
     return 0;
@@ -479,6 +480,190 @@ static int strlen_c(const char *text) {
     while (text[n])
         n++;
     return n;
+}
+
+static int write_shared(const char *path) {
+    u64 text_file = 0x1000;
+    u64 data_file = align_up(text_file + text_size, 0x1000);
+    u64 data_end = data_file + data_size;
+    u64 meta_base = align_up(data_base + data_size, 0x1000);
+    u64 meta_file = align_up(data_end, 0x1000);
+    u64 dynsym_off = 0, dynstr_off, hash_off, dynamic_off, meta_size;
+    u64 dynsym_size, dynstr_size = 1, hash_size, dynamic_size = 6 * 16;
+    u64 shstr_off, shoff, file_size;
+    u64 value;
+    unsigned char *image, *p, *dynsym, *dynstr, *hash, *dynamic, *sh;
+    int i, nsym = 1, sym_index, gsec, shndx;
+    struct symbol *s;
+    for (i = 0; i < symbol_count; i++) {
+        s = &symbols[i];
+        if (!objects[s->object].active || s->bind == 0 || s->shndx == 0 || !s->name[0])
+            continue;
+        nsym++;
+        dynstr_size += (u64)strlen_c(s->name) + 1;
+    }
+    dynsym_size = (u64)nsym * 24;
+    dynstr_off = dynsym_size;
+    hash_off = align_up(dynstr_off + dynstr_size, 4);
+    hash_size = (u64)(2 + 1 + nsym) * 4;
+    dynamic_off = align_up(hash_off + hash_size, 8);
+    meta_size = align_up(dynamic_off + dynamic_size, 16);
+    shstr_off = meta_file + meta_size;
+    shoff = align_up(shstr_off + 59, 8);
+    file_size = shoff + 9 * 64;
+    image = __c1_linux_HeapAlloc(0, 0, file_size + 1);
+    if (!image)
+        return 1;
+    memset(image, 0, (size_t)file_size);
+    p = image;
+    p[0] = 0x7f; p[1] = 'E'; p[2] = 'L'; p[3] = 'F';
+    p[4] = 2; p[5] = 1; p[6] = 1;
+    put32(p + 16, 3);
+    put32(p + 18, 62);
+    put32(p + 20, 1);
+    put64(p + 24, 0);
+    put64(p + 32, 64);
+    put64(p + 40, shoff);
+    put32(p + 48, 0);
+    put32(p + 52, 64);
+    put32(p + 54, 56);
+    put32(p + 56, 6);
+    put32(p + 58, 64);
+    put32(p + 60, 9);
+    put32(p + 62, 8);
+    p = image + 64;
+    put32(p, 6); put32(p + 4, 5);
+    put64(p + 8, 64); put64(p + 16, 0x40);
+    put64(p + 24, 0x40); put64(p + 32, 64 + 6 * 56);
+    put64(p + 40, 64 + 6 * 56); put64(p + 48, 8);
+    p += 56;
+    put32(p, 1); put32(p + 4, 5);
+    put64(p + 8, 0); put64(p + 16, 0);
+    put64(p + 24, 0); put64(p + 32, text_file + text_size);
+    put64(p + 40, text_file + text_size); put64(p + 48, 0x1000);
+    p += 56;
+    put32(p, 1); put32(p + 4, 6);
+    put64(p + 8, data_file); put64(p + 16, data_base);
+    put64(p + 24, data_base); put64(p + 32, data_size);
+    put64(p + 40, data_size + bss_size); put64(p + 48, 0x1000);
+    p += 56;
+    put32(p, 1); put32(p + 4, 6);
+    put64(p + 8, meta_file); put64(p + 16, meta_base);
+    put64(p + 24, meta_base); put64(p + 32, meta_size);
+    put64(p + 40, meta_size); put64(p + 48, 0x1000);
+    p += 56;
+    put32(p, 2); put32(p + 4, 6);
+    put64(p + 8, meta_file + dynamic_off); put64(p + 16, meta_base + dynamic_off);
+    put64(p + 24, meta_base + dynamic_off); put64(p + 32, dynamic_size);
+    put64(p + 40, dynamic_size); put64(p + 48, 8);
+    p += 56;
+    put32(p, 0x6474e551); put32(p + 4, 6);
+    put64(p + 8, 0); put64(p + 16, 0);
+    put64(p + 24, 0); put64(p + 32, 0);
+    put64(p + 40, 0); put64(p + 48, 0x10);
+    memcpy(image + text_file, text_image, (size_t)text_size);
+    if (data_size)
+        memcpy(image + data_file, data_image, (size_t)data_size);
+    dynsym = image + meta_file + dynsym_off;
+    dynstr = image + meta_file + dynstr_off;
+    dynstr[0] = 0;
+    dynstr_size = 1;
+    sym_index = 1;
+    for (i = 0; i < symbol_count; i++) {
+        s = &symbols[i];
+        if (!objects[s->object].active || s->bind == 0 || s->shndx == 0 || !s->name[0])
+            continue;
+        gsec = objects[s->object].sec_map[s->shndx];
+        shndx = 0;
+        value = 0;
+        if (sections[gsec].out_kind == 1) {
+            shndx = 1;
+            value = text_base + sections[gsec].out_off + s->value;
+        } else if (sections[gsec].out_kind == 2) {
+            shndx = 2;
+            value = data_base + sections[gsec].out_off + s->value;
+        } else if (sections[gsec].out_kind == 3) {
+            shndx = 3;
+            value = bss_base + sections[gsec].out_off + s->value;
+        } else
+            continue;
+        p = dynsym + sym_index * 24;
+        put32(p, (u32)dynstr_size);
+        p[4] = (unsigned char)((s->bind << 4) | s->type);
+        p[5] = 0;
+        put32(p + 6, (u32)shndx);
+        put64(p + 8, value);
+        put64(p + 16, s->size);
+        {
+            int j = 0;
+            while (s->name[j])
+                dynstr[dynstr_size++] = (unsigned char)s->name[j++];
+            dynstr[dynstr_size++] = 0;
+        }
+        sym_index++;
+    }
+    hash = image + meta_file + hash_off;
+    put32(hash, 1);
+    put32(hash + 4, (u32)nsym);
+    put32(hash + 8, nsym > 1 ? 1 : 0);
+    for (i = 0; i < nsym; i++)
+        put32(hash + 12 + i * 4, i + 1 < nsym ? (u32)(i + 1) : 0);
+    dynamic = image + meta_file + dynamic_off;
+    put64(dynamic, 4); put64(dynamic + 8, meta_base + hash_off);
+    put64(dynamic + 16, 5); put64(dynamic + 24, meta_base + dynstr_off);
+    put64(dynamic + 32, 6); put64(dynamic + 40, meta_base + dynsym_off);
+    put64(dynamic + 48, 10); put64(dynamic + 56, dynstr_size);
+    put64(dynamic + 64, 11); put64(dynamic + 72, 24);
+    put64(dynamic + 80, 0); put64(dynamic + 88, 0);
+    p = image + shstr_off;
+    p[0] = 0;
+    p += 1;
+    {
+        static char *names[8] = {".text", ".data", ".bss", ".dynsym", ".dynstr", ".hash",
+                                 ".dynamic", ".shstrtab"};
+        for (i = 0; i < 8; i++) {
+            int j = 0;
+            while (names[i][j])
+                *p++ = (unsigned char)names[i][j++];
+            *p++ = 0;
+        }
+    }
+    sh = image + shoff;
+    sh += 64;
+    put32(sh, 1); put32(sh + 4, 1); put64(sh + 8, 6); put64(sh + 16, text_base);
+    put64(sh + 24, text_file); put64(sh + 32, text_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 16); put64(sh + 56, 0);
+    sh += 64;
+    put32(sh, 7); put32(sh + 4, 1); put64(sh + 8, 3); put64(sh + 16, data_base);
+    put64(sh + 24, data_file); put64(sh + 32, data_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 16); put64(sh + 56, 0);
+    sh += 64;
+    put32(sh, 13); put32(sh + 4, 8); put64(sh + 8, 3); put64(sh + 16, bss_base);
+    put64(sh + 24, data_end); put64(sh + 32, bss_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 16); put64(sh + 56, 0);
+    sh += 64;
+    put32(sh, 18); put32(sh + 4, 11); put64(sh + 8, 0); put64(sh + 16, meta_base);
+    put64(sh + 24, meta_file); put64(sh + 32, dynsym_size); put32(sh + 40, 5); put32(sh + 44, 1);
+    put64(sh + 48, 8); put64(sh + 56, 24);
+    sh += 64;
+    put32(sh, 26); put32(sh + 4, 3); put64(sh + 8, 0); put64(sh + 16, meta_base + dynstr_off);
+    put64(sh + 24, meta_file + dynstr_off); put64(sh + 32, dynstr_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 1); put64(sh + 56, 0);
+    sh += 64;
+    put32(sh, 34); put32(sh + 4, 5); put64(sh + 8, 0); put64(sh + 16, meta_base + hash_off);
+    put64(sh + 24, meta_file + hash_off); put64(sh + 32, hash_size); put32(sh + 40, 4); put32(sh + 44, 0);
+    put64(sh + 48, 4); put64(sh + 56, 0);
+    sh += 64;
+    put32(sh, 40); put32(sh + 4, 6); put64(sh + 8, 0); put64(sh + 16, meta_base + dynamic_off);
+    put64(sh + 24, meta_file + dynamic_off); put64(sh + 32, dynamic_size); put32(sh + 40, 5); put32(sh + 44, 0);
+    put64(sh + 48, 8); put64(sh + 56, 16);
+    sh += 64;
+    put32(sh, 49); put32(sh + 4, 3); put64(sh + 8, 0); put64(sh + 16, 0);
+    put64(sh + 24, shstr_off); put64(sh + 32, 59); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 1); put64(sh + 56, 0);
+    i = write_file(path, image, file_size);
+    __c1_linux_HeapFree(0, 0, image);
+    return i;
 }
 
 static int write_output(const char *path, u64 entry) {
@@ -696,6 +881,24 @@ int main(int argc, char **argv) {
     if (argc > 1 && same_name(argv[1], "--pie")) {
         output_pie = 1;
         base = 2;
+    } else if (argc > 1 && same_name(argv[1], "--shared")) {
+        output_shared = 1;
+        base = 2;
+    }
+    if (output_shared) {
+        if (argc < base + 2) {
+            puts("usage: c1link --shared output object...");
+            return 2;
+        }
+        for (i = base + 1; i < argc; i++)
+            if (parse_input(argv[i])) {
+                puts("c1link: invalid object");
+                return 1;
+            }
+        layout_sections();
+        if (build_images() || apply_relocations())
+            return 1;
+        return write_shared(argv[base]);
     }
     if (argc < base + 3) {
         puts("usage: c1link [--pie] output entry object...");

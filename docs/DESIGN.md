@@ -973,7 +973,7 @@ bit/
 - 状态：接受（原型）
 - 决策：先用 `tools/elflink.py` 验证，再用 C1 编译的 `linux/linker.c` 实现同一套静态链接；当前不替换 `build.sh` 的系统 `ld`。
 - 理由：自制链接器风险高，先用原型对拍并链接 C1 自身，再决定是否用 C 重写并纳入自举链。
-- 后果：C 版本已用于 stage1/stage2 自举链并保持 bit-identical，且 c1link 自身已自举（c1link1 = c1link2）；支持 `.a` 归档的选择性成员抽取、节表/符号表输出和静态 PIE 自举；动态链接待补。
+- 后果：C 版本已用于 stage1/stage2 自举链并保持 bit-identical，且 c1link 自身已自举（c1link1 = c1link2）；支持 `.a` 归档的选择性成员抽取、节表/符号表、静态 PIE 自举和 `--shared` ELF `.so` 输出；完整动态可执行链接待补。
 
 ### ADR-017：`#pragma pack` 与未对齐聚合
 
