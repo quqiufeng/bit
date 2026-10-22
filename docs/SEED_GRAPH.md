@@ -49,6 +49,7 @@ The native script checks the fixed points:
 | `seed.hex` | hex text | seed root |
 | `a0.seed.hex` | hex text | seed decoder |
 | `a1.seed.hex` | hex text | A0 |
+| `c0.seed.hex` | hex text | A1 |
 | `c0v2.a1` | A1 text | C0v2 fixed point |
 | `compiler-runtime.c` | C text | `make-seed-source.sh` with `make-source.c` (optional) |
 | `linux/standalone-*.c` | C source | source-built `c1l` linker |

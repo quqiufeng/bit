@@ -40,7 +40,7 @@ This avoids compact `char` slot complexity while keeping pointer arithmetic exac
 
 `build.sh` compiles C0, emits A1 text, lets A1 assemble it, and checks
 `exit(42)`.  `selfhost.sh` materializes A0/A1 from their text seeds and checks
-that both can reproduce `c0.seed.elf` from `c0.seed.hex`.
+that both reproduce the same on-demand C0 ELF from `c0.seed.hex`; the binary is not committed.
 
 
 ## Source-level selfhost audit

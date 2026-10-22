@@ -21,7 +21,8 @@ materialized on demand from text seeds into the build directory:
 
 - `bootstrap/linux/seed.elf` / `seed.hex` (trusted binary root)
 - `bootstrap/linux/a0/a0.seed.hex` -> A0 via `a0/from-hex.sh`
-- `bootstrap/linux/a1/a1.seed.hex` -> A1 via `a1/from-hex.sh`
+- `bootstrap/linux/a1/a1.seed.hex`
+- `bootstrap/linux/c0/c0.seed.hex` (materialized on demand) -> A1 via `a1/from-hex.sh`
 - `bootstrap/linux/c0/c0v2.a1`
 - `bootstrap/linux/c0/native/compiler-runtime.c`
 

@@ -68,4 +68,3 @@ dkms.conf
 !**/bootstrap/**/*.o
 !**/startup/**/*.o
 !bootstrap/linux/seed.elf
-!bootstrap/linux/c0/c0.seed.elf
