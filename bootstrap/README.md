@@ -17,6 +17,8 @@ upstream A0/A1/C0 seed chain:
 - the rebuilt compiler compiles and runs `examples/hello.c`
 - the seed compiler is a fixed point: `seed-c1 == seed-stage2`
 
+The hex files are verified against `seed.sha256` before decoding.
+
 Regenerate the bundle after intentional compiler/linker changes with:
 
 ```sh

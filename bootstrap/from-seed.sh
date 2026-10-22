@@ -3,6 +3,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 mkdir -p "$BUILD"
+(cd "$ROOT" && sha256sum -c bootstrap/seed.sha256)
 python3 - "$ROOT/bootstrap" "$BUILD" <<'PY'
 import binascii, pathlib, sys, os
 source = pathlib.Path(sys.argv[1])
