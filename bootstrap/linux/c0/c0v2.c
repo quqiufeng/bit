@@ -9,6 +9,9 @@ extern void __c1_sysv_exit(long long);
 static char src[1048576];
 static u64 src_len, pos, generated_bytes;
 static int label_seq = 0x2000;
+static char goto_names[128][64];
+static int goto_ids[128];
+static int goto_count;
 static char g_name[256][64];
 static u64 g_size[256];
 static int g_type[256];
@@ -572,6 +575,17 @@ static void emit_incdec(int delta, int postfix) {
     emit_text("\n");
 }
 
+static int goto_id(const char *name) {
+    int i;
+    for (i = 0; i < goto_count; i++)
+        if (strcmp(goto_names[i], name) == 0) return goto_ids[i];
+    if (goto_count == 128) fail();
+    strcpy(goto_names[goto_count], name);
+    goto_ids[goto_count] = new_label();
+    goto_count++;
+    return goto_ids[goto_count - 1];
+}
+
 static void ex_primary(void) {
     char name[64];
     skip();
@@ -1094,7 +1108,25 @@ static void ex_block(void) {
 }
 
 static void ex_stmt(void) {
+    char gname[64];
+    u64 gsave;
     skip();
+    gsave = pos;
+    if (ident(gname)) {
+        if (ch(':')) {
+            emit_label(goto_id(gname));
+            return;
+        }
+        pos = gsave;
+    }
+    if (word("goto")) {
+        if (!ident(gname)) fail();
+        ch(';');
+        emit_hex("E9");
+        emit_ref(goto_id(gname));
+        emit_text("\n");
+        return;
+    }
     if (word("do")) {
         int s = new_label();
         int e = new_label();
