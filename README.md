@@ -205,7 +205,8 @@ bit/
 │   ├── pthread.h
 │   └── sys/
 │       ├── types.h
-│       └── stat.h
+│       ├── stat.h
+│       └── time.h
 ├── shared/
 │   ├── README.md
 │   ├── sources.json
@@ -245,7 +246,7 @@ bit/
 | --- | --- | --- |
 | M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
 | M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点（含 NaN）/varargs/聚合/80-bit long double/packed/_Complex long double/32-bit wchar_t 与宽字符串已通过；纯种子链待补 |
-| M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread/扩展 libc/math/wchar/wctype 已通过；更多头/边界待完成 |
+| M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread/扩展 libc/math/wchar/wctype/gettimeofday 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
 | M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2，支持 `.a` 选择性成员抽取）；仅纯种子链/PIC 待做，hosted 测试仍用系统 `ld` |
