@@ -1095,6 +1095,27 @@ static void ex_block(void) {
 
 static void ex_stmt(void) {
     skip();
+    if (word("do")) {
+        int s = new_label();
+        int e = new_label();
+        int oldb = brk_n;
+        brk_l[brk_n] = e;
+        cont_l[brk_n] = s;
+        brk_n++;
+        emit_label(s);
+        ex_stmt();
+        word("while");
+        ch('(');
+        ex_expr();
+        ch(')');
+        ch(';');
+        emit_hex("48 83 F8 00 0F 85");
+        emit_ref(s);
+        emit_text("\n");
+        emit_label(e);
+        brk_n = oldb;
+        return;
+    }
     last_pos = pos;
     if (word("return")) {
         if (!ch(';')) {
