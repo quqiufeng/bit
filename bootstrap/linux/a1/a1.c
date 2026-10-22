@@ -8,6 +8,7 @@ extern void __c1_sysv_exit(long long);
 #define MAX_LABELS 1024
 #define MAX_NAME 64
 #define BUF_SIZE (1u << 20)
+#define OUT_SIZE (8u << 20)
 
 struct label {
     char name[MAX_NAME];
@@ -19,7 +20,7 @@ struct label {
 static struct label labels[MAX_LABELS];
 static int label_count;
 static char src[BUF_SIZE];
-static unsigned char out[BUF_SIZE];
+static unsigned char out[OUT_SIZE];
 static u64 src_len, pos, base_vaddr, cur_vaddr;
 static u64 cur_offset, max_offset;
 
@@ -142,7 +143,7 @@ static void parse_string(int emit) {
             else if (c == 't') c = '\t';
         }
         if (emit) {
-            if (cur_offset >= BUF_SIZE) fail();
+            if (cur_offset >= OUT_SIZE) fail();
             out[cur_offset] = (unsigned char)c;
         }
         advance(1);
@@ -219,7 +220,7 @@ static void scan(int emit) {
                 u32 rel;
                 if (!l || !l->defined) fail();
                 rel = (u32)(l->vaddr - (cur_vaddr + 4));
-                if (cur_offset + 4 > BUF_SIZE) fail();
+                if (cur_offset + 4 > OUT_SIZE) fail();
                 out[cur_offset + 0] = rel & 0xff;
                 out[cur_offset + 1] = (rel >> 8) & 0xff;
                 out[cur_offset + 2] = (rel >> 16) & 0xff;
@@ -240,10 +241,20 @@ static void scan(int emit) {
                 n = parse_dec();
                 if (emit) {
                     u64 i;
-                    if (cur_offset + n > BUF_SIZE) fail();
+                    if (cur_offset + n > OUT_SIZE) fail();
                     for (i = 0; i < n; i++) out[cur_offset + i] = 0;
                 }
                 advance(n);
+                continue;
+            }
+            if (pos + 4 <= src_len && src[pos + 1] == 'o' && src[pos + 2] == 'r' &&
+                src[pos + 3] == 'g') {
+                u64 n;
+                pos += 4;
+                n = parse_dec();
+                cur_offset = n;
+                cur_vaddr = base_vaddr + n;
+                if (n > max_offset) max_offset = n;
                 continue;
             }
             fail();
@@ -254,7 +265,7 @@ static void scan(int emit) {
             b = (unsigned char)((hexval(c) << 4) | hexval((unsigned char)src[pos + 1]));
             pos += 2;
             if (emit) {
-                if (cur_offset >= BUF_SIZE) fail();
+                if (cur_offset >= OUT_SIZE) fail();
                 out[cur_offset] = b;
             }
             advance(1);

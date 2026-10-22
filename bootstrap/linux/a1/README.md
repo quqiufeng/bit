@@ -7,6 +7,7 @@ to A0:
 - named relative references: `%name`
 - strings: `"text"`
 - zero fill: `.zero N`
+- offset jump: `.org N` (decimal; sets file offset and virtual address)
 - the A0 forms `^`, `:HHHH`, `%HHHH` and raw hex bytes
 
 `smoke.a1` builds a two-PT_LOAD ELF that jumps over a string and exits 42.

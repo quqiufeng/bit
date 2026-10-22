@@ -17,3 +17,12 @@ set +e
 status=$?
 set -e
 test "$status" -eq 42
+
+printf 'int g;\nint a[4];\nint main(void){return 42;}\n' | "$OUT/c0" > "$OUT/globals.a1"
+"$A1" < "$OUT/globals.a1" > "$OUT/globals.elf"
+chmod +x "$OUT/globals.elf"
+set +e
+"$OUT/globals.elf"
+status=$?
+set -e
+test "$status" -eq 42

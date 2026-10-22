@@ -15,6 +15,9 @@ static void write_all(const char *p, u64 n);
 static void emit_decimal(u64 v);
 static void emit_code_hex(const char *hex);
 static void emit_imm32(u32 v);
+static char g_name[256][64];
+static u64 g_size[256];
+static int g_count;
 
 static const char head[] =
     "^00400000\n"
@@ -224,6 +227,31 @@ static void hex_byte(unsigned int b) {
     write_all(out, 4);
 }
 
+static int ident(char *dst) {
+    int n = 0;
+    skip();
+    if (pos >= src_len) return 0;
+    if (!((src[pos] >= 'a' && src[pos] <= 'z') || (src[pos] >= 'A' && src[pos] <= 'Z') || src[pos] == '_'))
+        return 0;
+    while (pos < src_len && ((src[pos] >= 'a' && src[pos] <= 'z') ||
+                             (src[pos] >= 'A' && src[pos] <= 'Z') ||
+                             (src[pos] >= '0' && src[pos] <= '9') || src[pos] == '_')) {
+        if (n < 63) dst[n++] = src[pos];
+        pos++;
+    }
+    dst[n] = 0;
+    return 1;
+}
+
+static int same_name(const char *a, const char *b) {
+    int i = 0;
+    while (a[i] && b[i]) {
+        if (a[i] != b[i]) return 0;
+        i++;
+    }
+    return a[i] == b[i];
+}
+
 int main(void) {
     long long n;
     u64 value;
@@ -233,23 +261,50 @@ int main(void) {
         if (src_len == BUF_SIZE) break;
     }
     skip();
-    if (!word("int")) fail();
-    skip();
-    if (!word("main")) fail();
-    skip();
-    if (!ch('(')) fail();
-    skip();
-    if (word("void")) skip();
-    if (!ch(')')) fail();
-    skip();
-    if (!ch('{')) fail();
-    skip();
-    if (!word("return")) fail();
-    value = number();
-    skip();
-    if (!ch(';')) fail();
-    skip();
-    if (!ch('}')) fail();
+    while (word("int")) {
+        char name[64];
+        skip();
+        if (!ident(name)) fail();
+        skip();
+        if (ch('[')) {
+            u64 count = number();
+            skip();
+            if (!ch(']')) fail();
+            skip();
+            if (!ch(';')) fail();
+            if (g_count == 256) fail();
+            {
+                int i;
+                for (i = 0; name[i] && i < 63; i++) g_name[g_count][i] = name[i];
+                g_name[g_count][i] = 0;
+            }
+            g_size[g_count++] = count * 4;
+        } else if (ch('(')) {
+            skip();
+            if (word("void")) skip();
+            if (!ch(')')) fail();
+            skip();
+            if (!ch('{')) fail();
+            skip();
+            if (!word("return")) fail();
+            value = number();
+            skip();
+            if (!ch(';')) fail();
+            skip();
+            if (!ch('}')) fail();
+            break;
+        } else {
+            if (!ch(';')) fail();
+            if (g_count == 256) fail();
+            {
+                int i;
+                for (i = 0; name[i] && i < 63; i++) g_name[g_count][i] = name[i];
+                g_name[g_count][i] = 0;
+            }
+            g_size[g_count++] = 4;
+        }
+        skip();
+    }
     skip();
     if (pos != src_len) fail();
 
@@ -271,6 +326,28 @@ int main(void) {
         emit_decimal(pad);
         write_all("\n", 1);
         generated_bytes = 65536;
+    }
+    write_all("^00410000\n.org 65536\n", 21);
+    {
+        int i;
+        for (i = 0; i < g_count; i++) {
+            write_all(":", 1);
+            {
+                int j;
+                for (j = 0; g_name[i][j]; j++) write_all(g_name[i] + j, 1);
+            }
+            write_all("\n.zero ", 7);
+            emit_decimal(g_size[i]);
+            write_all("\n", 1);
+            generated_bytes += g_size[i];
+        }
+    }
+    if (generated_bytes < 0x410000) {
+        u64 pad = 0x410000 - generated_bytes;
+        write_all(".zero ", 6);
+        emit_decimal(pad);
+        write_all("\n", 1);
+        generated_bytes = 0x410000;
     }
     return 0;
 }

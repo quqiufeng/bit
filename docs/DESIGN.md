@@ -661,7 +661,7 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 - `int` 固定 4 字节，`int[]` 元素步长固定 4
 - 全局 BSS 总量 `0x371800`，第一阶段使用 4MB 数据段
 - 先接受 4MB 文件级零填充（方案 A）；真正的 `.bss` 后置
-- A1 `.zero` 只接受十进制常数
+- A1 `.zero` 和 `.org` 只接受十进制常数
 - C0 自己维护 `generated_bytes`；头部/段表/字节/字符串/引用分别计数
 - 标量局部变量固定 8 字节槽，数组按元素宽度，栈帧 16 字节对齐
 - 局部偏移超过 127 使用 `disp32`
@@ -669,7 +669,7 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 - 条件统一为 `expression -> RAX -> cmp rax,0 -> je`，不依赖比较 flags
 - `%label` 由 A1 写成 4 字节小端 PC 相对位移
 
-当前 C0 仍只支持 `int main(void){ return N; }`；上述契约是下一轮实现的边界。
+当前 C0 已支持全局 `int`/`int[]` 和 `int main(void){ return N; }`；A1 新增十进制 `.org N` 以便数据段从偏移 65536 开始。函数、局部变量、控制流和表达式仍是下一轮实现的边界。
 
 ---
 

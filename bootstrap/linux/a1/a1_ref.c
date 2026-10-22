@@ -7,6 +7,7 @@
 #define MAX_LABELS 1024
 #define MAX_NAME 64
 #define BUF_SIZE (1u << 20)
+#define OUT_SIZE (8u << 20)
 
 struct label {
     char name[MAX_NAME];
@@ -17,7 +18,7 @@ struct label {
 
 static struct label labels[MAX_LABELS];
 static int label_count;
-static unsigned char out[BUF_SIZE];
+static unsigned char out[OUT_SIZE];
 static const char *src;
 static size_t src_len, pos;
 static uint64_t base_vaddr, cur_vaddr;
@@ -126,7 +127,7 @@ static void parse_string(int emit) {
             else if (c == 't') c = '\t';
         }
         if (emit) {
-            if (cur_offset >= BUF_SIZE) fail("output overflow");
+            if (cur_offset >= OUT_SIZE) fail("output overflow");
             out[cur_offset] = (unsigned char)c;
         }
         advance(1);
@@ -189,7 +190,7 @@ static void scan(int emit) {
                 uint32_t rel;
                 if (!l || !l->defined) fail("undefined label");
                 rel = (uint32_t)(l->vaddr - (cur_vaddr + 4));
-                if (cur_offset + 4 > BUF_SIZE) fail("output overflow");
+                if (cur_offset + 4 > OUT_SIZE) fail("output overflow");
                 out[cur_offset + 0] = rel & 0xff;
                 out[cur_offset + 1] = (rel >> 8) & 0xff;
                 out[cur_offset + 2] = (rel >> 16) & 0xff;
@@ -212,10 +213,23 @@ static void scan(int emit) {
                 if (end == src + pos) fail("expected zero count");
                 pos = (size_t)(end - src);
                 if (emit) {
-                    if (cur_offset + n > BUF_SIZE) fail("output overflow");
+                    if (cur_offset + n > OUT_SIZE) fail("output overflow");
                     memset(out + cur_offset, 0, n);
                 }
                 advance(n);
+                continue;
+            }
+            if (pos + 4 <= src_len && !memcmp(src + pos, ".org", 4)) {
+                unsigned long n;
+                char *end;
+                pos += 4;
+                skip();
+                n = strtoul(src + pos, &end, 0);
+                if (end == src + pos) fail("expected org value");
+                pos = (size_t)(end - src);
+                cur_offset = (size_t)n;
+                cur_vaddr = base_vaddr + n;
+                if (cur_offset > max_offset) max_offset = cur_offset;
                 continue;
             }
             fail("unknown directive");
@@ -227,7 +241,7 @@ static void scan(int emit) {
             b = (unsigned char)((hexval(c) << 4) | hexval((unsigned char)src[pos + 1]));
             pos += 2;
             if (emit) {
-                if (cur_offset >= BUF_SIZE) fail("output overflow");
+                if (cur_offset >= OUT_SIZE) fail("output overflow");
                 out[cur_offset] = b;
             }
             advance(1);

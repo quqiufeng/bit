@@ -3,10 +3,14 @@
 `c0.c` is the freestanding C0 body.  It currently accepts:
 
 ```c
+int g;
+int a[4];
 int main(void) { return N; }
 ```
 
-and emits A1 text for the A1 assembler.
+and emits A1 text for the A1 assembler.  Global `int` scalars take 4 bytes and
+`int` arrays take `N * 4` bytes in the data segment.  Code is padded to
+`0x10000`, data starts at `0x410000`, and the file is padded to `0x410000`.
 
 ## Emitter contract
 
@@ -14,6 +18,7 @@ and emits A1 text for the A1 assembler.
 - C0 owns `generated_bytes`, starting at file offset 0.
 - Header + two program headers are 176 bytes (`0xB0`).
 - `.zero 80` moves the entry to `0x100`; `:0100` and `:start` follow.
+- `.org 65536` moves the file offset to the data segment; A1 accepts decimal only.
 - Each emitted byte increments `generated_bytes`.
 - Each `%Lxxxx` reference and each 32-bit immediate contributes 4 bytes.
 - Strings contribute their bytes plus the NUL.
