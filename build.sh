@@ -58,6 +58,7 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/run-static-pie.sh
 ./tests/run-archive.sh
 ./tests/run-shared.sh
+./bootstrap/from-seed.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, seed and source checks"
