@@ -1429,14 +1429,23 @@ static void ex_function(char *name) {
     {
         int i;
         for (i = 0; i < p; i++) {
-            if (i == 0) emit_hex("48 89 BD");
-            else if (i == 1) emit_hex("48 89 B5");
-            else if (i == 2) emit_hex("48 89 95");
-            else if (i == 3) emit_hex("48 89 8D");
-            else if (i == 4) emit_hex("4C 89 85");
-            else emit_hex("4C 89 8D");
-            emit_imm32((u32)(-l_off[i]));
-            emit_text("\n");
+            if (i < 6) {
+                if (i == 0) emit_hex("48 89 BD");
+                else if (i == 1) emit_hex("48 89 B5");
+                else if (i == 2) emit_hex("48 89 95");
+                else if (i == 3) emit_hex("48 89 8D");
+                else if (i == 4) emit_hex("4C 89 85");
+                else emit_hex("4C 89 8D");
+                emit_imm32((u32)(-l_off[i]));
+                emit_text("\n");
+            } else {
+                emit_hex("48 8B 85");
+                emit_imm32((u32)(16 + 8 * (i - 6)));
+                emit_text("\n");
+                emit_hex("48 89 85");
+                emit_imm32((u32)(-l_off[i]));
+                emit_text("\n");
+            }
         }
     }
     if (ch('{')) {
