@@ -235,7 +235,10 @@ bootstrap/linux/c0/c0v2.c
 - 单独测试：`pos=4; ident(nm)` 成功；`type_word(); ident(nm)` 失败
 - 说明 `type_word` 返回后向调用者留下了错误的栈/寄存器状态
 - `skip(); type_word()` 单独退出码正常，但后续 `ident` 仍失败
-- 下一步：审计 `type_word`/`word` 的栈平衡和函数返回，特别是 `word` 内嵌套调用 `skip` 后的栈状态
+- 已定位并修复一个关键 codegen bug：C0v2 对空条件 `for (;;)` 仍无条件发射 `cmp rax,0; je end`，会读取陈旧 RAX，导致循环被跳过
+- 修复后 stage1 已能进入主循环并执行到 `type_word()` 成功（退出码 14 证明）
+- 但 stage1 仍未执行到 `stage=2` 后的 `ident`，仍有后续控制流/栈布局问题
+- 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
 ### Phase 4：自增/复合赋值
 

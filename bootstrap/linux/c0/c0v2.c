@@ -1109,6 +1109,7 @@ static void ex_stmt(void) {
         int oldb = brk_n;
         u64 inc_start, inc_end, after_body;
         int depth;
+        int has_cond = 0;
         ch('(');
         if (!ch(';')) {
             ex_expr();
@@ -1121,6 +1122,7 @@ static void ex_stmt(void) {
         if (!ch(';')) {
             ex_expr();
             ch(';');
+            has_cond = 1;
         }
         inc_start = pos;
         depth = 0;
@@ -1135,9 +1137,11 @@ static void ex_stmt(void) {
         if (pos >= src_len) fail();
         inc_end = pos;
         ch(')');
-        emit_hex("48 83 F8 00 0F 84");
-        emit_ref(e);
-        emit_text("\n");
+        if (has_cond) {
+            emit_hex("48 83 F8 00 0F 84");
+            emit_ref(e);
+            emit_text("\n");
+        }
         ex_stmt();
         after_body = pos;
         emit_label(in);
