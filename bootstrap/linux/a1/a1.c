@@ -259,7 +259,9 @@ static void scan(int emit) {
             }
             if (pos + 4 <= src_len && src[pos + 1] == 'b' && src[pos + 2] == 's' &&
                 src[pos + 3] == 's') {
-                u64 n = parse_dec();
+                u64 n;
+                pos += 4;
+                n = parse_dec();
                 cur_offset += n;
                 cur_vaddr += n;
                 if (cur_offset > max_offset) max_offset = cur_offset;
