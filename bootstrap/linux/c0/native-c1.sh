@@ -19,6 +19,9 @@ C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
 "$BUILD/c1link" "$OUT/native-linker" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
+"$OUT/native-linker" "$OUT/native-linker2" _start \
+    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
+cmp "$OUT/native-linker" "$OUT/native-linker2"
 "$OUT/native-linker" "$OUT/stage1" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler.o" "$BUILD/syscalls_sysv.o"
 "$OUT/stage1" < "$OUT/tiny.c" > "$OUT/tiny-stage1.o"
@@ -28,4 +31,4 @@ cmp "$OUT/compiler.o" "$OUT/compiler-stage2.o"
 "$OUT/native-linker" "$OUT/stage2" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler-stage2.o" "$BUILD/syscalls_sysv.o"
 cmp "$OUT/stage1" "$OUT/stage2"
-echo "PASS: native Linux C1 compiles an ELF object and reaches stage1 == stage2 binaries"
+echo "PASS: native Linux C1 and native linker reach stage1 == stage2"
