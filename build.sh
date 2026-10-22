@@ -65,6 +65,7 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./bootstrap/linux/a0/test.sh
 ./bootstrap/linux/a0/test-asm.sh
 ./bootstrap/linux/a0/selfhost.sh
+./bootstrap/linux/seed-selfhost.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0 reference/assembly/selfhost, upstream bridge and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0 reference/assembly/selfhost, Linux seed, upstream bridge and source checks"
