@@ -2,10 +2,11 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
+C1=${C1:-$C1}
 LD=${LD:-ld}
-"$BUILD/c1-stage2" < "$ROOT/tests/dynamic/plugin.c" > "$BUILD/dynamic-plugin.o"
+$C1 < "$ROOT/tests/dynamic/plugin.c" > "$BUILD/dynamic-plugin.o"
 "$BUILD/c1link" --shared "$BUILD/libanswer.so" "$BUILD/dynamic-plugin.o"
-"$BUILD/c1-stage2" < "$ROOT/tests/dynamic/main.c" > "$BUILD/dynamic-main.o"
+$C1 < "$ROOT/tests/dynamic/main.c" > "$BUILD/dynamic-main.o"
 "$LD" -o "$BUILD/dynamic-main" \
     -dynamic-linker /lib64/ld-linux-x86-64.so.2 \
     -rpath "$BUILD" \

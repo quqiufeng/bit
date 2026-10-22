@@ -2,9 +2,10 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
-"$BUILD/c1-stage2" < "$ROOT/tests/linker/answer.c" > "$BUILD/archive-answer.o"
-"$BUILD/c1-stage2" < "$ROOT/tests/linker/unused.c" > "$BUILD/archive-unused.o"
-"$BUILD/c1-stage2" < "$ROOT/tests/linker/main.c" > "$BUILD/archive-main.o"
+C1=${C1:-$C1}
+$C1 < "$ROOT/tests/linker/answer.c" > "$BUILD/archive-answer.o"
+$C1 < "$ROOT/tests/linker/unused.c" > "$BUILD/archive-unused.o"
+$C1 < "$ROOT/tests/linker/main.c" > "$BUILD/archive-main.o"
 rm -f "$BUILD/libarchive-test.a"
 ar rcs "$BUILD/libarchive-test.a" "$BUILD/archive-answer.o" "$BUILD/archive-unused.o"
 "$BUILD/c1link" "$BUILD/archive-test" _start \
