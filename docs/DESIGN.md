@@ -675,6 +675,8 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 
 ---
 
+C0 类型系统重构计划见 `docs/C0_REFACTOR.md`。
+
 ## 7. 构建系统
 
 ### 7.1 Linux
