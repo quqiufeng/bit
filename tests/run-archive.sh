@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
-C1=${C1:-$C1}
+C1=${C1:-"$BUILD/c1-stage2"}
 $C1 < "$ROOT/tests/linker/answer.c" > "$BUILD/archive-answer.o"
 $C1 < "$ROOT/tests/linker/unused.c" > "$BUILD/archive-unused.o"
 $C1 < "$ROOT/tests/linker/main.c" > "$BUILD/archive-main.o"

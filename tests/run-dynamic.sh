@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
-C1=${C1:-$C1}
+C1=${C1:-"$BUILD/c1-stage2"}
 LD=${LD:-ld}
 $C1 < "$ROOT/tests/dynamic/plugin.c" > "$BUILD/dynamic-plugin.o"
 "$BUILD/c1link" --shared "$BUILD/libanswer.so" "$BUILD/dynamic-plugin.o"
