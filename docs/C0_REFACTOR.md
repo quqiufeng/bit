@@ -223,7 +223,12 @@ bootstrap/linux/c0/c0v2.c
 - 组合测试 `word` 风格：`while (w[i]) { if (src[pos] != w[i]) ...; i++; pos++; }` 在 stage1 中失败
 - 已尝试把 `src[pos]` 和 `w[i]` 拆成两个局部变量，仍失败
 - 这指向 C0v2 在为“全局 char 数组索引 + 指针参数索引 + while 循环”组合生成代码时的寄存器/栈状态问题
-- 下一步：对比 C0v2 生成的 `word` 函数 A1 与稳定 C1 生成的 `word` A1
+- 新对比结果：
+  - `char src[] + char wbuf[]` 双全局数组循环：通过
+  - `while(w[i]) + src[pos]`（w 是函数指针参数）：失败
+  - 把 `w` 先 `strcpy` 到全局 `wbuf` 后仍失败
+  - 说明触发条件与“函数指针参数”本身有关，不只是指针索引表达式
+- 下一步：对比 C0v2 生成的 `word` 函数 A1 与稳定 C1 生成的 `word` A1，重点看指针参数 `w` 的栈槽和循环内寄存器状态
 
 ### Phase 4：自增/复合赋值
 
