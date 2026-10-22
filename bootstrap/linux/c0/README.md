@@ -41,3 +41,20 @@ This avoids compact `char` slot complexity while keeping pointer arithmetic exac
 `build.sh` compiles C0, emits A1 text, lets A1 assemble it, and checks
 `exit(42)`.  `selfhost.sh` checks that A0 and A1 can reproduce `c0.seed.elf`
 from `c0.seed.hex`.
+
+
+## Source-level selfhost audit
+
+`selfsource.sh` feeds `c0.c` back into C0.  It currently fails at the first
+token because `c0.c` uses `typedef`, while C0 only parses `int` declarations.
+The remaining source-level blockers are:
+
+- `typedef` and type aliases
+- `static` globals/functions
+- `char` scalars, `char` arrays and `char *`
+- 2D arrays (`char name[256][64]`)
+- pointer arithmetic, `*p`, `p[i]` for non-int pointers
+- `void` functions and `return;`
+- string/char helpers used by `c0.c`
+
+These are language-extension work, not chain-closure work.

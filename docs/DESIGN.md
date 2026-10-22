@@ -671,7 +671,7 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 - 条件统一为 `expression -> RAX -> cmp rax,0 -> je`，不依赖比较 flags
 - `%label` 由 A1 写成 4 字节小端 PC 相对位移
 
-当前 C0 已支持函数、参数、局部变量、全局 `int`/`int[]`、`if/else`、`while`、`for`、`break/continue`、函数调用、递归、算术/比较/逻辑/位运算和数组寻址。C0 已能把单体 `bootstrap.c`（2594 行）编译成约 191KB A1 文本；A1 能装配出约 4.7MB ELF。该 bootstrap ELF 已能运行并输出 PE；`bootstrap/linux/c0/chain.sh` 已用 C0 编译 `bootstrap.c` → `bootstrap-capacity.c` → `compiler.c`，生成的 `c1-stage0/1/2` 与上游 minimal-chain 逐字节一致，`stage1 == stage2`。C0 链已闭合；`c0/linux.sh` 已完成 C0 -> Windows C1 -> SysV Linux C1。剩余是把 C0 自身写成 A1 源码并去掉 C1 生成的 C0 seed。
+当前 C0 已支持函数、参数、局部变量、全局 `int`/`int[]`、`if/else`、`while`、`for`、`break/continue`、函数调用、递归、算术/比较/逻辑/位运算和数组寻址。C0 已能把单体 `bootstrap.c`（2594 行）编译成约 191KB A1 文本；A1 能装配出约 4.7MB ELF。该 bootstrap ELF 已能运行并输出 PE；`bootstrap/linux/c0/chain.sh` 已用 C0 编译 `bootstrap.c` → `bootstrap-capacity.c` → `compiler.c`，生成的 `c1-stage0/1/2` 与上游 minimal-chain 逐字节一致，`stage1 == stage2`。C0 链已闭合；`c0/linux.sh` 已完成 C0 -> Windows C1 -> SysV Linux C1。剩余是把 C0 自身写成 A1/C0 源码并去掉 C1 生成的 C0 seed。`bootstrap/linux/c0/selfsource.sh` 已记录当前首批阻塞：`typedef`、`static`、`char`、二维数组、指针运算、`void`/空 `return`。
 
 ---
 
