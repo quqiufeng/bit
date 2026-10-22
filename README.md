@@ -237,6 +237,7 @@ bit/
 ├── bootstrap/
 │   ├── README.md
 │   ├── from-seed.sh           # 无 gcc/ld 的 seed bundle 自举
+│   ├── minimal-chain.sh       # 上游 seed -> A0 -> A1 -> C0 -> C1
 │   ├── make-seed.sh
 │   ├── seed.sha256
 │   └── seed-*.hex
@@ -246,7 +247,8 @@ bit/
 │   └── upstream/              # 冻结的上游 Windows 参考树
 ├── tools/
 │   ├── check_sources.py
-│   └── elflink.py             # 自制静态 ELF 链接器原型
+│   ├── elflink.py             # 自制静态 ELF 链接器原型
+│   └── pe2elf.py              # 上游 PE seed/工具 -> Linux ELF 运行
 ├── examples/
 │   └── hello.c
 ├── tests/
@@ -282,7 +284,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP/UNIX sockets/select/poll/epoll/inotify/eventfd/timerfd/signalfd/memfd/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex/iconv/glob/ioctl/statvfs/getauxval 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。最小 seed→A0/A1→C0→C1 链仍待做，hosted glibc 测试仍用系统 `ld` |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；上游最小 seed→A0/A1→C0→C1 链已能在 Linux 上跑通（产物仍是 Windows C1）；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。剩余是把最小 seed 链桥接到 SysV/Linux C1，hosted glibc 测试仍用系统 `ld` |
 
 ## 快速开始
 
