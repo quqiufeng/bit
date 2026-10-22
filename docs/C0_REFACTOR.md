@@ -343,6 +343,14 @@ diff c0v2.a1 c0v2-stage2.a1
 - 该 C0v2 能编译 `tiny.c` 并运行返回 42
 - 仍不是完全无 C1 seed：`c0v2.a1` 是由当前 C0v2 生成后冻结的
 
+## 9.4 C0v2 from A1 固定点
+
+- A1 从冻结的 `c0v2.a1` 装配 C0v2
+- 该 C0v2 编译 `c0v2.c` 得到新的 A1
+- A1 再装配后与第一个 C0v2 二进制逐字节一致
+- `c0v2-from-a1-selfhost.sh` 验证该固定点
+- 仍剩：冻结资产 `c0v2.a1` 的最初生成、A0 手写、Linux 原生 bootstrap C1
+
 ## 10. 风险与回滚
 
 高风险点：
