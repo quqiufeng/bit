@@ -351,6 +351,13 @@ diff c0v2.a1 c0v2-stage2.a1
 - `c0v2-from-a1-selfhost.sh` 验证该固定点
 - 仍剩：冻结资产 `c0v2.a1` 的最初生成、A0 手写、Linux 原生 bootstrap C1
 
+## 9.5 C0v2 驱动 C1 链
+
+- A1 装配的 C0v2 可以编译 `bootstrap.c`
+- 继续生成 capacity 和 C1 stage1/stage2
+- `c0v2-chain.sh` 验证 `stage1 == stage2`
+- 仍依赖冻结的 `c0v2.a1` 与 A1 seed
+
 ## 10. 风险与回滚
 
 高风险点：
