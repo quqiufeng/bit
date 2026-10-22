@@ -85,6 +85,25 @@ call_with_pollution_6:
     CHECK_CALLEE
     RESTORE_CALLEE
 
+
+.global call_with_pollution_7
+call_with_pollution_7:
+    SAVE_CALLEE
+    mov %rdi, %r10
+    mov %rsi, %rdi
+    mov %rdx, %rsi
+    mov %rcx, %rdx
+    mov %r8, %rcx
+    mov %r9, %r8
+    mov 16(%rbp), %r9
+    mov 24(%rbp), %r11
+    mov %r11, (%rsp)
+    POLLUTE_CALLEE
+    mov $0xdeadbeef, %r11
+    call *%r10
+    CHECK_CALLEE
+    RESTORE_CALLEE
+
 .global call_with_pollution_2d
 call_with_pollution_2d:
     SAVE_CALLEE
@@ -106,4 +125,5 @@ call_with_pollution_2d:
 .size call_with_pollution_2, .-call_with_pollution_2
 .size call_with_pollution_6, .-call_with_pollution_6
 .size call_with_pollution_2d, .-call_with_pollution_2d
+.size call_with_pollution_7, .-call_with_pollution_7
 .section .note.GNU-stack,"",@progbits
