@@ -35,6 +35,7 @@ C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
 "$OUT/native-linker" --bootstrap "$OUT/native-linker2" _start \
     "$OUT/runtime.o" "$OUT/linker.o"
 cmp "$OUT/native-linker" "$OUT/native-linker2"
+cmp "$OUT/native-linker" "$LINKER"
 "$OUT/native-linker" --bootstrap "$OUT/stage1" _start \
     "$OUT/runtime.o" "$OUT/compiler.o"
 "$OUT/stage1" < "$OUT/tiny.c" > "$OUT/tiny-stage1.o"
