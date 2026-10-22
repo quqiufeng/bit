@@ -228,7 +228,10 @@ bootstrap/linux/c0/c0v2.c
   - `while(w[i]) + src[pos]`（w 是函数指针参数）：失败
   - 把 `w` 先 `strcpy` 到全局 `wbuf` 后仍失败
   - 说明触发条件与“函数指针参数”本身有关，不只是指针索引表达式
-- 下一步：对比 C0v2 生成的 `word` 函数 A1 与稳定 C1 生成的 `word` A1，重点看指针参数 `w` 的栈槽和循环内寄存器状态
+- 已定位并修复：数组变址 `src[pos]` 在解析索引后丢失了元素类型，导致 char 数组被按 4 字节 int 加载；`word` 因此把 `src[pos]` 读成 4 字节值
+- 修复后 `word`/`wordtest` 返回 42，char 指针和 `src[pos]` 正常
+- 第一代 c0v2 仍只输出 837 字节 header；说明还有后续独立 bug
+- 下一步：在修复后的 stage1 上重新做 `src_len` / `type_word` 显形
 
 ### Phase 4：自增/复合赋值
 

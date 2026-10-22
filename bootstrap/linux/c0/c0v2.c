@@ -481,6 +481,7 @@ static void ex_lvalue(const char *name) {
         if (dims == 2) {
             dims = 1;
             lv_ptr = 1;
+            lv_type = tw;
             if (ch('[')) {
                 emit_hex("50");
                 ex_expr();
@@ -489,10 +490,12 @@ static void ex_lvalue(const char *name) {
                 emit_scale(elem);
                 lv_ptr = 0;
                 dims = 0;
+                lv_type = tw;
             }
         } else {
             lv_ptr = 0;
             dims = 0;
+            lv_type = tw;
         }
     }
 }
