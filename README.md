@@ -176,7 +176,8 @@ bit/
 │   ├── linuximports.h         # 编译器使用的运行时声明
 │   ├── startup-sysv.S         # SysV 入口（gcc stage0 与 C1 共用）
 │   ├── syscalls-sysv.S        # SysV syscall stub
-│   └── link-hosted.sh         # crt1/crti + glibc + crtn 链接
+│   ├── link-hosted.sh         # crt1/crti + glibc + crtn 链接
+│   └── link-shared.sh         # C1 对象 -> .so
 ├── include/
 │   ├── stdarg.h               # SysV va_list / va_start / va_arg
 │   ├── stddef.h
@@ -243,6 +244,8 @@ bit/
 │   ├── run-linker-selfhost.sh
 │   ├── run-static-pie.sh
 │   ├── run-archive.sh
+│   ├── run-shared.sh
+│   ├── shlib/                  # C1 对象 -> .so 测试
 │   ├── sysv/                  # SysV ABI/语言回归测试
 │   ├── hosted/                # glibc hosted 互操作测试
 │   ├── interop/               # C1 <-> gcc ABI 双向互操作测试
@@ -279,7 +282,7 @@ bit/
 - `c1-stage1` 与 `c1-stage2` 逐字节一致；
 - `examples/hello.c` 可编译、链接并运行；
 - `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64/`stdint.h`/`limits.h`、预定义目标宏、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
-- `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`；
+- `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 C1 对象作为 `.so` 被 `dlopen`，以及 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`；
 - `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
 - `tests/reject/` 验证未实现的 `__int128` 会明确报错；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
 
