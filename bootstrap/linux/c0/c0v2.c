@@ -1438,7 +1438,7 @@ static void ex_function(char *name) {
     }
     strcpy(cur_func, name);
     emit_named_label(name);
-    emit_hex("55 48 89 E5 48 81 EC 00 40 00 00");
+    emit_hex("55 48 89 E5 48 81 EC 00 00 01 00");
     emit_text("\n");
     l_count = 0;
     ch('(');
@@ -1529,7 +1529,7 @@ static void emit_header(void) {
     emit_text("\n");
     emit_hex("00 00 80 00 00 00 00 00 00 00 80 00 00 00 00 00");
     emit_text("\n");
-    emit_hex("00 00 80 01 00 00 00 00 00 00 80 01 00 00 00 00 00 10 00 00 00 00 00 00");
+    emit_hex("00 00 00 02 00 00 00 00 00 00 00 02 00 00 00 00 00 10 00 00 00 00 00 00");
     emit_text("\n");
     generated_bytes = 176;
     emit_zero(80);
@@ -1692,6 +1692,6 @@ int main(void) {
             }
         }
     }
-    if (generated_bytes < 0x1800000) emit_zero(0x1800000 - generated_bytes);
+    if (generated_bytes < 0x2000000) emit_zero(0x2000000 - generated_bytes);
     return 0;
 }
