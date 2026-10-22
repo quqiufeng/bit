@@ -13,6 +13,12 @@ typedef union {
     char __size[48];
     long long __align;
 } pthread_cond_t;
+typedef union {
+    char __size[56];
+    long long __align;
+} pthread_rwlock_t;
+typedef int pthread_once_t;
+#define PTHREAD_ONCE_INIT 0
 #define PTHREAD_MUTEX_INITIALIZER { { 0 } }
 int pthread_create(pthread_t *thread, const pthread_attr_t *attributes,
                    void *(*start)(void *), void *argument);
@@ -29,4 +35,10 @@ int pthread_cond_destroy(pthread_cond_t *condition);
 int pthread_cond_wait(pthread_cond_t *condition, pthread_mutex_t *mutex);
 int pthread_cond_signal(pthread_cond_t *condition);
 int pthread_cond_broadcast(pthread_cond_t *condition);
+int pthread_rwlock_init(pthread_rwlock_t *lock, const void *attributes);
+int pthread_rwlock_destroy(pthread_rwlock_t *lock);
+int pthread_rwlock_rdlock(pthread_rwlock_t *lock);
+int pthread_rwlock_wrlock(pthread_rwlock_t *lock);
+int pthread_rwlock_unlock(pthread_rwlock_t *lock);
+int pthread_once(pthread_once_t *once, void (*function)(void));
 #endif
