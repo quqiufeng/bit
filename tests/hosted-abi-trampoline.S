@@ -32,6 +32,14 @@
     cmp %r11, %r15; jne .abi_fatal
 .endm
 
+.macro CHECK_X87
+    push %rax
+    fnstsw %ax
+    test $0x3800, %ax
+    pop %rax
+    jne .abi_fatal
+.endm
+
 .macro RESTORE_CALLEE
     add $8, %rsp
     pop %r15
@@ -53,6 +61,7 @@ call_with_pollution_0:
     mov $0xdeadbeef, %r11
     call *%r10
     CHECK_CALLEE
+    CHECK_X87
     RESTORE_CALLEE
 
 .global call_with_pollution_2
@@ -67,6 +76,7 @@ call_with_pollution_2:
     mov $0xdeadbeef, %r11
     call *%r10
     CHECK_CALLEE
+    CHECK_X87
     RESTORE_CALLEE
 
 .global call_with_pollution_6
@@ -83,6 +93,7 @@ call_with_pollution_6:
     mov $0xdeadbeef, %r11
     call *%r10
     CHECK_CALLEE
+    CHECK_X87
     RESTORE_CALLEE
 
 
@@ -102,6 +113,7 @@ call_with_pollution_7:
     mov $0xdeadbeef, %r11
     call *%r10
     CHECK_CALLEE
+    CHECK_X87
     RESTORE_CALLEE
 
 .global call_with_pollution_2d
@@ -116,6 +128,7 @@ call_with_pollution_2d:
     mov $0xdeadbeef, %r11
     call *%r10
     CHECK_CALLEE
+    CHECK_X87
     RESTORE_CALLEE
 
 .abi_fatal:
