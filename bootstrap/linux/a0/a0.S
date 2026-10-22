@@ -116,6 +116,8 @@ run_pass:
     call read_hex_n
     cmp rax, 65536
     jae fail
+    test r12, r12
+    jz .run_rel_advance
     imul rcx, rax, 24
     lea rdi, [r15 + rcx]
     cmp qword ptr [rdi], 0
@@ -126,6 +128,7 @@ run_pass:
     sub rdx, rcx
     mov eax, edx
     call emit_dword
+.run_rel_advance:
     mov rdi, 4
     call advance
     jmp .run_loop

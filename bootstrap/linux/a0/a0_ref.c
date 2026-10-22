@@ -130,10 +130,12 @@ static void scan(int emit) {
             uint32_t rel;
             pos++;
             id = read_hex(4);
-            if (id >= MAX_LABELS || !labels[id].defined)
-                fail("undefined label");
-            rel = (uint32_t)(labels[id].vaddr - (cur_vaddr + 4));
+            if (id >= MAX_LABELS)
+                fail("label id out of range");
             if (emit) {
+                if (!labels[id].defined)
+                    fail("undefined label");
+                rel = (uint32_t)(labels[id].vaddr - (cur_vaddr + 4));
                 if (cur_offset + 4 > BUF_SIZE)
                     fail("output overflow");
                 out[cur_offset + 0] = (unsigned char)(rel & 0xff);
