@@ -839,7 +839,7 @@ bit/
 
 ### M5：可选增强
 
-当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 已不参与 freestanding 构建，bootstrap 由 `tools/elflink.py` 完成。`.a` 归档已支持按未定义符号选择性抽取成员；动态链接和完整 ELF 节/重定位待补；hosted glibc 测试仍用系统 `ld`。
+当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 已不参与 freestanding 构建，bootstrap 由 `tools/elflink.py` 完成。`.a` 归档已支持按未定义符号选择性抽取成员；c1link 输出已包含 `.text`/`.data`/`.bss`/`.symtab`/`.strtab`/`.shstrtab` 节表。动态链接和其余重定位待补；hosted glibc 测试仍用系统 `ld`。
 
 - 自制 ELF 链接器（静态→动态）。
 - Linux 纯种子链（seed/A0/A1/C0）。
@@ -973,7 +973,7 @@ bit/
 - 状态：接受（原型）
 - 决策：先用 `tools/elflink.py` 验证，再用 C1 编译的 `linux/linker.c` 实现同一套静态链接；当前不替换 `build.sh` 的系统 `ld`。
 - 理由：自制链接器风险高，先用原型对拍并链接 C1 自身，再决定是否用 C 重写并纳入自举链。
-- 后果：C 版本已用于 stage1/stage2 自举链并保持 bit-identical，且 c1link 自身已自举（c1link1 = c1link2）；支持 `.a` 归档的选择性成员抽取；动态链接和完整节表待补。
+- 后果：C 版本已用于 stage1/stage2 自举链并保持 bit-identical，且 c1link 自身已自举（c1link1 = c1link2）；支持 `.a` 归档的选择性成员抽取和节表/符号表输出；动态链接待补。
 
 ### ADR-017：`#pragma pack` 与未对齐聚合
 

@@ -473,13 +473,36 @@ static int select_globals(void) {
     return 0;
 }
 
+static int strlen_c(const char *text) {
+    int n = 0;
+    while (text[n])
+        n++;
+    return n;
+}
+
 static int write_output(const char *path, u64 entry) {
     u64 text_file = 0x1000;
     u64 data_file = align_up(text_file + text_size, 0x1000);
-    u64 file_size = data_file + data_size;
-    unsigned char *image = __c1_linux_HeapAlloc(0, 0, file_size + 1);
-    unsigned char *p;
-    int i;
+    u64 data_end = data_file + data_size;
+    u64 sym_file, str_file, shstr_file, shoff, file_size, sym_size, str_size = 1, shstr_size = 44;
+    u64 value;
+    unsigned char *image, *p, *symtab, *strtab, *shstrtab, *sh;
+    int i, nsym = 1, sym_index, gsec, shndx;
+    struct symbol *s;
+    for (i = 0; i < symbol_count; i++) {
+        s = &symbols[i];
+        if (!objects[s->object].active || s->bind == 0 || s->shndx == 0 || !s->name[0])
+            continue;
+        nsym++;
+        str_size += (u64)strlen_c(s->name) + 1;
+    }
+    sym_file = align_up(data_end, 8);
+    sym_size = (u64)nsym * 24;
+    str_file = sym_file + sym_size;
+    shstr_file = str_file + str_size;
+    shoff = align_up(shstr_file + shstr_size, 8);
+    file_size = shoff + 7 * 64;
+    image = __c1_linux_HeapAlloc(0, 0, file_size + 1);
     if (!image)
         return 1;
     memset(image, 0, (size_t)file_size);
@@ -491,14 +514,14 @@ static int write_output(const char *path, u64 entry) {
     put32(p + 20, 1);
     put64(p + 24, entry);
     put64(p + 32, 64);
-    put64(p + 40, 0);
+    put64(p + 40, shoff);
     put32(p + 48, 0);
     put32(p + 52, 64);
     put32(p + 54, 56);
     put32(p + 56, 4);
     put32(p + 58, 64);
-    put32(p + 60, 0);
-    put32(p + 62, 0);
+    put32(p + 60, 7);
+    put32(p + 62, 6);
     p = image + 64;
     put32(p, 6); put32(p + 4, 5);
     put64(p + 8, 64); put64(p + 16, 0x400040);
@@ -522,6 +545,88 @@ static int write_output(const char *path, u64 entry) {
     memcpy(image + text_file, text_image, (size_t)text_size);
     if (data_size)
         memcpy(image + data_file, data_image, (size_t)data_size);
+    symtab = image + sym_file;
+    strtab = image + str_file;
+    strtab[0] = 0;
+    str_size = 1;
+    sym_index = 1;
+    for (i = 0; i < symbol_count; i++) {
+        s = &symbols[i];
+        if (!objects[s->object].active || s->bind == 0 || s->shndx == 0 || !s->name[0])
+            continue;
+        gsec = objects[s->object].sec_map[s->shndx];
+        shndx = 0;
+        value = 0;
+        if (sections[gsec].out_kind == 1) {
+            shndx = 1;
+            value = text_base + sections[gsec].out_off + s->value;
+        } else if (sections[gsec].out_kind == 2) {
+            shndx = 2;
+            value = data_base + sections[gsec].out_off + s->value;
+        } else if (sections[gsec].out_kind == 3) {
+            shndx = 3;
+            value = bss_base + sections[gsec].out_off + s->value;
+        } else
+            continue;
+        p = symtab + sym_index * 24;
+        put32(p, (u32)str_size);
+        p[4] = (unsigned char)((s->bind << 4) | s->type);
+        p[5] = 0;
+        put32(p + 6, (u32)shndx);
+        put64(p + 8, value);
+        put64(p + 16, s->size);
+        {
+            int j = 0;
+            while (s->name[j]) {
+                strtab[str_size++] = (unsigned char)s->name[j];
+                j++;
+            }
+            strtab[str_size++] = 0;
+        }
+        sym_index++;
+    }
+    shstrtab = image + shstr_file;
+    shstrtab[0] = 0;
+    p = shstrtab + 1;
+    for (i = 0; i < 6; i++) {
+        static char *names[6] = {".text", ".data", ".bss", ".symtab", ".strtab", ".shstrtab"};
+        int j = 0;
+        while (names[i][j])
+            *p++ = (unsigned char)names[i][j++];
+        *p++ = 0;
+    }
+    sh = image + shoff;
+    /* NULL */
+    sh += 64;
+    /* .text */
+    put32(sh, 1); put32(sh + 4, 1); put64(sh + 8, 6); put64(sh + 16, text_base);
+    put64(sh + 24, text_file); put64(sh + 32, text_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 16); put64(sh + 56, 0);
+    sh += 64;
+    /* .data */
+    put32(sh, 7); put32(sh + 4, 1); put64(sh + 8, 3); put64(sh + 16, data_base);
+    put64(sh + 24, data_file); put64(sh + 32, data_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 16); put64(sh + 56, 0);
+    sh += 64;
+    /* .bss */
+    put32(sh, 13); put32(sh + 4, 8); put64(sh + 8, 3); put64(sh + 16, bss_base);
+    put64(sh + 24, data_end); put64(sh + 32, bss_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 16); put64(sh + 56, 0);
+    sh += 64;
+    /* .symtab */
+    put32(sh, 18); put32(sh + 4, 2); put64(sh + 8, 0); put64(sh + 16, 0);
+    put64(sh + 24, sym_file); put64(sh + 32, sym_size); put32(sh + 40, 5); put32(sh + 44, 1);
+    put64(sh + 48, 8); put64(sh + 56, 24);
+    sh += 64;
+    /* .strtab */
+    put32(sh, 26); put32(sh + 4, 3); put64(sh + 8, 0); put64(sh + 16, 0);
+    put64(sh + 24, str_file); put64(sh + 32, str_size); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 1); put64(sh + 56, 0);
+    sh += 64;
+    /* .shstrtab */
+    put32(sh, 34); put32(sh + 4, 3); put64(sh + 8, 0); put64(sh + 16, 0);
+    put64(sh + 24, shstr_file); put64(sh + 32, 44); put32(sh + 40, 0); put32(sh + 44, 0);
+    put64(sh + 48, 1); put64(sh + 56, 0);
     i = write_file(path, image, file_size);
     __c1_linux_HeapFree(0, 0, image);
     return i;

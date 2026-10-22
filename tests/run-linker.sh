@@ -18,6 +18,10 @@ python3 "$LINK" "$BUILD/linker-c1-stage1" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
     "$BUILD/hello.o" "$BUILD/syscalls_sysv.o"
 "$BUILD/c-linker-hello"
+if command -v readelf >/dev/null 2>&1; then
+    readelf -S "$BUILD/c-linker-hello" | grep -q '.symtab'
+    readelf -s "$BUILD/c-linker-hello" | grep -q ' main'
+fi
 echo "PASS: C linker -> hello"
 
 "$BUILD/c1link" "$BUILD/c-linker-c1-stage1" _start \
