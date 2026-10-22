@@ -17,7 +17,7 @@ cd "$ROOT"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/compiler.c > "$OUT/compiler.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
-"$BUILD/c1link" "$OUT/native-linker" _start \
+"$ROOT/bootstrap/linux/c0/native/linker.seed.elf" "$OUT/native-linker" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
 "$OUT/native-linker" "$OUT/native-linker2" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
