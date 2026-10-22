@@ -23,12 +23,23 @@ Linux ELF64 ET_EXEC, static, fixed load address.  The ELF header and program
 headers are part of the A0 source image, exactly as the upstream PE headers are
 part of `a0.a0`.
 
+## Current implementation
+
+- `a0_ref.c`: host C reference, used only as a semantics oracle
+- `a0.S`: syscall-only x86-64 body, no libc calls
+- `smoke.a0`: two PT_LOAD ELF image, exits 42
+- `rel.a0`: forward label reference test
+
+`test.sh` checks the C reference.  `test-asm.sh` compiles `a0.S` with the host
+cc/ld, then compares its output byte-for-byte with `a0_ref.c`.
+
 ## Constraints
 
-- syscall-only x86-64; no gcc, ld, libc or upstream Windows seed
+- final A0 must be syscall-only; no gcc, ld, libc or upstream Windows seed
 - one read buffer, one output buffer, no external files
 - deterministic output
 - first milestone: resolve a hand-written A0 image that exits with status 42
 - second milestone: assemble A1, then A1 assembles itself twice
 
-`smoke.a0` is an A1-syntax target, not an A0 input yet.
+The remaining gap is bootstrapping `a0.S` into a self-contained `a0.hex`
+without the host cc/ld used by the test harness.
