@@ -16,3 +16,12 @@ set +e
 status=$?
 set -e
 test "$status" -eq 42
+
+"$OUT/c0v2" < "$ROOT/bootstrap/linux/c0/c0v2-args.c" > "$OUT/args.a1"
+"$BUILD/a1/a1" < "$OUT/args.a1" > "$OUT/args.elf"
+chmod +x "$OUT/args.elf"
+set +e
+"$OUT/args.elf"
+status=$?
+set -e
+test "$status" -eq 42

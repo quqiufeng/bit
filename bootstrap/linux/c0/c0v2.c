@@ -692,12 +692,62 @@ static void ex_primary(void) {
                     break;
                 }
             }
-            if (n >= 6) emit_hex("41 59");
-            if (n >= 5) emit_hex("41 58");
-            if (n >= 4) emit_hex("59");
-            if (n >= 3) emit_hex("5A");
-            if (n >= 2) emit_hex("5E");
-            if (n >= 1) emit_hex("5F");
+            if (n > 6) {
+                int i, a, b, slots = n - 6;
+                emit_hex("48 8B BC 24");
+                emit_imm32((u32)(8 * (n - 1)));
+                emit_text("\n");
+                emit_hex("48 8B B4 24");
+                emit_imm32((u32)(8 * (n - 2)));
+                emit_text("\n");
+                emit_hex("48 8B 94 24");
+                emit_imm32((u32)(8 * (n - 3)));
+                emit_text("\n");
+                emit_hex("48 8B 8C 24");
+                emit_imm32((u32)(8 * (n - 4)));
+                emit_text("\n");
+                emit_hex("4C 8B 84 24");
+                emit_imm32((u32)(8 * (n - 5)));
+                emit_text("\n");
+                emit_hex("4C 8B 8C 24");
+                emit_imm32((u32)(8 * (n - 6)));
+                emit_text("\n");
+                for (i = 0; i < slots / 2; i++) {
+                    a = 8 * i;
+                    b = 8 * (slots - 1 - i);
+                    emit_hex("4C 8B 94 24");
+                    emit_imm32((u32)a);
+                    emit_text("\n");
+                    emit_hex("4C 8B 9C 24");
+                    emit_imm32((u32)b);
+                    emit_text("\n");
+                    emit_hex("4C 89 94 24");
+                    emit_imm32((u32)b);
+                    emit_text("\n");
+                    emit_hex("4C 89 9C 24");
+                    emit_imm32((u32)a);
+                    emit_text("\n");
+                }
+                for (i = slots - 1; i >= 0; i--) {
+                    a = 8 * i;
+                    emit_hex("4C 8B 94 24");
+                    emit_imm32((u32)a);
+                    emit_text("\n");
+                    emit_hex("4C 89 94 24");
+                    emit_imm32((u32)(a + 48));
+                    emit_text("\n");
+                }
+                emit_hex("48 81 C4");
+                emit_imm32(48);
+                emit_text("\n");
+            } else {
+                if (n >= 6) emit_hex("41 59");
+                if (n >= 5) emit_hex("41 58");
+                if (n >= 4) emit_hex("59");
+                if (n >= 3) emit_hex("5A");
+                if (n >= 2) emit_hex("5E");
+                if (n >= 1) emit_hex("5F");
+            }
             emit_hex("E8");
             emit_named_ref(name);
             emit_text("\n");
