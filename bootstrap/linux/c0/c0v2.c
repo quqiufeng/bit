@@ -355,6 +355,7 @@ static u64 number(void) {
         }
     }
     if (!any) fail();
+    while (pos < src_len && (src[pos] == 'U' || src[pos] == 'u' || src[pos] == 'L' || src[pos] == 'l')) pos++;
     return v;
 }
 
@@ -528,10 +529,8 @@ static int assign_ahead(void) {
     else if (op("&=")) assign_op = '&';
     else if (op("|=")) assign_op = '|';
     else if (op("^=")) assign_op = '^';
-    else if (op("<<") || op(">>")) {
-        pos = save;
-        return 0;
-    }
+    else if (op("<<=")) assign_op = 'L';
+    else if (op(">>=")) assign_op = 'R';
     else if (pos + 1 < src_len && src[pos] == '=' && src[pos + 1] != '=') assign_op = 0;
     else {
         pos = save;
@@ -1035,6 +1034,8 @@ static void ex_expr(void) {
         else if (aop == '&') op("&=");
         else if (aop == '|') op("|=");
         else if (aop == '^') op("^=");
+        else if (aop == 'L') op("<<=");
+        else if (aop == 'R') op(">>=");
         ex_expr();
         emit_hex("48 89 C1 58");
         emit_text("\n");
@@ -1051,6 +1052,8 @@ static void ex_expr(void) {
         else if (aop == '&') emit_hex("48 21 C8");
         else if (aop == '|') emit_hex("48 09 C8");
         else if (aop == '^') emit_hex("48 31 C8");
+        else if (aop == 'L') emit_hex("48 D3 E0");
+        else if (aop == 'R') emit_hex("48 D3 E8");
         emit_text("\n");
         emit_hex("5A");
         emit_text("\n");
@@ -1062,6 +1065,21 @@ static void ex_expr(void) {
         return;
     }
     ex_or();
+    if (op("?")) {
+        int e = new_label();
+        int d = new_label();
+        emit_hex("48 83 F8 00 0F 84");
+        emit_ref(e);
+        emit_text("\n");
+        ex_expr();
+        ch(':');
+        emit_hex("E9");
+        emit_ref(d);
+        emit_text("\n");
+        emit_label(e);
+        ex_expr();
+        emit_label(d);
+    }
 }
 
 static void ex_stmt(void);
