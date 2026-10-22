@@ -38,7 +38,7 @@ The native script checks the fixed points:
 | `a0.seed.hex` | hex text | seed decoder |
 | `a1.seed.hex` | hex text | A0 |
 | `c0v2.a1` | A1 text | C0v2 fixed point |
-| `compiler-runtime.c` | C text | `make-seed-source.sh` (optional) |
+| `compiler-runtime.c` | C text | `make-seed-source.sh` with `make-source.c` (optional) |
 | `linux/standalone-*.c` | C source | source-built `c1l` linker |
 
 ## Not yet lowered
@@ -52,6 +52,7 @@ provenance is the remaining formalization gap.
 ```sh
 BUILD=/tmp/zero ./build-zero.sh
 BUILD=/tmp/core ./build-core.sh
+bootstrap/linux/c0/native/make-seed-source.sh
 tests/clean-room.sh
 tests/clean-room-full.sh
 ```
