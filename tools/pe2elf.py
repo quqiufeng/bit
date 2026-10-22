@@ -45,10 +45,25 @@ def cstr(image, rva):
 def main(argv):
     allow = '--allow-unresolved' in argv
     args = [a for a in argv if a != '--allow-unresolved']
+    c1_output = None
+    if '--c1-output' in args:
+        i = args.index('--c1-output')
+        if i + 1 >= len(args):
+            sys.stderr.write('pe2elf: --c1-output needs a value\n')
+            return 2
+        c1_output = args[i + 1]
+        del args[i:i + 2]
     if len(args) != 2:
-        sys.stderr.write('usage: pe2elf.py [--allow-unresolved] <input.exe> <output.elf>\n')
+        sys.stderr.write('usage: pe2elf.py [--allow-unresolved] [--c1-output object] <input.exe> <output.elf>\n')
         return 2
     src, dst = args
+    stubs = bytearray(STUBS)
+    if c1_output is not None:
+        if c1_output != 'object':
+            sys.stderr.write('pe2elf: --c1-output only supports object\n')
+            return 2
+        off = OFF['c1_output']
+        stubs[off:off + 7] = b'object\0'
 
     d = open(src, 'rb').read()
     pe = u32(d, 0x3c)
@@ -115,7 +130,7 @@ def main(argv):
         sys.stderr.write('pe2elf: --allow-unresolved, continuing with unresolved IAT entries\n')
 
     stub_off = align(0x1000 + size, 0x1000)
-    shoff = align(stub_off + len(STUBS), 8)
+    shoff = align(stub_off + len(stubs), 8)
     out = bytearray(shoff)
     out[0:4] = b'\x7fELF'
     out[4] = 2
@@ -137,11 +152,11 @@ def main(argv):
     ph = 64
     struct.pack_into('<IIQQQQQQ', out, ph, 1, 7, 0x1000, base, base, size, size, 0x1000)
     ph += 56
-    struct.pack_into('<IIQQQQQQ', out, ph, 1, 5, stub_off, 0x900000, 0x900000, len(STUBS), len(STUBS), 0x1000)
+    struct.pack_into('<IIQQQQQQ', out, ph, 1, 5, stub_off, 0x900000, 0x900000, len(stubs), len(stubs), 0x1000)
     ph += 56
     struct.pack_into('<IIQQQQQQ', out, ph, 0x6474e551, 6, 0, 0, 0, 0, 0, 0x10)
     out[0x1000:0x1000 + size] = image
-    out[stub_off:stub_off + len(STUBS)] = STUBS
+    out[stub_off:stub_off + len(stubs)] = stubs
     open(dst, 'wb').write(out)
     import os
     os.chmod(dst, 0o755)

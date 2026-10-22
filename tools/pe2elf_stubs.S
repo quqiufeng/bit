@@ -188,49 +188,65 @@ stub_GetEnvironmentVariableA:
     push rdi
     lea rsi, [rip + .Lname_include]
     xor r9d, r9d
-1:
+.Lcmp_include:
     mov al, [rcx + r9]
     cmp al, [rsi + r9]
-    jne 2f
+    jne .Lcmp_standard
     test al, al
     jz .Linclude
     inc r9
-    jmp 1b
-2:
+    jmp .Lcmp_include
+.Lcmp_standard:
     lea rsi, [rip + .Lname_standard]
     xor r9d, r9d
-3:
+.Lcmp_standard_loop:
+    mov al, [rcx + r9]
+    cmp al, [rsi + r9]
+    jne .Lcmp_output
+    test al, al
+    jz .Lstandard
+    inc r9
+    jmp .Lcmp_standard_loop
+.Lcmp_output:
+    lea rsi, [rip + .Lname_output]
+    xor r9d, r9d
+.Lcmp_output_loop:
     mov al, [rcx + r9]
     cmp al, [rsi + r9]
     jne .Lnot_found
     test al, al
-    jz .Lstandard
+    jz .Loutput
     inc r9
-    jmp 3b
+    jmp .Lcmp_output_loop
 .Linclude:
     lea rdi, [rip + .Lvalue_include]
     jmp .Lcopy
 .Lstandard:
     lea rdi, [rip + .Lvalue_standard]
+    jmp .Lcopy
+.Loutput:
+    cmp byte ptr [rip + data_c1_output], 0
+    je .Lnot_found
+    lea rdi, [rip + data_c1_output]
 .Lcopy:
     xor r9d, r9d
-4:
+.Lcopy_loop:
     mov al, [rdi + r9]
     test al, al
-    jz 5f
+    jz .Lcopy_end
     inc r9
-    jmp 4b
-5:
+    jmp .Lcopy_loop
+.Lcopy_end:
     lea rax, [r9 + 1]
     cmp r8, rax
     jb .Lsmall
     xor r10d, r10d
-6:
+.Lcopy_bytes:
     mov al, [rdi + r10]
     mov [rdx + r10], al
     inc r10
     cmp r10, rax
-    jb 6b
+    jb .Lcopy_bytes
     mov rax, r9
     jmp .Ldone
 .Lsmall:
@@ -251,3 +267,7 @@ stub_GetEnvironmentVariableA:
     .asciz "."
 .Lvalue_standard:
     .asciz "c99"
+.Lname_output:
+    .asciz "C1_OUTPUT"
+data_c1_output:
+    .skip 8

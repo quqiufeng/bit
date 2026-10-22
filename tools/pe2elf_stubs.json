@@ -9,5 +9,6 @@
   "HeapAlloc": 248,
   "HeapFree": 316,
   "ReadFile": 15,
-  "WriteFile": 83
+  "WriteFile": 83,
+  "c1_output": 580
 }

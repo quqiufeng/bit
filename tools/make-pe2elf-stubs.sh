@@ -17,7 +17,7 @@ for line in open(nm_path):
     if len(parts) != 3:
         continue
     addr, kind, name = parts
-    if kind in 'tT' and name.startswith('stub_'):
+    if kind in 'tTdDbB' and (name.startswith('stub_') or name.startswith('data_')):
         offs[name[5:]] = int(addr, 16)
 open(out_bin, 'wb').write(data)
 open(out_json, 'w').write(json.dumps(offs, indent=2, sort_keys=True) + '\n')
