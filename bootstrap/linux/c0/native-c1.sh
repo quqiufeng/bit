@@ -22,4 +22,7 @@ C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
 cmp "$OUT/tiny.o" "$OUT/tiny-stage1.o"
 C1_INCLUDE="$ROOT" "$OUT/stage1" < linux/compiler.c > "$OUT/compiler-stage2.o"
 cmp "$OUT/compiler.o" "$OUT/compiler-stage2.o"
-echo "PASS: native Linux C1 compiles an ELF object and reaches stage1 == stage2"
+"$BUILD/c1link" "$OUT/stage2" _start \
+    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler-stage2.o" "$BUILD/syscalls_sysv.o"
+cmp "$OUT/stage1" "$OUT/stage2"
+echo "PASS: native Linux C1 compiles an ELF object and reaches stage1 == stage2 binaries"
