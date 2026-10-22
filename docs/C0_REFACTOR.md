@@ -213,8 +213,9 @@ bootstrap/linux/c0/c0v2.c
 - 指针类型、`char *` 参数、`&x`、`*p`、`p[i]`、指针算术已加入
 - `int *p` 和 `char *p` 基本索引已通过
 - `selfsource` 已能把 `c0v2.c` 编成约 115KB A1，A1 能装配出 ELF
-- `c0v2` 第一代自编译输出仅 836 字节，固定点未达成；说明 char/指针代码生成仍有语义 bug
-- 下一步：对比 first/second selfsource，定位指针/字符宽度/函数返回问题
+- `c0v2` 第一代自编译输出仅 836 字节，固定点未达成
+- 已确认 stage1 能正确读取 stdin（read 到 27 字节），但随后只输出 ELF 头/填充，未编译源文件
+- 下一步：调试 stage1 的 `type_word`/`skip`/parser 路径，定位为什么输入被读入但未进入声明解析
 
 ### Phase 4：自增/复合赋值
 
