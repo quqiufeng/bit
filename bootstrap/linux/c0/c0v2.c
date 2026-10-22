@@ -755,9 +755,13 @@ static void ex_unary(void) {
     u64 cast_save = pos;
     if (ch('(')) {
         int tw = type_word();
+        int cp = 0;
+        while (ch('*')) cp = 1;
         if (tw && ch(')')) {
             ex_unary();
-            if (tw == 2) {
+            if (cp) {
+                ex_type = 6; ex_ptr = 1;
+            } else if (tw == 2) {
                 emit_hex("48 25 FF 00 00 00");
                 emit_text("\n");
             } else if (tw == 7) {
@@ -1377,8 +1381,14 @@ static void ex_function(char *name) {
     emit_text("\n");
     l_count = 0;
     ch('(');
-    word("void");
-    while (!ch(')')) {
+    {
+        int noparams = 0;
+        u64 ps = pos;
+        if (word("void")) {
+            if (ch(')')) noparams = 1;
+            else pos = ps;
+        }
+        while (!noparams && !ch(')')) {
         {
             int tw = type_word();
             int pelem = type_size(tw);
@@ -1399,6 +1409,7 @@ static void ex_function(char *name) {
             p++;
         }
         ch(',');
+        }
     }
     {
         int i;
