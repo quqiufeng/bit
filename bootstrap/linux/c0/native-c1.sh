@@ -4,6 +4,9 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 OUT="$BUILD/native-c1"
 mkdir -p "$OUT"
+LINKER="$OUT/linker.seed.elf"
+"$ROOT/bootstrap/linux/a1/a1.seed.elf" < "$ROOT/bootstrap/linux/c0/native/linker.seed.hex" > "$LINKER"
+chmod +x "$LINKER"
 C0V2="$OUT/c0v2-seed.elf"
 "$ROOT/bootstrap/linux/a1/a1.seed.elf" < "$ROOT/bootstrap/linux/c0/c0v2.a1" > "$C0V2"
 chmod +x "$C0V2"
@@ -21,7 +24,7 @@ C1_INCLUDE="$ROOT" "$OUT/c1.elf" < "$OUT/compiler.i" > "$OUT/compiler-i.o"
 cmp "$OUT/compiler.o" "$OUT/compiler-i.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
-"$ROOT/bootstrap/linux/c0/native/linker.seed.elf" --bootstrap "$OUT/native-linker" _start \
+"$LINKER" --bootstrap "$OUT/native-linker" _start \
     "$OUT/runtime.o" "$OUT/linker.o"
 "$OUT/native-linker" --bootstrap "$OUT/native-linker2" _start \
     "$OUT/runtime.o" "$OUT/linker.o"
