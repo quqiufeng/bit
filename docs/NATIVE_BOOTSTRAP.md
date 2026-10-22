@@ -18,7 +18,8 @@ A1 seed
 
 The native path uses only committed seeds:
 
-- `bootstrap/linux/a0/a0.seed.elf` (bootstraps A1)
+- `bootstrap/linux/seed.elf` / `seed.hex` (root hex decoder)
+- `bootstrap/linux/a0/a0.seed.hex`
 - `bootstrap/linux/a1/a1.seed.hex`
 - `bootstrap/linux/c0/c0v2.a1`
 - `bootstrap/linux/c0/native/compiler-runtime.c`

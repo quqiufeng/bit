@@ -4,8 +4,11 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 OUT="$BUILD/native-c1"
 mkdir -p "$OUT"
+A0="$OUT/a0.seed.elf"
+"$ROOT/bootstrap/linux/seed.elf" < "$ROOT/bootstrap/linux/a0/a0.seed.hex" > "$A0"
+chmod +x "$A0"
 A1="$OUT/a1.seed.elf"
-"$ROOT/bootstrap/linux/a0/a0.seed.elf" < "$ROOT/bootstrap/linux/a1/a1.seed.hex" > "$A1"
+"$A0" < "$ROOT/bootstrap/linux/a1/a1.seed.hex" > "$A1"
 chmod +x "$A1"
 LINKER="$OUT/linker.seed.elf"
 "$A1" < "$ROOT/bootstrap/linux/c0/native/linker.seed.hex" > "$LINKER"
