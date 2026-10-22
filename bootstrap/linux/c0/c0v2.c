@@ -9,6 +9,9 @@ extern void __c1_sysv_exit(long long);
 static char src[1048576];
 static u64 src_len, pos, generated_bytes;
 static int label_seq = 0x2000;
+static char goto_names[128][64];
+static int goto_ids[128];
+static int goto_count;
 static char g_name[256][64];
 static u64 g_size[256];
 static int g_type[256];
@@ -573,9 +576,46 @@ static void emit_incdec(int delta, int postfix) {
     emit_text("\n");
 }
 
+static int goto_id(const char *name) {
+    int i;
+    for (i = 0; i < goto_count; i++)
+        if (strcmp(goto_names[i], name) == 0) return goto_ids[i];
+    if (goto_count == 128) fail();
+    strcpy(goto_names[goto_count], name);
+    goto_ids[goto_count] = new_label();
+    goto_count++;
+    return goto_ids[goto_count - 1];
+}
+
 static void ex_primary(void) {
     char name[64];
     skip();
+    if (word("sizeof")) {
+        u64 sz = 0;
+        ch('(');
+        if (type_word()) {
+            sz = (u64)type_size(last_type);
+            if (ch('[')) {
+                u64 n = number();
+                ch(']');
+                sz = sz * n;
+            }
+        } else {
+            int li, gi;
+            if (!ident(name)) fail();
+            li = find_local(name);
+            gi = li < 0 ? find_global(name) : -1;
+            if (li >= 0) sz = (u64)l_size[li];
+            else if (gi >= 0) sz = (u64)g_size[gi];
+            else fail();
+        }
+        ch(')');
+        emit_hex("B8");
+        emit_imm32((u32)sz);
+        emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
+        return;
+    }
     if (pos < src_len && src[pos] == '"') {
         int a = new_label();
         int b = new_label();
@@ -1049,8 +1089,47 @@ static void ex_block(void) {
 }
 
 static void ex_stmt(void) {
+    char gname[64];
+    u64 gsave;
     skip();
     last_pos = pos;
+    gsave = pos;
+    if (ident(gname)) {
+        if (ch(':')) {
+            emit_label(goto_id(gname));
+            return;
+        }
+        pos = gsave;
+    }
+    if (word("goto")) {
+        if (!ident(gname)) fail();
+        ch(';');
+        emit_hex("E9");
+        emit_ref(goto_id(gname));
+        emit_text("\n");
+        return;
+    }
+    if (word("do")) {
+        int s = new_label();
+        int e = new_label();
+        int oldb = brk_n;
+        brk_l[brk_n] = e;
+        cont_l[brk_n] = s;
+        brk_n++;
+        emit_label(s);
+        ex_stmt();
+        word("while");
+        ch('(');
+        ex_expr();
+        ch(')');
+        ch(';');
+        emit_hex("48 83 F8 00 0F 85");
+        emit_ref(s);
+        emit_text("\n");
+        emit_label(e);
+        brk_n = oldb;
+        return;
+    }
     if (word("return")) {
         if (!ch(';')) {
             ex_expr();
