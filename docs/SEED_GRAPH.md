@@ -54,6 +54,7 @@ provenance is the remaining formalization gap.
 BUILD=/tmp/zero ./build-zero.sh
 BUILD=/tmp/core ./build-core.sh
 tests/clean-room.sh
+tests/clean-room-full.sh
 ```
 
 `build.sh` additionally runs host-only PE, hosted glibc and interoperability
