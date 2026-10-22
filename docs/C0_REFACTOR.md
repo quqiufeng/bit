@@ -260,7 +260,10 @@ bootstrap/linux/c0/c0v2.c
 - 已加入 `check_pos()` 哨兵：`pos > 1048576` 时退出 188；用 stage1 编译 `c0v2.c` 确认触发 188
 - 巨大 `pos = 0x006574735F646F76`，按小端解码为字节 `76 6f 64 5F 73 74 65 00`，即 `"vod_ste\0"`，明显来自源码标识符/字符串文本
 - 说明不是普通数值溢出，而是局部/栈/字符串缓冲写入覆盖了 `pos` 或其 `save` 槽
-- 下一步：分别只在 `word()` 与 `ident()` 挂哨兵，确定第一次踩踏发生在哪个函数，并检查 `word` 的 `u64 save` 与 `ident` 的 `dst/name[64]` 栈槽偏移
+- 已分别挂哨兵：只在 `word()` 挂哨兵不触发 188，只在 `ident()` 挂哨兵触发 188
+- 因此第一次把 `pos` 写成源码文本的是 `ident()` 的 `dst[n++] = src[pos]` 写入路径
+- 最可能：调用 `ident(name)` 时 `name` 的地址/`rbp` 已损坏，`dst` 指向了全局 `pos`，源码标识符文本被写进 `pos`
+- 下一步：在 `ident` 入口记录 `dst` 低位地址、在 main 调用点记录 `name` 地址，确认 `dst` 是否等于 `pos` 的地址；检查 `type_word()` 返回后 `rbp/name` 地址
 - 下一步：对最新 stage1 重新做地址断点，而不是复用旧 ELF
 - 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
