@@ -1,0 +1,26 @@
+typedef unsigned long long u64;
+extern u64 call_with_pollution_0(u64 (*)(void));
+extern u64 call_with_pollution_2(u64 (*)(u64, u64), u64, u64);
+extern u64 call_with_pollution_6(u64 (*)(u64, u64, u64, u64, u64, u64), u64, u64, u64, u64, u64, u64);
+extern double call_with_pollution_2d(double (*)(int, double), int, double);
+extern u64 c1_target_0(void);
+extern u64 c1_target_2(u64, u64);
+extern u64 c1_target_6(u64, u64, u64, u64, u64, u64);
+extern double c1_target_2d(int, double);
+extern u64 gcc_target_0(void);
+extern u64 gcc_target_2(u64, u64);
+extern u64 gcc_target_6(u64, u64, u64, u64, u64, u64);
+extern double gcc_target_2d(int, double);
+extern u64 gcc_caller_c1_2(u64 (*)(u64, u64));
+int main(void) {
+    if (call_with_pollution_0(c1_target_0) != 11) return 1;
+    if (call_with_pollution_0(gcc_target_0) != 11) return 2;
+    if (call_with_pollution_2(c1_target_2, 5, 7) != 22) return 3;
+    if (call_with_pollution_2(gcc_target_2, 5, 7) != 22) return 4;
+    if (call_with_pollution_6(c1_target_6, 1, 2, 3, 4, 5, 6) != 245) return 5;
+    if (call_with_pollution_6(gcc_target_6, 1, 2, 3, 4, 5, 6) != 245) return 6;
+    if (call_with_pollution_2d(c1_target_2d, 3, 4.5) != 12.0) return 7;
+    if (call_with_pollution_2d(gcc_target_2d, 3, 4.5) != 12.0) return 8;
+    if (gcc_caller_c1_2(c1_target_2) != 30) return 9;
+    return 0;
+}
