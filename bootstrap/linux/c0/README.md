@@ -39,8 +39,8 @@ This avoids compact `char` slot complexity while keeping pointer arithmetic exac
 ## Tests
 
 `build.sh` compiles C0, emits A1 text, lets A1 assemble it, and checks
-`exit(42)`.  `selfhost.sh` checks that A0 and A1 can reproduce `c0.seed.elf`
-from `c0.seed.hex`.
+`exit(42)`.  `selfhost.sh` materializes A0/A1 from their text seeds and checks
+that both can reproduce `c0.seed.elf` from `c0.seed.hex`.
 
 
 ## Source-level selfhost audit

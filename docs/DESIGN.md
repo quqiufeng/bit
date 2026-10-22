@@ -509,8 +509,8 @@ Linux seed → Linux A0 → Linux A1 → Linux C0 → Linux C1
 
 当前基线：
 
-- `bootstrap/linux/seed.hex`：手写十六进制解码器的原始 ELF 十六进制；`seed.elf` 可复现自身并生成 `a0.seed.elf`。
-- `bootstrap/linux/a0/`：A0 契约、C 参考实现 `a0_ref.c`、syscall-only 汇编本体 `a0.S` 和测试源；两者输出已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出。`a0.S` 由宿主 cc/ld 生成一次 `a0.seed.elf`/`a0.seed.hex`；`selfhost.sh` 用该 seed 重新解码自身 hex 并逐字节比较，已无 cc/ld 参与。手写 seed 解码器已完成；Linux A1 参考实现和 freestanding A1 本体已完成，A1 能装配 `smoke.a1` 并以 42 退出；`a1.seed.elf` 可由 A0 从 `a1.seed.hex` 复现。最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已有物理字节计数器、十进制 `.zero` 尾部补齐、64 KiB RX 段和独立 RW/BSS 段；`c0.seed.elf` 可由 A0/A1 从 hex 复现。C0 仍未实现函数/局部变量/控制流，下一步是扩展它到能编译 C1 桥接源码。
+- `bootstrap/linux/seed.hex`：手写十六进制解码器的原始 ELF 十六进制；`seed.elf` 可复现自身，并从 `a0.seed.hex` 按需生成 A0（A0 二进制不提交）。
+- `bootstrap/linux/a0/`：A0 契约、C 参考实现 `a0_ref.c`、syscall-only 汇编本体 `a0.S` 和测试源；两者输出已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出。`a0.S` 由宿主 cc/ld 仅在重新生成 `a0.seed.hex` 时使用；`from-hex.sh` 用 `seed.elf` 从该 hex 按需物化 A0，`selfhost.sh` 再用 A0 重新解码自身 hex 并逐字节比较，已无 cc/ld 参与。手写 seed 解码器已完成；Linux A1 参考实现和 freestanding A1 本体已完成，A1 能装配 `smoke.a1` 并以 42 退出；A1 由 A0 从 `a1.seed.hex` 按需物化，二进制不提交。最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已有物理字节计数器、十进制 `.zero` 尾部补齐、64 KiB RX 段和独立 RW/BSS 段；`c0.seed.elf` 可由 A0/A1 从 hex 复现。C0 仍未实现函数/局部变量/控制流，下一步是扩展它到能编译 C1 桥接源码。
 - `bootstrap/minimal-chain.sh`：上游 `seed → A0 → A1 → C0 → C1` 在 Linux 上通过
   `tools/pe2elf.c` + kernel32 shim 运行；产物仍是 Windows PE C1，仅作为
   上游链可执行性的对照，不作为 Linux 最终 C1。
@@ -1012,7 +1012,7 @@ bit/
 - 自制 ELF 链接器（静态→动态）。
 - 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.c` + kernel32 shim），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
 - Win64 PE C1 → SysV 桥接：`bootstrap/bridge.sh` 已完成，上游 object C1 编译 `linux/compiler.c`，上游 PE 链接器生成 `bridge.exe`，c1link 闭合 Linux stage1/stage2；仍依赖上游 seed/PE 链接器。
-- Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并生成 `a0.seed.elf`；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 复现 A1；最小 C0 已完成 C→A1→ELF 的 `return N` 闭环，尚未实现函数/控制流。
+- Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并从 `a0.seed.hex` 按需物化 A0；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 按需物化 A1（A0/A1 二进制不提交）；最小 C0 已完成 C→A1→ELF 的 `return N` 闭环，尚未实现函数/控制流。
 - PIC/PIE。
 - 更多系统头/扩展（E2）。
 - 性能优化。

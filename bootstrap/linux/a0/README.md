@@ -41,9 +41,10 @@ cc/ld, then compares its output byte-for-byte with `a0_ref.c`.
 - first milestone: resolve a hand-written A0 image that exits with status 42
 - second milestone: assemble A1, then A1 assembles itself twice
 
-`make-seed.sh` uses the host cc/ld once to produce `a0.seed.elf` and
-`a0.seed.hex`.  `selfhost.sh` then runs that seed on its own hex and compares
-the result byte-for-byte, with no cc/ld involved.
+`make-seed.sh` uses the host cc/ld only to regenerate `a0.seed.hex` from
+`a0.S`; the A0 binary is not committed.  `from-hex.sh [out]` materializes A0
+from `seed.elf` and `a0.seed.hex`.  `selfhost.sh` materializes A0, runs it on
+its own hex and compares the result byte-for-byte, with no cc/ld involved.
 
-The remaining gap is replacing `a0.seed.elf` with a hand-authored minimal seed
-decoder.
+The remaining gap is replacing the initial host-generated `a0.seed.hex` with a
+hand-authored minimal seed decoder.

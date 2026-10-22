@@ -16,11 +16,12 @@ A1 seed
 `stage1` and `stage2` are byte-identical.  The path is exercised by
 `bootstrap/linux/c0/native-c1.sh` and by `./build.sh`.
 
-The native path uses only committed seeds:
+The only committed binary seed is `bootstrap/linux/seed.elf`.  A0 and A1 are
+materialized on demand from text seeds into the build directory:
 
-- `bootstrap/linux/seed.elf` / `seed.hex` (root hex decoder)
-- `bootstrap/linux/a0/a0.seed.hex`
-- `bootstrap/linux/a1/a1.seed.hex`
+- `bootstrap/linux/seed.elf` / `seed.hex` (trusted binary root)
+- `bootstrap/linux/a0/a0.seed.hex` -> A0 via `a0/from-hex.sh`
+- `bootstrap/linux/a1/a1.seed.hex` -> A1 via `a1/from-hex.sh`
 - `bootstrap/linux/c0/c0v2.a1`
 - `bootstrap/linux/c0/native/compiler-runtime.c`
 

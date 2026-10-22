@@ -17,5 +17,7 @@ to A0:
 little-endian PC-relative displacement.  `.zero` accepts a decimal constant
 only; it does not evaluate label expressions.
 
-`a1.seed.hex` is reproduced by A0 and by A1 itself.  Source-level A1
-self-hosting is still open; the next milestone is C0 for `bootstrap.c`.
+`a1.seed.hex` is reproduced by A0 and by A1 itself.  The A1 binary is not
+committed; `from-hex.sh [out]` materializes it by running the A0 seed on
+`a1.seed.hex`.  Source-level A1 self-hosting is still open; the next milestone
+is C0 for `bootstrap.c`.
