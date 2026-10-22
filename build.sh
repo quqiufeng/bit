@@ -83,10 +83,11 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/fuzz-expr.sh
 ./tests/fuzz-struct.sh
 ./tests/fuzz-float.sh
+./tests/fuzz-varargs.sh
 ./tests/run-native.sh
 ./tests/run-native-hosted.sh
 ./tests/ddc.sh
 ./bootstrap/linux/c0/chain.sh
 ./tools/check_sources.sh
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native seed-bundle Linux C1 + linker stage1==stage2, native C1/GCC differential, native/GCC SysV differential, fuzz expressions, fuzz structs, fuzz long double, native SysV corpus, Native C1 hosted/interop/reject/env/archive/shared/dynamic, DDC object equality, Linux seed, upstream bridge and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native seed-bundle Linux C1 + linker stage1==stage2, native C1/GCC differential, native/GCC SysV differential, fuzz expressions, fuzz structs, fuzz long double, fuzz varargs, native SysV corpus, Native C1 hosted/interop/reject/env/archive/shared/dynamic, DDC object equality, Linux seed, upstream bridge and source checks"
