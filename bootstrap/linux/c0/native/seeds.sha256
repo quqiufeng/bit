@@ -4,4 +4,4 @@ e03b3ac184ffde8393549827a281446105c3ec02449dbe9b47175a875f050702  bootstrap/linu
 5e1c91d40dc9d4f66c919be021170476c7e046a55dafb61dc8232bc861889880  bootstrap/linux/a1/a1.seed.hex
 7fedbb542fc080c26ce76d36e79a3d35de5bb02563ef0535b7449f1676cacdb1  bootstrap/linux/c0/c0v2.a1
 678d47ef4b4f51aa7b72a317e7a517da6c2a24ac9de3d7d6d32eb1b161612ada  bootstrap/linux/c0/native/compiler-runtime.c
-1ae23e78eefd8af2d1623b58ecc36f3bf6d477e7a6f48a37a81eb79d33776ec8  bootstrap/linux/c0/native/linker.seed.hex
+1208389161a6addadbae306a4bde46db4e37b5a2378fd0a2858d1b5e0962030f  bootstrap/linux/c0/native/linker.seed.hex

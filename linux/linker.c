@@ -220,7 +220,8 @@ static int add_builtin_object(void) {
     s->out_kind = 0; s->out_off = 0;
     symbol_count++;
     builtin_symbol(oi, 1, 1, "_start");
-    builtin_symbol(oi, 0, 0, "__c1_init"); sym_init = symbol_count - 1;
+    builtin_symbol(oi, 1, 0, "__c1_init"); sym_init = symbol_count - 1;
+    symbols[sym_init].bind = 2;
     builtin_symbol(oi, 0, 0, "__c1_start"); sym_start = symbol_count - 1;
     builtin_symbol(oi, 1, 45, "__c1_sysv_read");
     builtin_symbol(oi, 1, 53, "__c1_sysv_write");
