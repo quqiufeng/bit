@@ -6,8 +6,9 @@ comparison, logical and bitwise expressions.
 
 Global `int` scalars take 4 bytes and `int` arrays take `N * 4` bytes in the
 data segment.  Code is padded to `0x80000`; data starts at `0x500000`; the file
-is padded to `0x480000`.  C0 compiles `bootstrap.c` to A1 text, but the
-resulting bootstrap executable still needs semantic debugging.
+is padded to `0x480000`.  C0 compiles `bootstrap.c` to A1 text and A1 assembles it into an ELF, but the
+resulting bootstrap executable currently exits 1.  The failure is after source
+read, when `next()` returns token 0; lexer/intern debugging is the next step.
 
 ## Emitter contract
 
