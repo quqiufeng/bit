@@ -692,6 +692,8 @@ static void ex_primary(void) {
                     break;
                 }
             }
+            if (n >= 6) emit_hex("41 59");
+            if (n >= 5) emit_hex("41 58");
             if (n >= 4) emit_hex("59");
             if (n >= 3) emit_hex("5A");
             if (n >= 2) emit_hex("5E");
@@ -699,9 +701,9 @@ static void ex_primary(void) {
             emit_hex("E8");
             emit_named_ref(name);
             emit_text("\n");
-            if (n > 4) {
+            if (n > 6) {
                 emit_hex("48 81 C4");
-                emit_imm32((u32)(8 * (n - 4)));
+                emit_imm32((u32)(8 * (n - 6)));
                 emit_text("\n");
             }
             {
