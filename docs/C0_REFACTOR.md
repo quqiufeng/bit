@@ -211,11 +211,10 @@ bootstrap/linux/c0/c0v2.c
 ### Phase 3：指针（进行中）
 
 - 指针类型、`char *` 参数、`&x`、`*p`、`p[i]`、指针算术已加入
-- `int *p; p=&x; return *p;` 通过（退出 42）
-- `char *p; p=s; p[0]=65;` 目前段错误，仍在修
-- c0v2 仍能编译 `bootstrap.c`，C0 chain 通过
-- 自举源当前停在 `strcpy` 的 `*d++ = *s++`
-- 下一步：修 char 指针索引/赋值和 `*p++`
+- `int *p` 和 `char *p` 基本索引已通过
+- `selfsource` 已能把 `c0v2.c` 编成约 115KB A1，A1 能装配出 ELF
+- `c0v2` 第一代自编译输出仅 836 字节，固定点未达成；说明 char/指针代码生成仍有语义 bug
+- 下一步：对比 first/second selfsource，定位指针/字符宽度/函数返回问题
 
 ### Phase 4：自增/复合赋值
 

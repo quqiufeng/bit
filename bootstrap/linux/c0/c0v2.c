@@ -76,19 +76,24 @@ static void fail(void) {
 }
 
 static int strcmp(const char *a, const char *b) {
-    while (*a && *b) {
-        if (*a != *b) return (unsigned char)*a - (unsigned char)*b;
-        a++;
-        b++;
+    int i;
+    i = 0;
+    while (a[i] && b[i]) {
+        if (a[i] != b[i]) return (unsigned char)a[i] - (unsigned char)b[i];
+        i = i + 1;
     }
-    return (unsigned char)*a - (unsigned char)*b;
+    return (unsigned char)a[i] - (unsigned char)b[i];
 }
 
 static char *strcpy(char *d, const char *s) {
-    char *r = d;
-    while (*s) *d++ = *s++;
-    *d = 0;
-    return r;
+    int i;
+    i = 0;
+    while (s[i]) {
+        d[i] = s[i];
+        i = i + 1;
+    }
+    d[i] = 0;
+    return d;
 }
 
 static void write_all(const char *p, u64 n) {
@@ -119,8 +124,10 @@ static void emit_decimal(u64 v) {
 
 static void emit_hex(const char *hex) {
     int phase = 0;
-    while (*hex) {
-        char c = *hex++;
+    int i = 0;
+    while (hex[i]) {
+        char c = hex[i];
+        i = i + 1;
         if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
         write_all(&c, 1);
         if (!phase) generated_bytes++;
@@ -130,7 +137,11 @@ static void emit_hex(const char *hex) {
 }
 
 static void emit_text(const char *s) {
-    while (*s) write_all(s++, 1);
+    int i = 0;
+    while (s[i]) {
+        write_all(s + i, 1);
+        i = i + 1;
+    }
 }
 
 static void emit_label(int id) {
@@ -267,6 +278,7 @@ static int word(const char *w) {
 static int type_word(void) {
     if (word("const")) return type_word();
     if (word("unsigned") || word("signed")) return type_word();
+    if (word("long")) { word("long"); last_type = 4; return 4; }
     if (word("int")) { last_type = 1; return 1; }
     if (word("char")) { last_type = 2; return 2; }
     if (word("void")) { last_type = 3; return 3; }
@@ -426,13 +438,15 @@ static void ex_expr(void);
 
 static void ex_lvalue(const char *name) {
     int l = find_local(name);
-    int g = l < 0 ? find_global(name) : -1;
-    int tw, elem, dims, row;
+    int g;
+    if (l < 0) g = find_global(name); else g = -1;
+    int tw, elem, dims, row, pelem = 0;
     if (l >= 0) {
-        tw = l_type[l]; elem = l_elem[l]; dims = l_dims[l]; row = l_row[l];
+        tw = l_type[l]; elem = l_elem[l]; dims = l_dims[l]; row = l_row[l]; pelem = l_pelem[l];
     } else if (g >= 0) {
-        tw = g_type[g]; elem = g_elem[g]; dims = g_dims[g]; row = g_row[g];
+        tw = g_type[g]; elem = g_elem[g]; dims = g_dims[g]; row = g_row[g]; pelem = g_pelem[g];
     } else fail();
+    if (tw == 6) elem = pelem;
     emit_addr(name);
     lv_type = tw;
     lv_elem = elem;
@@ -450,7 +464,9 @@ static void ex_lvalue(const char *name) {
         ch(']');
         emit_hex("48 89 C1 58");
         emit_scale(elem);
-        lv_type = elem == 1 ? 2 : (elem == 8 ? 4 : 1);
+        if (elem == 1) lv_type = 2;
+        else if (elem == 8) lv_type = 4;
+        else lv_type = 1;
         lv_elem = elem;
         lv_ptr = 0;
         return;
@@ -461,7 +477,7 @@ static void ex_lvalue(const char *name) {
         ex_expr();
         ch(']');
         emit_hex("48 89 C1 58");
-        emit_scale(dims == 2 ? row : elem);
+        if (dims == 2) emit_scale(row); else emit_scale(elem);
         if (dims == 2) {
             dims = 1;
             lv_ptr = 1;
@@ -566,9 +582,15 @@ static void ex_primary(void) {
         write_all("\"", 1);
         pos++;
         while (pos < src_len && src[pos] != '"') {
-            write_all(src + pos, 1);
-            generated_bytes++;
-            pos++;
+            if (src[pos] == '\\' && pos + 1 < src_len) {
+                write_all(src + pos, 2);
+                generated_bytes++;
+                pos += 2;
+            } else {
+                write_all(src + pos, 1);
+                generated_bytes++;
+                pos++;
+            }
         }
         if (pos < src_len) pos++;
         write_all("\" 00\n", 5);
@@ -1307,6 +1329,15 @@ static void emit_header(void) {
     emit_named_label("__c0_putchar");
     emit_hex("48 83 EC 10 40 88 3C 24 B8 01 00 00 00 BF 01 00 00 00 48 89 E6 BA 01 00 00 00 0F 05 0F B6 04 24 48 83 C4 10 C3");
     emit_text("\n");
+    emit_named_label("__c1_sysv_write");
+    emit_hex("B8 01 00 00 00 0F 05 C3");
+    emit_text("\n");
+    emit_named_label("__c1_sysv_read");
+    emit_hex("31 C0 0F 05 C3");
+    emit_text("\n");
+    emit_named_label("__c1_sysv_exit");
+    emit_hex("B8 3C 00 00 00 0F 05 F4");
+    emit_text("\n");
 }
 
 int main(void) {
@@ -1345,6 +1376,15 @@ int main(void) {
             }
             if (!ident(name)) fail();
             if (ch('(')) {
+                u64 after = pos;
+                int depth = 1;
+                while (pos < src_len && depth) {
+                    if (src[pos] == '(') depth++;
+                    else if (src[pos] == ')') depth--;
+                    pos++;
+                }
+                if (ch(';')) continue;
+                pos = after;
                 cur_ret_type = gtw;
                 cur_ret_elem = pelem;
                 ex_function(name);
