@@ -75,3 +75,8 @@ The next reductions are:
    the native script.
 4. Remove the remaining host `gcc`/`ld` and upstream PE bridge from the global
    `build.sh` seed chain.
+
+## Fuzzing
+
+See `docs/FUZZING.md` for the current template-based fuzz suites, gaps, and
+ABI-first differential fuzzing plan.
