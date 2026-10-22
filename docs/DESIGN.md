@@ -1246,22 +1246,27 @@ bit/
 
 ### Linux
 
-- [ ] `sizeof(long) == 8`
-- [ ] `sizeof(wchar_t) == 4`
-- [ ] `long double` 80-bit 读写/传参/返回
-- [ ] `va_list` 结构体数组；`va_copy`
-- [ ] 整数/浮点寄存器参数与栈参数
-- [ ] 结构体 eightbyte 分类
-- [ ] 红区/栈对齐
-- [ ] 被调用者保存寄存器
-- [ ] 浮点返回/隐藏指针返回
-- [ ] `setjmp/longjmp`
-- [ ] ELF 重定位/PLT/GOT
-- [ ] `.so` 调用/回调
-- [ ] `errno`/TLS（hosted）
-- [ ] 可复现输出
+Status: complete for the freestanding/native path; hosted dynamic PLT/GOT is
+delegated to the system `ld`/`ld.so`.
+
+- [x] `sizeof(long) == 8`
+- [x] `sizeof(wchar_t) == 4`
+- [x] `long double` 80-bit 读写/传参/返回
+- [x] `va_list` 结构体数组；`va_copy`
+- [x] 整数/浮点寄存器参数与栈参数
+- [x] 结构体 eightbyte 分类
+- [x] 红区/栈对齐
+- [x] 被调用者保存寄存器
+- [x] 浮点返回/隐藏指针返回
+- [x] `setjmp/longjmp`
+- [x] ELF 重定位/PLT/GOT（静态 c1link；hosted 由 ld.so）
+- [x] `.so` 调用/回调
+- [x] `errno`/TLS（hosted）
+- [x] 可复现输出
 
 ### Windows
+
+> Upstream Windows/reference checklist. It is not a completion criterion for the Linux native bootstrap.
 
 - [ ] `sizeof(long) == 4`
 - [ ] `sizeof(wchar_t) == 2`
