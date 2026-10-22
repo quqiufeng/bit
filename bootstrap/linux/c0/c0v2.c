@@ -1449,13 +1449,13 @@ static void emit_header(void) {
     emit_text("\n");
     emit_hex("00 00 40 00 00 00 00 00 00 00 40 00 00 00 00 00");
     emit_text("\n");
-    emit_hex("00 00 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 10 00 00 00 00 00 00");
+    emit_hex("00 00 20 00 00 00 00 00 00 00 20 00 00 00 00 00 00 10 00 00 00 00 00 00");
     emit_text("\n");
-    emit_hex("01 00 00 00 06 00 00 00 00 00 08 00 00 00 00 00");
+    emit_hex("01 00 00 00 06 00 00 00 00 00 20 00 00 00 00 00");
     emit_text("\n");
-    emit_hex("00 00 50 00 00 00 00 00 00 00 50 00 00 00 00 00");
+    emit_hex("00 00 60 00 00 00 00 00 00 00 60 00 00 00 00 00");
     emit_text("\n");
-    emit_hex("00 00 40 00 00 00 00 00 00 00 40 00 00 00 00 00 00 10 00 00 00 00 00 00");
+    emit_hex("00 00 80 01 00 00 00 00 00 00 80 01 00 00 00 00 00 10 00 00 00 00 00 00");
     emit_text("\n");
     generated_bytes = 176;
     emit_zero(80);
@@ -1593,9 +1593,9 @@ int main(void) {
             }
         }
     }
-    if (generated_bytes > 0x80000) fail();
-    if (generated_bytes < 0x80000) emit_zero(0x80000 - generated_bytes);
-    emit_text("^00500000\n.org 524288\n");
+    if (generated_bytes > 0x200000) fail();
+    if (generated_bytes < 0x200000) emit_zero(0x200000 - generated_bytes);
+    emit_text("^00600000\n.org 2097152\n");
     {
         int i;
         for (i = 0; i < g_count; i++) {
@@ -1614,6 +1614,6 @@ int main(void) {
             }
         }
     }
-    if (generated_bytes < 0x480000) emit_zero(0x480000 - generated_bytes);
+    if (generated_bytes < 0x1800000) emit_zero(0x1800000 - generated_bytes);
     return 0;
 }

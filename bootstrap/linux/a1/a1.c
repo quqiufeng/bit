@@ -4,11 +4,12 @@ typedef unsigned int u32;
 extern long long __c1_sysv_read(long long, void *, unsigned long long);
 extern long long __c1_sysv_write(long long, const void *, unsigned long long);
 extern void __c1_sysv_exit(long long);
+extern long long __c1_sysv_mmap(long long, unsigned long long, long long, long long, long long, long long);
 
 #define MAX_LABELS 8192
 #define MAX_NAME 64
 #define BUF_SIZE (8u << 20)
-#define OUT_SIZE (8u << 20)
+#define OUT_SIZE (64u << 20)
 
 struct label {
     char name[MAX_NAME];
@@ -20,7 +21,7 @@ struct label {
 static struct label labels[MAX_LABELS];
 static int label_count;
 static char src[BUF_SIZE];
-static unsigned char out[OUT_SIZE];
+static unsigned char *out;
 static u64 src_len, pos, base_vaddr, cur_vaddr;
 static u64 cur_offset, max_offset, file_max;
 
@@ -303,6 +304,8 @@ int main(void) {
         src_len += (u64)n;
         if (src_len == BUF_SIZE) break;
     }
+    out = (unsigned char *)__c1_sysv_mmap(0, OUT_SIZE, 3, 34, -1, 0);
+    if (!out) return 1;
     scan(0);
     scan(1);
     __c1_sysv_write(1, out, file_max);
