@@ -231,7 +231,11 @@ bootstrap/linux/c0/c0v2.c
 - 已定位并修复：数组变址 `src[pos]` 在解析索引后丢失了元素类型，导致 char 数组被按 4 字节 int 加载；`word` 因此把 `src[pos]` 读成 4 字节值
 - 修复后 `word`/`wordtest` 返回 42，char 指针和 `src[pos]` 正常
 - 第一代 c0v2 仍只输出 837 字节 header；说明还有后续独立 bug
-- 下一步：在修复后的 stage1 上重新做 `src_len` / `type_word` 显形
+- 修复后 stage1 中 `type_word` 已能返回真，但紧接着调用 `ident` 失败
+- 单独测试：`pos=4; ident(nm)` 成功；`type_word(); ident(nm)` 失败
+- 说明 `type_word` 返回后向调用者留下了错误的栈/寄存器状态
+- `skip(); type_word()` 单独退出码正常，但后续 `ident` 仍失败
+- 下一步：审计 `type_word`/`word` 的栈平衡和函数返回，特别是 `word` 内嵌套调用 `skip` 后的栈状态
 
 ### Phase 4：自增/复合赋值
 
