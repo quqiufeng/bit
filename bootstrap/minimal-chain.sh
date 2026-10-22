@@ -3,7 +3,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BASE="$ROOT/windows/upstream/bootstrap-c99/base"
 OUT="$ROOT/build/minimal"
-PE2ELF="$ROOT/tools/pe2elf.py"
+PE2ELF="$("$ROOT/tools/build-pe2elf.sh")"
 mkdir -p "$OUT"
 
 sed 's/#.*//' "$BASE/seed.hex" | "$ROOT/bootstrap/linux/seed.elf" > "$OUT/a0-seed.exe"
@@ -13,7 +13,7 @@ run_pe() {
     input=$2
     output=$3
     elf=${pe%.exe}.elf
-    python3 "$PE2ELF" --allow-unresolved "$pe" "$elf"
+    "$PE2ELF" --allow-unresolved "$pe" "$elf"
     "$elf" < "$input" > "$output"
 }
 
@@ -35,7 +35,7 @@ run_pe "$OUT/c1-capacity.exe" c1/compiler.c "$OUT/c1-stage0.exe"
 run_pe "$OUT/c1-stage0.exe" c1/compiler.c "$OUT/c1-stage1.exe"
 run_pe "$OUT/c1-stage1.exe" c1/compiler.c "$OUT/c1-stage2.exe"
 cmp "$OUT/c1-stage1.exe" "$OUT/c1-stage2.exe"
-if python3 "$PE2ELF" "$OUT/c1-stage1.exe" "$OUT/strict-should-fail.elf" 2>"$OUT/strict-imports.log"; then
+if "$PE2ELF" "$OUT/c1-stage1.exe" "$OUT/strict-should-fail.elf" 2>"$OUT/strict-imports.log"; then
     echo "FAIL: strict pe2elf accepted unresolved imports" >&2
     exit 1
 fi

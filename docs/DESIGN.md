@@ -512,7 +512,7 @@ Linux seed → Linux A0 → Linux A1 → Linux C0 → Linux C1
 - `bootstrap/linux/seed.hex`：手写十六进制解码器的原始 ELF 十六进制；`seed.elf` 可复现自身并生成 `a0.seed.elf`。
 - `bootstrap/linux/a0/`：A0 契约、C 参考实现 `a0_ref.c`、syscall-only 汇编本体 `a0.S` 和测试源；两者输出已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出。`a0.S` 由宿主 cc/ld 生成一次 `a0.seed.elf`/`a0.seed.hex`；`selfhost.sh` 用该 seed 重新解码自身 hex 并逐字节比较，已无 cc/ld 参与。手写 seed 解码器已完成；Linux A1 参考实现和 freestanding A1 本体已完成，A1 能装配 `smoke.a1` 并以 42 退出；`a1.seed.elf` 可由 A0 从 `a1.seed.hex` 复现。最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已有物理字节计数器、十进制 `.zero` 尾部补齐、64 KiB RX 段和独立 RW/BSS 段；`c0.seed.elf` 可由 A0/A1 从 hex 复现。C0 仍未实现函数/局部变量/控制流，下一步是扩展它到能编译 C1 桥接源码。
 - `bootstrap/minimal-chain.sh`：上游 `seed → A0 → A1 → C0 → C1` 在 Linux 上通过
-  `tools/pe2elf.py` + 4 个 kernel32 stub 运行；产物仍是 Windows PE C1，仅作为
+  `tools/pe2elf.c` + kernel32 shim 运行；产物仍是 Windows PE C1，仅作为
   上游链可执行性的对照，不作为 Linux 最终 C1。
 
 A0/A1 的职责划分沿用上游：
@@ -587,20 +587,23 @@ __c0_putchar
 
 ABI 边界只在最底层：
 
-- `pe2elf.py` 的 kernel32 stub、或 Win64 syscall stub，必须按 Win64 ABI 取参
+- `pe2elf.c` 的 kernel32 stub、或 Win64 syscall stub，必须按 Win64 ABI 取参
   （`RCX/RDX/R8/R9`，第 5 参数在影子空间之后）。
 - 不得把 SysV 的 `linux/syscalls-sysv.S` 直接链入 Win64 运行时；它的参数寄存器
   不匹配。要么写 Win64 syscall stub，要么统一走 kernel32 shim。
 - 调用带栈参数的 Win64 函数时，必须保留 32 字节 shadow space，并保证
   `(rsp + 8) % 16 == 0`。
 
-#### 6.6.3 `pe2elf.py` 现状与扩展
+#### 6.6.3 `pe2elf.c` 现状与扩展
 
 当前实现是静态 stub section，不是动态解析：
 
 - `tools/pe2elf_stubs.S` 是 Win64 ABI stub 源，`make-pe2elf-stubs.sh` 生成
-  `pe2elf_stubs.bin` 和 `pe2elf_stubs.json`。
-- `pe2elf.py` 在转换时把 IAT 项改成 `0x900000 + OFF[name]`。
+  `pe2elf_stubs.bin`、`pe2elf_stubs.json` 和嵌入式 C 头 `pe2elf_stubs.h`。
+- `pe2elf.c` 由宿主 gcc 为 HOSTED/bridge 测试构建，不进入 build-zero/build-core；
+  它直接使用已提交的 `pe2elf_stubs.h`，运行时不读取 JSON 或调用 Python。
+- `pe2elf.c` 在转换时把 IAT 项改成 `0x900000 + OFF[name]`，支持
+  `--allow-unresolved` 和 `--c1-output object`。
 - stub blob 作为独立 LOAD 段固定映射到 `0x900000`。
 - 当前已实现 11 个 stub：4 个标准 I/O + `CreateFileA`/`CloseHandle`/
   `GetEnvironmentVariableA`/`GetLocalTime`/`GetProcessHeap`/`HeapAlloc`/`HeapFree`。
@@ -612,7 +615,7 @@ ABI 边界只在最底层：
 shim 维护方式：
 
 1. 在 `tools/pe2elf_stubs.S` 增加 Win64 ABI stub。
-2. 运行 `tools/make-pe2elf-stubs.sh` 重新生成 blob 和偏移表。
+2. 运行 `tools/make-pe2elf-stubs.sh` 重新生成 blob、JSON 偏移表和 C 头。
 3. 未知 import 默认报错，避免静默 0。
 4. 需要第 5 个栈参数或调用其他函数时，必须保留 32 字节 shadow space 并保证
    16 字节栈对齐。
@@ -620,7 +623,7 @@ shim 维护方式：
 #### 6.6.4 验收
 
 1. 上游 C1 能编译并链接 `linux/compiler.c` + `win32_runtime.c`。
-2. `pe2elf.py` 能在 Linux 下运行桥接 PE，并产出一个合法 SysV ELF `.o`。
+2. `pe2elf.c` 能在 Linux 下运行桥接 PE，并产出一个合法 SysV ELF `.o`。
 3. c1link 链接该 `.o` 后得到可运行的 Linux C1 stage1。
 4. stage1 再编译同一份源码得到 stage2，`stage1 == stage2`。
 5. 桥接链不改变现有 `./build.sh` 的 SysV 自举结果。
@@ -637,7 +640,7 @@ shim 维护方式：
 - 入口：`./bootstrap/bridge.sh`，可用 `C1_STAGE1=<path>` 指定输入 C1。
 - `./bootstrap/linux/c0/linux.sh` 已用 C0 生成的 C1 stage1 作为桥接输入，
   完成 `C0 -> Windows C1 -> SysV Linux C1`，不再依赖 minimal-chain 的 C1。
-  仍使用上游源码、Python `pe2elf` 和上游 PE 链接器。
+  仍使用上游源码、C 工具 `pe2elf` 和上游 PE 链接器。
 - 下一步是零依赖 Linux 链：C0 扩到能编译 bootstrap C1，再完成 A1/C0 源码级自举。
 
 ### 6.7 Linux C0 窄域契约（第一阶段）
@@ -1007,7 +1010,7 @@ bit/
 当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 只用于最初构建 bootstrap c1link，之后所有 C1 输出由 c1link 链接。`.a` 归档已支持按未定义符号选择性抽取成员；c1link 输出已包含 `.text`/`.data`/`.bss`/`.symtab`/`.strtab`/`.shstrtab` 节表。动态链接和其余重定位待补；hosted glibc 测试仍用系统 `ld`。
 
 - 自制 ELF 链接器（静态→动态）。
-- 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.py` + 4 个 kernel32 stub），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
+- 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.c` + kernel32 shim），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
 - Win64 PE C1 → SysV 桥接：`bootstrap/bridge.sh` 已完成，上游 object C1 编译 `linux/compiler.c`，上游 PE 链接器生成 `bridge.exe`，c1link 闭合 Linux stage1/stage2；仍依赖上游 seed/PE 链接器。
 - Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并生成 `a0.seed.elf`；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 复现 A1；最小 C0 已完成 C→A1→ELF 的 `return N` 闭环，尚未实现函数/控制流。
 - PIC/PIE。

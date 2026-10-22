@@ -19,11 +19,11 @@ upstream A0/A1/C0 seed chain:
 
 The hex files are verified against `seed.sha256` before decoding.
 
-The upstream minimal chain now runs on Linux via `minimal-chain.sh` and
-`tools/pe2elf.py`:
+The upstream minimal chain now runs on Linux via `minimal-chain.sh` and the
+host-built `tools/pe2elf.c`:
 
 - decode upstream `seed.hex` (PE)
-- convert seed/A0/A1/C0/C1 PE outputs to Linux ELF with 4 kernel32 shims
+- convert seed/A0/A1/C0/C1 PE outputs to Linux ELF with kernel32 shims
 - run seed → A0 → A1 → C0 → C1
 - `A0 stage1 == stage2`, `A1 stage1 == stage2`, `C1 stage1 == stage2`
 

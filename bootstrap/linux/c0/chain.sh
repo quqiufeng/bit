@@ -6,7 +6,7 @@ BASE="$ROOT/windows/upstream/bootstrap-c99/base"
 WORK="$BUILD/c0/chain"
 C0=${C0:-"$BUILD/c0/c0"}
 A1="$BUILD/a1/a1"
-PE2ELF="$ROOT/tools/pe2elf.py"
+PE2ELF="$("$ROOT/tools/build-pe2elf.sh")"
 mkdir -p "$WORK"
 
 "$C0" < "$BASE/c1/bootstrap.c" > "$WORK/c1-bridge.a1"
@@ -14,15 +14,15 @@ mkdir -p "$WORK"
 chmod +x "$WORK/c1-bridge.elf"
 
 "$WORK/c1-bridge.elf" < "$BASE/c1/bootstrap-capacity.c" > "$WORK/c1-capacity.exe"
-python3 "$PE2ELF" --allow-unresolved "$WORK/c1-capacity.exe" "$WORK/c1-capacity.elf"
+"$PE2ELF" --allow-unresolved "$WORK/c1-capacity.exe" "$WORK/c1-capacity.elf"
 chmod +x "$WORK/c1-capacity.elf"
 
 "$WORK/c1-capacity.elf" < "$BASE/c1/compiler.c" > "$WORK/c1-stage0.exe"
-python3 "$PE2ELF" --allow-unresolved "$WORK/c1-stage0.exe" "$WORK/c1-stage0.elf"
+"$PE2ELF" --allow-unresolved "$WORK/c1-stage0.exe" "$WORK/c1-stage0.elf"
 chmod +x "$WORK/c1-stage0.elf"
 
 "$WORK/c1-stage0.elf" < "$BASE/c1/compiler.c" > "$WORK/c1-stage1.exe"
-python3 "$PE2ELF" --allow-unresolved "$WORK/c1-stage1.exe" "$WORK/c1-stage1.elf"
+"$PE2ELF" --allow-unresolved "$WORK/c1-stage1.exe" "$WORK/c1-stage1.elf"
 chmod +x "$WORK/c1-stage1.elf"
 
 "$WORK/c1-stage1.elf" < "$BASE/c1/compiler.c" > "$WORK/c1-stage2.exe"

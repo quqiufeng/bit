@@ -6,7 +6,7 @@ MIN="$BUILD/minimal"
 C1_STAGE1=${C1_STAGE1:-"$MIN/c1-stage1.elf"}
 WORK="$BUILD/bridge"
 UP="$ROOT/windows/upstream/bootstrap-c99"
-PE2ELF="$ROOT/tools/pe2elf.py"
+PE2ELF="$("$ROOT/tools/build-pe2elf.sh")"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/bit-bridge.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$WORK" "$TMP/src"
@@ -20,11 +20,11 @@ test -x "$C1_STAGE1" || {
 
 cd "$TMP"
 "$C1_STAGE1" < "$UP/object/compiler.c" > "$TMP/object-c1.exe"
-python3 "$PE2ELF" --allow-unresolved --c1-output object "$TMP/object-c1.exe" "$TMP/object-c1-obj.elf"
-python3 "$PE2ELF" --allow-unresolved "$TMP/object-c1.exe" "$TMP/object-c1-exe.elf"
+"$PE2ELF" --allow-unresolved --c1-output object "$TMP/object-c1.exe" "$TMP/object-c1-obj.elf"
+"$PE2ELF" --allow-unresolved "$TMP/object-c1.exe" "$TMP/object-c1-exe.elf"
 
 "$TMP/object-c1-exe.elf" < "$UP/linker/link.c" > "$TMP/link.exe"
-python3 "$PE2ELF" --allow-unresolved "$TMP/link.exe" "$TMP/link.elf"
+"$PE2ELF" --allow-unresolved "$TMP/link.exe" "$TMP/link.elf"
 
 cd "$ROOT"
 "$TMP/object-c1-obj.elf" < "$ROOT/linux/compiler.c" > "$TMP/compiler.c1o"
@@ -42,7 +42,7 @@ cd "$ROOT"
     --import __c1_win_HeapAlloc KERNEL32.dll HeapAlloc \
     --import __c1_win_HeapFree KERNEL32.dll HeapFree
 
-python3 "$PE2ELF" "$TMP/bridge.exe" "$TMP/bridge.elf"
+"$PE2ELF" "$TMP/bridge.exe" "$TMP/bridge.elf"
 "$TMP/bridge.elf" < "$ROOT/linux/compiler.c" > "$TMP/compiler-bridge.o"
 
 "$BUILD/c1link" "$WORK/c1-stage1" _start \

@@ -136,7 +136,7 @@ flowchart LR
 - 自举完成后，构建 C1 不再需要 gcc/MinGW GCC。
 - Linux freestanding 链已改用自制 `c1link`：gcc/ld 只负责构建最初的 bootstrap c1link，stage0/stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
 - Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）与 gcc stage0 路线并行推进：`bootstrap/linux/seed.S` 是手写十六进制解码器，`seed.hex` 可复现 `seed.elf`，`seed.elf` 可复现 `a0.seed.elf`；Linux A1 参考实现和 freestanding 本体已完成，A0 可复现 `a1.seed.elf`；最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已支持函数/局部变量/控制流/表达式/全局变量，并能把 `bootstrap.c` 编成 A1、由 A1 装配成 ELF；C0 已能编译 bootstrap.c -> capacity -> C1，产物与上游 minimal-chain 逐字节一致；`c0/linux.sh` 已把 C0 产出的 C1 接入桥接，得到 SysV Linux C1；C0 源码级自举待做；上游最小链只作为对照，不作为 Linux 最终 C1。
-- Win64 PE C1 → SysV 桥接方案见 [技术设计 6.6](docs/DESIGN.md#66-win64-pe-c1--sysvlinux-c1-桥接)：`win32_runtime.c`（13 个符号）+ `pe2elf.py` 12 个 stub + 上游 C1 编译 `linux/compiler.c` + c1link 闭合 stage1/stage2。
+- Win64 PE C1 → SysV 桥接方案见 [技术设计 6.6](docs/DESIGN.md#66-win64-pe-c1--sysvlinux-c1-桥接)：`win32_runtime.c`（13 个符号）+ C 工具 `pe2elf.c` 的内置 stub + 上游 C1 编译 `linux/compiler.c` + c1link 闭合 stage1/stage2。
 
 ## 能做什么 / 不能做什么
 
@@ -254,7 +254,9 @@ bit/
 ├── tools/
 │   ├── check_sources.py
 │   ├── elflink.py             # 自制静态 ELF 链接器原型
-│   └── pe2elf.py              # 上游 PE seed/工具 -> Linux ELF 运行
+│   ├── pe2elf.c               # 上游 PE seed/工具 -> Linux ELF 运行（宿主 gcc 构建）
+│   ├── pe2elf_stubs.S         # Win64 ABI kernel32 shim 源
+│   └── pe2elf_stubs.json/.bin/.h  # shim 偏移、二进制和 C 头
 ├── examples/
 │   └── hello.c
 ├── tests/
