@@ -10,6 +10,9 @@ chmod +x "$OUT/c0v2.elf"
 printf 'int main(void){return 42;}\n' | "$OUT/c0v2.elf" > "$OUT/tiny.a1"
 "$BUILD/a1/a1" < "$OUT/tiny.a1" > "$OUT/tiny.elf"
 chmod +x "$OUT/tiny.elf"
+set +e
 "$OUT/tiny.elf"
-test $? -eq 42
+status=$?
+set -e
+test "$status" -eq 42
 echo "PASS: A1 assembles frozen C0v2 A1 source"
