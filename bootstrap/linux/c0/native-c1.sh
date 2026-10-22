@@ -16,13 +16,16 @@ head -c 4 "$OUT/tiny.o" | od -An -tx1 | grep -q '7f 45 4c 46'
 cd "$ROOT"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/compiler.c > "$OUT/compiler.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
-"$BUILD/c1link" "$OUT/stage1" _start \
+C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
+"$BUILD/c1link" "$OUT/native-linker" _start \
+    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
+"$OUT/native-linker" "$OUT/stage1" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler.o" "$BUILD/syscalls_sysv.o"
 "$OUT/stage1" < "$OUT/tiny.c" > "$OUT/tiny-stage1.o"
 cmp "$OUT/tiny.o" "$OUT/tiny-stage1.o"
 C1_INCLUDE="$ROOT" "$OUT/stage1" < linux/compiler.c > "$OUT/compiler-stage2.o"
 cmp "$OUT/compiler.o" "$OUT/compiler-stage2.o"
-"$BUILD/c1link" "$OUT/stage2" _start \
+"$OUT/native-linker" "$OUT/stage2" _start \
     "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler-stage2.o" "$BUILD/syscalls_sysv.o"
 cmp "$OUT/stage1" "$OUT/stage2"
 echo "PASS: native Linux C1 compiles an ELF object and reaches stage1 == stage2 binaries"
