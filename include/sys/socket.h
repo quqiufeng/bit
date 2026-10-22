@@ -6,6 +6,7 @@ struct sockaddr {
     unsigned short sa_family;
     char sa_data[14];
 };
+#define AF_UNSPEC 0
 #define AF_UNIX 1
 #define AF_INET 2
 #define SOCK_STREAM 1
