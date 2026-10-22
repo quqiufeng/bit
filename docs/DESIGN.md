@@ -669,7 +669,7 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 - 条件统一为 `expression -> RAX -> cmp rax,0 -> je`，不依赖比较 flags
 - `%label` 由 A1 写成 4 字节小端 PC 相对位移
 
-当前 C0 已支持函数、参数、局部变量、全局 `int`/`int[]`、`if/else`、`while`、`for`、`break/continue`、函数调用、递归、算术/比较/逻辑/位运算和数组寻址。C0 已能把单体 `bootstrap.c`（2594 行）编译成约 191KB A1 文本；A1 能装配出约 4.7MB ELF。运行该 ELF 仍返回 1，说明 C0 生成的 bootstrap 语义还有 bug，正在定位。
+当前 C0 已支持函数、参数、局部变量、全局 `int`/`int[]`、`if/else`、`while`、`for`、`break/continue`、函数调用、递归、算术/比较/逻辑/位运算和数组寻址。C0 已能把单体 `bootstrap.c`（2594 行）编译成约 191KB A1 文本；A1 能装配出约 4.7MB ELF。该 bootstrap ELF 目前返回 1；已定位到输入读取后 `next()` 得到 `token == 0`，正在继续排查 lexer/intern 路径。
 
 ---
 
