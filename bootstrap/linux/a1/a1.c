@@ -22,7 +22,7 @@ static int label_count;
 static char src[BUF_SIZE];
 static unsigned char out[OUT_SIZE];
 static u64 src_len, pos, base_vaddr, cur_vaddr;
-static u64 cur_offset, max_offset;
+static u64 cur_offset, max_offset, file_max;
 
 static void fail(void) {
     char b[32];
@@ -108,6 +108,7 @@ static void advance(u64 n) {
     cur_offset += n;
     cur_vaddr += n;
     if (cur_offset > max_offset) max_offset = cur_offset;
+    if (cur_offset > file_max) file_max = cur_offset;
 }
 
 static struct label *find_label(const char *name) {
@@ -178,6 +179,7 @@ static void scan(int emit) {
     cur_vaddr = 0;
     cur_offset = 0;
     max_offset = 0;
+    file_max = 0;
     for (;;) {
         unsigned char c;
         skip();
@@ -252,6 +254,15 @@ static void scan(int emit) {
                     for (i = 0; i < n; i++) out[cur_offset + i] = 0;
                 }
                 advance(n);
+                file_max = cur_offset;
+                continue;
+            }
+            if (pos + 4 <= src_len && src[pos + 1] == 'b' && src[pos + 2] == 's' &&
+                src[pos + 3] == 's') {
+                u64 n = parse_dec();
+                cur_offset += n;
+                cur_vaddr += n;
+                if (cur_offset > max_offset) max_offset = cur_offset;
                 continue;
             }
             if (pos + 4 <= src_len && src[pos + 1] == 'o' && src[pos + 2] == 'r' &&
@@ -262,6 +273,7 @@ static void scan(int emit) {
                 cur_offset = n;
                 cur_vaddr = base_vaddr + n;
                 if (n > max_offset) max_offset = n;
+                file_max = cur_offset;
                 continue;
             }
             fail();
@@ -291,6 +303,6 @@ int main(void) {
     }
     scan(0);
     scan(1);
-    __c1_sysv_write(1, out, max_offset);
+    __c1_sysv_write(1, out, file_max);
     return 0;
 }
