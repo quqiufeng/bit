@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 OUT="$BUILD/a1-selfhost"
 mkdir -p "$OUT"
