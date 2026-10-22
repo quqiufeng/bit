@@ -4,7 +4,9 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 OUT="$BUILD/native-c1"
 mkdir -p "$OUT"
-"$BUILD/c0v2/c0v2" < "$ROOT/bootstrap/linux/c0/native/compiler-runtime.c" > "$OUT/compiler.a1"
+C0V2="$BUILD/c0v2-from-a1/c0v2.elf"
+[ -x "$C0V2" ] || C0V2="$BUILD/c0v2/c0v2"
+"$C0V2" < "$ROOT/bootstrap/linux/c0/native/compiler-runtime.c" > "$OUT/compiler.a1"
 python3 "$ROOT/bootstrap/linux/c0/native/make.py" "$OUT/compiler.a1" "$ROOT/bootstrap/linux/c0/native/helpers.a1" "$OUT/compiler-full.a1"
 "$BUILD/a1/a1" < "$OUT/compiler-full.a1" > "$OUT/c1.elf"
 chmod +x "$OUT/c1.elf"
