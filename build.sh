@@ -81,4 +81,4 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./bootstrap/linux/c0/chain.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native Linux C1 stage1==stage2, Linux seed, upstream bridge and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native Linux C1 + native linker stage1==stage2, Linux seed, upstream bridge and source checks"
