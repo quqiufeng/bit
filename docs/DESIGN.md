@@ -615,7 +615,7 @@ ABI 边界只在最底层：
 shim 维护方式：
 
 1. 在 `tools/pe2elf_stubs.S` 增加 Win64 ABI stub。
-2. 运行 `tools/make-pe2elf-stubs.sh` 重新生成 blob、JSON 偏移表和 C 头。
+2. 运行 预生成的 `tools/pe2elf_stubs.bin`/`.h` 重新生成 blob、JSON 偏移表和 C 头。
 3. 未知 import 默认报错，避免静默 0。
 4. 需要第 5 个栈参数或调用其他函数时，必须保留 32 字节 shadow space 并保证
    16 字节栈对齐。
