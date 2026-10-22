@@ -510,7 +510,7 @@ Linux seed → Linux A0 → Linux A1 → Linux C0 → Linux C1
 当前基线：
 
 - `bootstrap/linux/seed.hex`：手写十六进制解码器的原始 ELF 十六进制；`seed.elf` 可复现自身并生成 `a0.seed.elf`。
-- `bootstrap/linux/a0/`：A0 契约、C 参考实现 `a0_ref.c`、syscall-only 汇编本体 `a0.S` 和测试源；两者输出已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出。`a0.S` 由宿主 cc/ld 生成一次 `a0.seed.elf`/`a0.seed.hex`；`selfhost.sh` 用该 seed 重新解码自身 hex 并逐字节比较，已无 cc/ld 参与。手写 seed 解码器已完成；Linux A1 参考实现和 freestanding A1 本体已完成，A1 能装配 `smoke.a1` 并以 42 退出；`a1.seed.elf` 可由 A0 从 `a1.seed.hex` 复现，A1 也能从自身 hex 复现。下一步是 C0 和 A1 源码级自举。
+- `bootstrap/linux/a0/`：A0 契约、C 参考实现 `a0_ref.c`、syscall-only 汇编本体 `a0.S` 和测试源；两者输出已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出。`a0.S` 由宿主 cc/ld 生成一次 `a0.seed.elf`/`a0.seed.hex`；`selfhost.sh` 用该 seed 重新解码自身 hex 并逐字节比较，已无 cc/ld 参与。手写 seed 解码器已完成；Linux A1 参考实现和 freestanding A1 本体已完成，A1 能装配 `smoke.a1` 并以 42 退出；`a1.seed.elf` 可由 A0 从 `a1.seed.hex` 复现。最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；`c0.seed.elf` 可由 A0/A1 从 hex 复现。下一步是扩展 C0 到能编译 C1 桥接源码。
 - `bootstrap/minimal-chain.sh`：上游 `seed → A0 → A1 → C0 → C1` 在 Linux 上通过
   `tools/pe2elf.py` + 4 个 kernel32 stub 运行；产物仍是 Windows PE C1，仅作为
   上游链可执行性的对照，不作为 Linux 最终 C1。
