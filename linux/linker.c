@@ -403,6 +403,17 @@ static int apply_relocations(void) {
         place = section_out_base(gsec) + r->offset;
         if (r->type == 1) {
             put64(dest + r->offset, target + (u64)r->addend);
+        } else if (r->type == 10 || r->type == 11) {
+            value = (long long)(target + (u64)r->addend);
+            if (r->type == 10 && (value < 0 || (u64)value > 0xffffffffULL)) {
+                puts("c1link: abs32 overflow");
+                return 1;
+            }
+            if (r->type == 11 && (value < -2147483647LL - 1 || value > 2147483647LL)) {
+                puts("c1link: abs32s overflow");
+                return 1;
+            }
+            put32(dest + r->offset, (u32)value);
         } else if (r->type == 2 || r->type == 4) {
             value = (long long)(target + (u64)r->addend - place);
             if (value < -2147483647LL - 1 || value > 2147483647LL) {
@@ -721,7 +732,7 @@ static int write_output(const char *path, u64 entry) {
     put64(p + 40, text_file + text_size); put64(p + 48, 0x1000);
     p += 56;
     put32(p, 1); put32(p + 4, 6);
-    put64(p + 8, text_file + text_size); put64(p + 16, data_base);
+    put64(p + 8, data_file); put64(p + 16, data_base);
     put64(p + 24, data_base); put64(p + 32, data_size);
     put64(p + 40, data_size + bss_size); put64(p + 48, 0x1000);
     p += 56;

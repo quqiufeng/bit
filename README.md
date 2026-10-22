@@ -134,7 +134,7 @@ flowchart LR
 - **stage0** 可以使用平台原生 C 编译器，这是允许的“前期依赖”。
 - **stage1** 由 C1 自己编译；**stage2** 再编译一次；要求 stage1 与 stage2 逐字节一致。
 - 自举完成后，构建 C1 不再需要 gcc/MinGW GCC。
-- Linux freestanding 链已改用自制 `c1link`：Python ELF 原型只负责 bootstrap，stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
+- Linux freestanding 链已改用自制 `c1link`：gcc/ld 只负责构建最初的 bootstrap c1link，stage0/stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
 - Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）是后置目标，不在第一版阻塞自举。
 
 ## 能做什么 / 不能做什么
@@ -267,7 +267,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP loopback/select/poll/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex/iconv/glob/ioctl/statvfs 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：freestanding 构建已不用系统 `ld`（Python ELF 原型 bootstrap c1link，c1link 自举并链接 stage1/stage2，支持 `.a` 选择性成员抽取、节表/符号表、静态 PIE 和 `--shared` ELF `.so`）；仅纯种子链待做，hosted 测试仍用系统 `ld` |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：c1link 由 gcc/ld 只 bootstrap 一次，随后链接 stage0/stage1/stage2/hello 并自举；支持 `.a` 选择性成员抽取、节表/符号表、静态 PIE 和 `--shared` ELF `.so`。仅纯种子链待做，hosted 测试仍用系统 `ld` |
 
 ## 快速开始
 
