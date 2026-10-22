@@ -576,6 +576,33 @@ static void emit_incdec(int delta, int postfix) {
 static void ex_primary(void) {
     char name[64];
     skip();
+    if (word("sizeof")) {
+        u64 sz = 0;
+        ch('(');
+        if (type_word()) {
+            sz = (u64)type_size(last_type);
+            if (ch('[')) {
+                u64 n = number();
+                ch(']');
+                sz = sz * n;
+            }
+        } else {
+            int li;
+            int gi;
+            if (!ident(name)) fail();
+            li = find_local(name);
+            if (li < 0) gi = find_global(name); else gi = -1;
+            if (li >= 0) sz = (u64)l_size[li];
+            else if (gi >= 0) sz = (u64)g_size[gi];
+            else fail();
+        }
+        ch(')');
+        emit_hex("B8");
+        emit_imm32((u32)sz);
+        emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
+        return;
+    }
     if (pos < src_len && src[pos] == '"') {
         int a = new_label();
         int b = new_label();
