@@ -254,7 +254,10 @@ bootstrap/linux/c0/c0v2.c
 - 因此问题进一步锁定为 `for(;;)` / `while` 控制流入口或标签，而不是 `word` 的连续调用
 - A1 文本核对：`0F84 %L2547`、`:L2547`、`E8 %type_word` 的位置正确，typedef false 跳转目标没有和 continue 撞车
 - 之前 gdb 轨迹使用的是旧 stage1，与最新 A1 不匹配；该轨迹不能作为结论
-- 重新装配最新 A1 后，stage1 仍输出 908 字节 header；直接用新 stage1 编译自身时 `fail` 打印出巨大 pos，说明控制流/状态已损坏
+- 重新装配最新 A1 后，stage1 输出 908 字节 A1，而不是 header-only；其中包含正确的 `:main`
+- 用 A1 装配该输出得到可执行文件，`tiny.c` 返回 42，说明 stage1 对简单输入已经可用
+- 但 stage1 编译 `c0v2.c` 时仍失败，`fail` 打印出巨大 pos（28556968888590198），说明大源码路径中 `pos` 被破坏
+- 下一步：定位 stage1 解析自身源码时 `pos` 如何变成巨大值
 - 下一步：对最新 stage1 重新做地址断点，而不是复用旧 ELF
 - 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
