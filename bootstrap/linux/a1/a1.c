@@ -7,7 +7,7 @@ extern void __c1_sysv_exit(long long);
 
 #define MAX_LABELS 8192
 #define MAX_NAME 64
-#define BUF_SIZE (1u << 20)
+#define BUF_SIZE (8u << 20)
 #define OUT_SIZE (8u << 20)
 
 struct label {

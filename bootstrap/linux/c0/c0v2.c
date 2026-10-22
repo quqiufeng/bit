@@ -12,22 +12,24 @@ static int label_seq = 0x2000;
 static char goto_names[128][64];
 static int goto_ids[128];
 static int goto_count;
-static char g_name[256][64];
-static u64 g_size[256];
-static int g_type[256];
-static int g_elem[256];
-static int g_dims[256];
-static int g_row[256];
-static int g_has_init[256];
-static int g_init[256];
-static int g_init_vals[256][512];
-static int g_init_count[256];
-static int g_pelem[256];
+static char g_name[1024][64];
+static u64 g_size[1024];
+static int g_type[1024];
+static int g_elem[1024];
+static int g_dims[1024];
+static int g_row[1024];
+static int g_has_init[1024];
+static int g_init[1024];
+static int g_init_vals[2048];
+static int g_init_off[1024];
+static int g_init_used;
+static int g_init_count[1024];
+static int g_pelem[1024];
 static int l_pelem[256];
 static int fn_count;
-static char fn_name[256][64];
-static int fn_type[256];
-static int fn_elem[256];
+static char fn_name[1024][64];
+static int fn_type[1024];
+static int fn_elem[1024];
 static int lv_ptrvar;
 static int cur_ret_type, cur_ret_elem;
 static int g_count;
@@ -1118,6 +1120,7 @@ static void ex_stmt(void) {
     char gname[64];
     u64 gsave;
     skip();
+    if (ch(';')) return;
     gsave = pos;
     if (ident(gname)) {
         if (ch(':')) {
@@ -1362,7 +1365,7 @@ static void ex_stmt(void) {
 
 static void ex_function(char *name) {
     int p = 0;
-    if (fn_count < 256) {
+    if (fn_count < 1024) {
         strcpy(fn_name[fn_count], name);
         fn_type[fn_count] = cur_ret_type;
         fn_elem[fn_count] = cur_ret_elem;
@@ -1538,7 +1541,7 @@ int main(void) {
                             total = n1 * row;
                         }
                     }
-                    if (g_count == 256) fail();
+                    if (g_count == 1024) fail();
                     strcpy(g_name[g_count], name);
                     g_type[g_count] = gtw;
                     g_elem[g_count] = elem;
@@ -1551,14 +1554,17 @@ int main(void) {
                         g_has_init[g_count] = 1;
                         if (ch('{')) {
                             int nv = 0;
+                            g_init_off[g_count] = g_init_used;
                             for (;;) {
-                                if (nv < 512) g_init_vals[g_count][nv] = (int)number();
+                                if (g_init_used + nv >= 2048) fail();
+                                g_init_vals[g_init_used + nv] = (int)number();
                                 nv++;
                                 if (ch(',')) continue;
                                 ch('}');
                                 break;
                             }
                             g_init_count[g_count] = nv;
+                            g_init_used += nv;
                         } else {
                             int neg = ch('-');
                             g_init[g_count] = (int)number();
@@ -1586,7 +1592,7 @@ int main(void) {
             if (g_init_count[i] > 0) {
                 int j;
                 for (j = 0; j < (int)(g_size[i] / 4); j++) {
-                    emit_imm32((u32)(j < g_init_count[i] ? g_init_vals[i][j] : 0));
+                    emit_imm32((u32)(j < g_init_count[i] ? g_init_vals[g_init_off[i] + j] : 0));
                     emit_text("\n");
                 }
             } else if (g_has_init[i] && g_size[i] == 4) {
