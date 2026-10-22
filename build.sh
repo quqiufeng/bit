@@ -81,7 +81,8 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/diff-native.sh
 ./tests/diff-sysv.sh
 ./tests/run-native.sh
+./tests/run-native-hosted.sh
 ./bootstrap/linux/c0/chain.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native seed-bundle Linux C1 + linker stage1==stage2, native C1/GCC differential, native/GCC SysV differential, native SysV corpus, Linux seed, upstream bridge and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native seed-bundle Linux C1 + linker stage1==stage2, native C1/GCC differential, native/GCC SysV differential, native SysV corpus, Native C1 hosted/interop, Linux seed, upstream bridge and source checks"
