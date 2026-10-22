@@ -1,33 +1,34 @@
 # A0 (zero-based Linux)
 
-A0 is the first assembler above `bootstrap/linux/seed.bin`.  It is written as
-Linux x86-64 machine code/assembly with syscall I/O only.  No gcc, ld, libc or
-upstream Windows seed is allowed in this tree.
+A0 is not a full mnemonic assembler.  It is the upstream-style byte/label/address
+resolver: it reads a textual hex image, resolves numeric labels and relative
+references, and writes an executable image.
 
-## First milestone
+## Input language
 
-Input: ASCII A0 source on stdin.
-Output: Linux ELF64 ET_EXEC on stdout.
+- `; ...` comment
+- hex byte pairs: `48 89 E5`
+- `^AAAAAAAA` set the current virtual address (origin), emits nothing
+- `:HHHH` set the current output offset, emits nothing
+- `%HHHH` emit a 4-byte little-endian PC-relative reference to numeric address
+  `HHHH`, relative to the end of the 4-byte field
 
-Required subset:
+Numeric labels are the `HHHH` addresses established by `^`/`:`.  A0 does not
+encode x86 instructions; the bytes are already in the source.  A1 is the next
+layer and adds named labels, strings, zero fill and a small mnemonic set.
 
-- `db`, `dw`, `dd`, `dq` data
-- labels and numeric expressions
-- `org`/origin handling
-- x86-64 instruction emission for the subset used by A1
-- local and forward label fixups
-- `.text`/`.bss` layout
-- ELF64 header + program headers
-- `read`/`write`/`exit` syscalls only
+## Output
 
-## Non-goals for the first cut
+Linux ELF64 ET_EXEC, static, fixed load address.  The ELF header and program
+headers are part of the A0 source image, exactly as the upstream PE headers are
+part of `a0.a0`.
 
-- macros
-- includes
-- relocatable ELF objects
-- external symbols
-- optimization
+## Constraints
 
-The immediate test is a hand-written source that emits an ELF program which
-exits with a fixed status.  The next test is assembling A1 and reaching the
-same A1 stage1/stage2 fixed point.
+- syscall-only x86-64; no gcc, ld, libc or upstream Windows seed
+- one read buffer, one output buffer, no external files
+- deterministic output
+- first milestone: resolve a hand-written A0 image that exits with status 42
+- second milestone: assemble A1, then A1 assembles itself twice
+
+`smoke.a0` is an A1-syntax target, not an A0 input yet.
