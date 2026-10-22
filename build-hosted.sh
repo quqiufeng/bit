@@ -1,0 +1,93 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+
+CC=${CC:-gcc}
+LD=${LD:-ld}
+BUILD=build
+CFLAGS="-std=gnu89 -O2 -ffreestanding -fno-builtin -fno-pic -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -I."
+LDFLAGS="-static -nostdlib -z noexecstack -e _start"
+
+mkdir -p "$BUILD"
+
+"$CC" $CFLAGS -c linux/compiler.c -o "$BUILD/compiler_gcc.o"
+"$CC" $CFLAGS -c linux/runtime.c -o "$BUILD/runtime_sysv.o"
+"$CC" -c linux/syscalls-sysv.S -o "$BUILD/syscalls_sysv.o"
+"$CC" -c linux/startup-sysv.S -o "$BUILD/startup_sysv.o"
+"$CC" $CFLAGS -c linux/linker.c -o "$BUILD/linker_gcc.o"
+
+# Build the bootstrap c1link once with the host gcc/ld.  From here on c1link
+# handles every C1 output, including the gcc-produced stage0 compiler object.
+"$LD" $LDFLAGS -o "$BUILD/c1link" \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime_sysv.o" \
+    "$BUILD/linker_gcc.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/c1link" "$BUILD/c1-stage0" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/compiler_gcc.o" \
+    "$BUILD/runtime_sysv.o" "$BUILD/syscalls_sysv.o"
+
+"$BUILD/c1-stage0" < linux/runtime.c > "$BUILD/runtime1.o"
+"$BUILD/c1-stage0" < linux/compiler.c > "$BUILD/compiler1.o"
+"$BUILD/c1link" "$BUILD/c1-stage1" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime1.o" \
+    "$BUILD/compiler1.o" "$BUILD/syscalls_sysv.o"
+
+"$BUILD/c1-stage1" < linux/runtime.c > "$BUILD/runtime2.o"
+"$BUILD/c1-stage1" < linux/compiler.c > "$BUILD/compiler2.o"
+cmp "$BUILD/runtime1.o" "$BUILD/runtime2.o"
+cmp "$BUILD/compiler1.o" "$BUILD/compiler2.o"
+
+"$BUILD/c1link" "$BUILD/c1-stage2" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
+    "$BUILD/compiler2.o" "$BUILD/syscalls_sysv.o"
+cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
+
+"$BUILD/c1-stage2" < examples/hello.c > "$BUILD/hello.o"
+"$BUILD/c1link" "$BUILD/hello" _start \
+    "$BUILD/startup_sysv.o" "$BUILD/runtime2.o" \
+    "$BUILD/hello.o" "$BUILD/syscalls_sysv.o"
+"$BUILD/hello"
+
+./tests/run.sh
+./tests/run-hosted.sh
+./tests/run-interop.sh
+./tests/reject/run.sh
+./tests/run-env.sh
+./tests/run-linker.sh
+./tests/run-selflink.sh
+./tests/run-linker-selfhost.sh
+./tests/run-static-pie.sh
+./tests/run-archive.sh
+./tests/run-shared.sh
+./tests/run-dynamic.sh
+./bootstrap/from-seed.sh
+./bootstrap/minimal-chain.sh
+./bootstrap/bridge.sh
+./bootstrap/linux/a0/test.sh
+./bootstrap/linux/a0/test-asm.sh
+./bootstrap/linux/a0/selfhost.sh
+./bootstrap/linux/seed-selfhost.sh
+./bootstrap/linux/a1/test.sh
+./bootstrap/linux/a1/build.sh
+./bootstrap/linux/a1/selfhost.sh
+./bootstrap/linux/c0/build.sh
+./bootstrap/linux/c0/selfhost.sh
+./bootstrap/linux/c0/c0v2-build.sh
+./bootstrap/linux/c0/c0v2-selfhost.sh
+./bootstrap/linux/a1/a1-selfhost.sh
+./bootstrap/linux/c0/c0v2-from-a1.sh
+./bootstrap/linux/c0/c0v2-from-a1-selfhost.sh
+./bootstrap/linux/c0/c0v2-chain.sh
+./bootstrap/linux/c0/native-c1.sh
+./tests/diff-native.sh
+./tests/diff-sysv.sh
+./tests/fuzz-expr.sh
+./tests/fuzz-struct.sh
+./tests/fuzz-float.sh
+./tests/fuzz-varargs.sh
+./tests/run-native.sh
+./tests/run-native-hosted.sh
+./tests/ddc.sh
+./bootstrap/linux/c0/chain.sh
+./tools/check_sources.sh
+
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0/A1 reference, A1/C0 body, A0/A1/C0 selfhost, A1/C0v2 selfhost, C0v2-from-A1 selfhost, C0v2->C1 chain, C0->C1 chain, native seed-bundle Linux C1 + linker stage1==stage2, native C1/GCC differential, native/GCC SysV differential, fuzz expressions, fuzz structs, fuzz long double, fuzz varargs, native SysV corpus, Native C1 hosted/interop/reject/env/archive/shared/dynamic, DDC object equality, Linux seed, upstream bridge and source checks"
