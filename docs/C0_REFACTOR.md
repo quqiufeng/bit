@@ -252,7 +252,11 @@ bootstrap/linux/c0/c0v2.c
 - 顺序测试 `if(word("static"))... else if(word("extern"))...` 返回 73，说明连续调用 word 本身正常
 - 但在真实主循环中，`while(word("static")) skip();` 之后注入的 `exit(pos)` 没有触发，stage1 仍直接输出 header
 - 因此问题进一步锁定为 `for(;;)` / `while` 控制流入口或标签，而不是 `word` 的连续调用
-- 下一步：检查 C0v2 生成的 `for(;;)` 回边与 `while(word("static"))` 的入口标签是否被布局变化影响
+- 用 gdb 对 stage1 设置地址断点，实际轨迹为：
+  `L2536 for-body -> static-false -> extern-check -> extern-false -> typedef-check -> L2547 -> L2537 continue -> L2536 -> for-break`
+- 轨迹中从未进入 `type_word`，也没有进入 `ident`
+- 说明 `if (word("typedef"))` 之后控制流直接走了 `continue`，而不是 typedef false 后的 `type_word`
+- 需要检查：typedef 判断是否被误判为真、typedef false 的跳转目标是否错误指向 continue、或地址/标签映射是否需要重新校准
 - 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
 ### Phase 4：自增/复合赋值
