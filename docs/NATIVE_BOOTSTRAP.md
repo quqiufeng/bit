@@ -23,7 +23,6 @@ The native path uses only committed seeds:
 - `bootstrap/linux/a1/a1.seed.hex`
 - `bootstrap/linux/c0/c0v2.a1`
 - `bootstrap/linux/c0/native/compiler-runtime.c`
-- `bootstrap/linux/c0/native/linker.seed.elf` (cross-check only)
 
 The native linker used for stage1/stage2 is now `c1l.elf`, built by C0v2/A1
 from `linux/standalone-runtime.c`, `linux/standalone-link.c` and
