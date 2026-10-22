@@ -70,3 +70,4 @@ dkms.conf
 !bootstrap/linux/seed.elf
 !bootstrap/linux/a0/a0.seed.elf
 !bootstrap/linux/a1/a1.seed.elf
+!bootstrap/linux/c0/c0.seed.elf
