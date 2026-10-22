@@ -3,6 +3,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 MIN="$BUILD/minimal"
+C1_STAGE1=${C1_STAGE1:-"$MIN/c1-stage1.elf"}
 WORK="$BUILD/bridge"
 UP="$ROOT/windows/upstream/bootstrap-c99"
 PE2ELF="$ROOT/tools/pe2elf.py"
@@ -12,13 +13,13 @@ mkdir -p "$WORK" "$TMP/src"
 ln -s "$UP" "$TMP/src/bootstrap-c99"
 ln -s "$UP/base/include" "$TMP/include"
 
-test -x "$MIN/c1-stage1.elf" || {
-    echo "bridge: run minimal-chain.sh first" >&2
+test -x "$C1_STAGE1" || {
+    echo "bridge: C1_STAGE1 is missing: $C1_STAGE1" >&2
     exit 1
 }
 
 cd "$TMP"
-"$MIN/c1-stage1.elf" < "$UP/object/compiler.c" > "$TMP/object-c1.exe"
+"$C1_STAGE1" < "$UP/object/compiler.c" > "$TMP/object-c1.exe"
 python3 "$PE2ELF" --allow-unresolved --c1-output object "$TMP/object-c1.exe" "$TMP/object-c1-obj.elf"
 python3 "$PE2ELF" --allow-unresolved "$TMP/object-c1.exe" "$TMP/object-c1-exe.elf"
 
