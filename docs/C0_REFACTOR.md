@@ -214,8 +214,16 @@ bootstrap/linux/c0/c0v2.c
 - `int *p` 和 `char *p` 基本索引已通过
 - `selfsource` 已能把 `c0v2.c` 编成约 115KB A1，A1 能装配出 ELF
 - `c0v2` 第一代自编译输出仅 836 字节，固定点未达成
-- 已确认 stage1 能正确读取 stdin（read 到 27 字节），但随后只输出 ELF 头/填充，未编译源文件
-- 下一步：调试 stage1 的 `type_word`/`skip`/parser 路径，定位为什么输入被读入但未进入声明解析
+- 已确认 stage1 能正确读取 stdin（read 到 27 字节）
+- `src_len` 在 read 后为 27，`src[0]` 为 105（`i`）
+- 直接调用 `word("int")` 在 stage1 中返回 0
+- 局部 `const char *w; w="int"; w[0]` 在 stage1 中返回 105
+- 指针参数函数 `int dbg(const char *w){return w[0];}` 在 stage1 中返回 105
+- 单独测试 `while (w[i])`、`src[pos]` 都能工作
+- 组合测试 `word` 风格：`while (w[i]) { if (src[pos] != w[i]) ...; i++; pos++; }` 在 stage1 中失败
+- 已尝试把 `src[pos]` 和 `w[i]` 拆成两个局部变量，仍失败
+- 这指向 C0v2 在为“全局 char 数组索引 + 指针参数索引 + while 循环”组合生成代码时的寄存器/栈状态问题
+- 下一步：对比 C0v2 生成的 `word` 函数 A1 与稳定 C1 生成的 `word` A1
 
 ### Phase 4：自增/复合赋值
 
