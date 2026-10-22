@@ -61,6 +61,7 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./tests/run-dynamic.sh
 ./bootstrap/from-seed.sh
 ./bootstrap/minimal-chain.sh
+./bootstrap/linux/a0/test.sh
 python3 tools/check_sources.py
 
-echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain and source checks"
+echo "PASS: stage1 = stage2; hello; SysV, hosted, interop, reject, env, linker, selflink, linker-selfhost, static-pie, archive, shared, dynamic, seed, minimal-chain, A0 reference and source checks"

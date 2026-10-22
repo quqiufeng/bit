@@ -510,7 +510,7 @@ Linux seed → Linux A0 → Linux A1 → Linux C0 → Linux C1
 当前基线：
 
 - `bootstrap/linux/seed.hex`：130 字节 ELF64，仅 `exit(0)`，是零依赖树的起点。
-- `bootstrap/linux/a0/`：A0 的输入/输出契约和 smoke 源，A0 本体尚未实现。
+- `bootstrap/linux/a0/`：A0 契约、C 参考实现 `a0_ref.c` 和 `smoke.a0`；参考实现已生成合法双 PT_LOAD ELF 并以 42 退出，纯汇编 A0 本体尚未实现。
 - `bootstrap/minimal-chain.sh`：上游 `seed → A0 → A1 → C0 → C1` 在 Linux 上通过
   `tools/pe2elf.py` + 4 个 kernel32 stub 运行；产物仍是 Windows PE C1，仅作为
   上游链可执行性的对照，不作为 Linux 最终 C1。
