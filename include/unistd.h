@@ -9,6 +9,8 @@ off_t lseek(int fd, off_t offset, int whence);
 int unlink(const char *path);
 int getpid(void);
 pid_t fork(void);
+uid_t getuid(void);
+gid_t getgid(void);
 int execve(const char *path, char *const arguments[], char *const environment[]);
 void _exit(int status);
 unsigned int sleep(unsigned int seconds);
