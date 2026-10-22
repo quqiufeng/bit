@@ -9,6 +9,10 @@ typedef union {
     char __size[40];
     long __align;
 } pthread_mutex_t;
+typedef union {
+    char __size[48];
+    long long __align;
+} pthread_cond_t;
 #define PTHREAD_MUTEX_INITIALIZER { { 0 } }
 int pthread_create(pthread_t *thread, const pthread_attr_t *attributes,
                    void *(*start)(void *), void *argument);
@@ -20,4 +24,9 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex);
 int pthread_mutex_lock(pthread_mutex_t *mutex);
 int pthread_mutex_unlock(pthread_mutex_t *mutex);
 int pthread_mutex_trylock(pthread_mutex_t *mutex);
+int pthread_cond_init(pthread_cond_t *condition, const void *attributes);
+int pthread_cond_destroy(pthread_cond_t *condition);
+int pthread_cond_wait(pthread_cond_t *condition, pthread_mutex_t *mutex);
+int pthread_cond_signal(pthread_cond_t *condition);
+int pthread_cond_broadcast(pthread_cond_t *condition);
 #endif
