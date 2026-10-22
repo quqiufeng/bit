@@ -15,11 +15,14 @@ static int g_type[256];
 static int g_elem[256];
 static int g_dims[256];
 static int g_row[256];
+static int g_has_init[256];
+static int g_init[256];
 static int g_count;
 static char l_name[256][64];
 static int l_off[256];
 static int l_type[256];
 static int l_elem[256];
+static int l_size[256];
 static int l_dims[256];
 static int l_row[256];
 static int l_count;
@@ -27,6 +30,10 @@ static int brk_l[64], cont_l[64], brk_n;
 static char cur_func[64];
 static u64 last_pos;
 static int stage;
+static int lv_type, lv_elem, lv_ptr;
+static int ex_type, ex_elem, ex_ptr;
+static int assign_op;
+static int last_type;
 
 static void fail(void) {
     char b[32];
@@ -250,11 +257,13 @@ static int word(const char *w) {
 }
 
 static int type_word(void) {
-    if (word("int")) return 1;
-    if (word("char")) return 2;
-    if (word("void")) return 3;
-    if (word("u64")) return 4;
-    if (word("u32")) return 5;
+    if (word("const")) return type_word();
+    if (word("unsigned") || word("signed")) return type_word();
+    if (word("int")) { last_type = 1; return 1; }
+    if (word("char")) { last_type = 2; return 2; }
+    if (word("void")) { last_type = 3; return 3; }
+    if (word("u64")) { last_type = 4; return 4; }
+    if (word("u32")) { last_type = 5; return 5; }
     return 0;
 }
 
@@ -343,15 +352,45 @@ static int find_local(const char *name) {
     return -1;
 }
 
+static int type_size(int tw) {
+    if (tw == 2) return 1;
+    if (tw == 4) return 8;
+    if (tw == 5) return 4;
+    return 4;
+}
+
+static void emit_scale(int scale) {
+    if (scale == 1) emit_hex("48 8D 04 08");
+    else if (scale == 4) emit_hex("48 8D 04 88");
+    else if (scale == 8) emit_hex("48 8D 04 C8");
+    else {
+        emit_hex("48 69 C9");
+        emit_imm32((u32)scale);
+        emit_text("\n");
+        emit_hex("48 01 C8");
+    }
+    emit_text("\n");
+}
+
+static void store_rcx(int tw, int ptr) {
+    if (ptr) fail();
+    if (tw == 2) emit_hex("88 01");
+    else if (tw == 4) emit_hex("48 89 01");
+    else if (tw == 5) emit_hex("89 01");
+    else emit_hex("89 01");
+    emit_text("\n");
+}
+
 static int add_local(const char *name, u64 bytes) {
     int i = l_count;
     int off = 8;
-    if (i) off = l_off[i - 1] + 8;
+    if (i) off = l_off[i - 1] + l_size[i - 1];
+    off = (off + 7) & -8;
     if (i == 256) fail();
     strcpy(l_name[i], name);
     l_off[i] = off;
+    l_size[i] = (int)bytes;
     l_count++;
-    (void)bytes;
     return i;
 }
 
@@ -375,26 +414,57 @@ static void emit_addr(const char *name) {
 static void ex_expr(void);
 
 static void ex_lvalue(const char *name) {
+    int l = find_local(name);
+    int g = l < 0 ? find_global(name) : -1;
+    int tw, elem, dims, row;
+    if (l >= 0) {
+        tw = l_type[l]; elem = l_elem[l]; dims = l_dims[l]; row = l_row[l];
+    } else if (g >= 0) {
+        tw = g_type[g]; elem = g_elem[g]; dims = g_dims[g]; row = g_row[g];
+    } else fail();
     emit_addr(name);
+    lv_type = tw;
+    lv_elem = elem;
+    lv_ptr = dims != 0;
+    if (dims == 0) return;
     if (ch('[')) {
         emit_hex("50");
         ex_expr();
         ch(']');
         emit_hex("48 89 C1 58");
-        emit_hex("48 8D 04 88");
-        emit_text("\n");
+        emit_scale(dims == 2 ? row : elem);
+        if (dims == 2) {
+            dims = 1;
+            lv_ptr = 1;
+            if (ch('[')) {
+                emit_hex("50");
+                ex_expr();
+                ch(']');
+                emit_hex("48 89 C1 58");
+                emit_scale(elem);
+                lv_ptr = 0;
+                dims = 0;
+            }
+        } else {
+            lv_ptr = 0;
+            dims = 0;
+        }
     }
 }
 
 static int assign_ahead(void) {
     u64 save = pos;
     char name[64];
+    assign_op = 0;
     if (!ident(name)) {
         pos = save;
         return 0;
     }
-    if (ch('[')) {
+    for (;;) {
         int depth = 1;
+        skip();
+        if (pos >= src_len || src[pos] != '[') break;
+        pos++;
         while (pos < src_len && depth) {
             if (src[pos] == '[') depth++;
             else if (src[pos] == ']') depth--;
@@ -402,12 +472,25 @@ static int assign_ahead(void) {
         }
     }
     skip();
-    if (pos + 1 < src_len && src[pos] == '=' && src[pos + 1] != '=') {
+    if (op("+=")) assign_op = '+';
+    else if (op("-=")) assign_op = '-';
+    else if (op("*=")) assign_op = '*';
+    else if (op("/=")) assign_op = '/';
+    else if (op("%=")) assign_op = '%';
+    else if (op("&=")) assign_op = '&';
+    else if (op("|=")) assign_op = '|';
+    else if (op("^=")) assign_op = '^';
+    else if (op("<<") || op(">>")) {
         pos = save;
-        return 1;
+        return 0;
+    }
+    else if (pos + 1 < src_len && src[pos] == '=' && src[pos + 1] != '=') assign_op = 0;
+    else {
+        pos = save;
+        return 0;
     }
     pos = save;
-    return 0;
+    return 1;
 }
 
 static void ex_add(void);
@@ -417,6 +500,30 @@ static void ex_eq(void);
 static void ex_bitand(void);
 static void ex_bitxor(void);
 static void ex_bitor(void);
+
+static void emit_incdec(int delta, int postfix) {
+    emit_hex("50");
+    emit_text("\n");
+    emit_hex("48 8B 0C 24");
+    emit_text("\n");
+    emit_hex("48 63 01");
+    emit_text("\n");
+    if (postfix) {
+        emit_hex("48 89 C2");
+        emit_text("\n");
+    }
+    if (delta > 0) emit_hex("48 83 C0 01");
+    else emit_hex("48 83 E8 01");
+    emit_text("\n");
+    emit_hex("89 01");
+    emit_text("\n");
+    if (postfix) {
+        emit_hex("48 89 D0");
+        emit_text("\n");
+    }
+    emit_hex("48 83 C4 08");
+    emit_text("\n");
+}
 
 static void ex_primary(void) {
     char name[64];
@@ -441,6 +548,7 @@ static void ex_primary(void) {
         emit_hex("48 8D 05");
         emit_ref(a);
         emit_text("\n");
+        ex_type = 2; ex_elem = 1; ex_ptr = 1;
         return;
     }
     if (pos < src_len && src[pos] >= '0' && src[pos] <= '9') {
@@ -448,6 +556,7 @@ static void ex_primary(void) {
         emit_hex("B8");
         emit_imm32((u32)v);
         emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
         return;
     }
     if (pos < src_len && src[pos] == '\'') {
@@ -468,6 +577,7 @@ static void ex_primary(void) {
         emit_hex("B8");
         emit_imm32((u32)v);
         emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
         return;
     }
     if (ident(name)) {
@@ -489,11 +599,30 @@ static void ex_primary(void) {
             emit_hex("E8");
             emit_named_ref(name);
             emit_text("\n");
+            ex_type = 1; ex_elem = 4; ex_ptr = 0;
             return;
         }
         ex_lvalue(name);
-        emit_hex("48 63 00");
+        if (!lv_ptr && op("++")) {
+            emit_incdec(1, 1);
+            ex_type = 1; ex_elem = 4; ex_ptr = 0;
+            return;
+        }
+        if (!lv_ptr && op("--")) {
+            emit_incdec(-1, 1);
+            ex_type = 1; ex_elem = 4; ex_ptr = 0;
+            return;
+        }
+        if (lv_ptr) {
+            ex_type = lv_type; ex_elem = lv_elem; ex_ptr = 1;
+            return;
+        }
+        if (lv_type == 2) emit_hex("48 0F BE 00");
+        else if (lv_type == 4) emit_hex("48 8B 00");
+        else if (lv_type == 5) emit_hex("8B 00");
+        else emit_hex("48 63 00");
         emit_text("\n");
+        ex_type = lv_type; ex_elem = lv_elem; ex_ptr = 0;
         return;
     }
     if (ch('(')) {
@@ -505,22 +634,54 @@ static void ex_primary(void) {
 }
 
 static void ex_unary(void) {
+    u64 cast_save = pos;
+    if (ch('(')) {
+        int tw = type_word();
+        if (tw && ch(')')) {
+            ex_unary();
+            if (tw == 2) {
+                emit_hex("48 25 FF 00 00 00");
+                emit_text("\n");
+            }
+            return;
+        }
+        pos = cast_save;
+    }
+    if (op("++")) {
+        char name[64];
+        if (!ident(name)) fail();
+        ex_lvalue(name);
+        emit_incdec(1, 0);
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
+        return;
+    }
+    if (op("--")) {
+        char name[64];
+        if (!ident(name)) fail();
+        ex_lvalue(name);
+        emit_incdec(-1, 0);
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
+        return;
+    }
     if (ch('!')) {
         ex_unary();
         emit_hex("48 83 F8 00 0F 94 C0 48 0F B6 C0");
         emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
         return;
     }
     if (ch('-')) {
         ex_unary();
         emit_hex("48 F7 D8");
         emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
         return;
     }
     if (ch('~')) {
         ex_unary();
         emit_hex("48 F7 D0");
         emit_text("\n");
+        ex_type = 1; ex_elem = 4; ex_ptr = 0;
         return;
     }
     if (ch('&')) {
@@ -572,14 +733,27 @@ static void ex_add(void) {
     ex_mul();
     for (;;) {
         int k = 0;
+        int lt = ex_type, le = ex_elem, lp = ex_ptr;
         if (op("+")) k = 1;
         else if (op("-")) k = 2;
         else break;
         emit_hex("50");
         ex_mul();
         emit_hex("48 89 C1 58");
-        if (k == 1) emit_hex("48 01 C8");
-        else emit_hex("48 29 C8");
+        if (lp) {
+            if (le != 1) {
+                emit_hex("48 69 C9");
+                emit_imm32((u32)le);
+                emit_text("\n");
+            }
+            if (k == 1) emit_hex("48 01 C8");
+            else emit_hex("48 29 C8");
+            ex_type = lt; ex_elem = le; ex_ptr = 1;
+        } else {
+            if (k == 1) emit_hex("48 01 C8");
+            else emit_hex("48 29 C8");
+            ex_type = 1; ex_elem = 4; ex_ptr = 0;
+        }
         emit_text("\n");
     }
 }
@@ -702,14 +876,58 @@ static void ex_or(void) {
 static void ex_expr(void) {
     if (assign_ahead()) {
         char name[64];
+        int aop = assign_op;
         ident(name);
         ex_lvalue(name);
+        if (aop == 0) {
+            emit_hex("50");
+            emit_text("\n");
+            ch('=');
+            ex_expr();
+            emit_hex("59");
+            emit_text("\n");
+            store_rcx(lv_type, lv_ptr);
+            ex_type = lv_type; ex_elem = lv_elem; ex_ptr = 0;
+            return;
+        }
         emit_hex("50");
         emit_text("\n");
-        ch('=');
-        ex_expr();
-        emit_hex("59 89 01");
+        emit_hex("48 8B 0C 24");
         emit_text("\n");
+        if (lv_type == 2) emit_hex("48 0F BE 01");
+        else if (lv_type == 4) emit_hex("48 8B 01");
+        else if (lv_type == 5) emit_hex("8B 01");
+        else emit_hex("48 63 01");
+        emit_text("\n");
+        emit_hex("50");
+        emit_text("\n");
+        if (aop == '+') op("+=");
+        else if (aop == '-') op("-=");
+        else if (aop == '*') op("*=");
+        else if (aop == '/') op("/=");
+        else if (aop == '%') op("%=");
+        else if (aop == '&') op("&=");
+        else if (aop == '|') op("|=");
+        else if (aop == '^') op("^=");
+        ex_expr();
+        emit_hex("48 89 C1 58");
+        emit_text("\n");
+        if (aop == '+') emit_hex("48 01 C8");
+        else if (aop == '-') emit_hex("48 29 C8");
+        else if (aop == '*') emit_hex("48 0F AF C1");
+        else if (aop == '/') emit_hex("48 99 48 F7 F9");
+        else if (aop == '%') emit_hex("48 99 48 F7 F9 48 89 D0");
+        else if (aop == '&') emit_hex("48 21 C8");
+        else if (aop == '|') emit_hex("48 09 C8");
+        else if (aop == '^') emit_hex("48 31 C8");
+        emit_text("\n");
+        emit_hex("5A");
+        emit_text("\n");
+        if (lv_type == 2) emit_hex("88 02");
+        else if (lv_type == 4) emit_hex("48 89 02");
+        else emit_hex("89 02");
+        emit_text("\n");
+        ex_type = lv_type; ex_elem = lv_elem; ex_ptr = 0;
         return;
     }
     ex_or();
@@ -849,24 +1067,49 @@ static void ex_stmt(void) {
         ex_block();
         return;
     }
-    if (type_word()) {
+    {
+        int tw = type_word();
+        if (!tw) {
+            ex_expr();
+            ch(';');
+            return;
+        }
         for (;;) {
             char name[64];
+            int elem, dims = 0, row = 0;
+            u64 total;
             if (!ident(name)) fail();
+            elem = type_size(tw);
             if (ch('[')) {
-                u64 n = number();
+                u64 n1 = number();
                 ch(']');
-                add_local(name, n * 4);
-            } else {
-                add_local(name, 4);
-                if (ch('=')) {
-                    emit_addr(name);
-                    emit_hex("50");
-                    emit_text("\n");
-                    ex_expr();
-                    emit_hex("59 89 01");
-                    emit_text("\n");
+                dims = 1;
+                total = n1 * elem;
+                if (ch('[')) {
+                    u64 n2 = number();
+                    ch(']');
+                    dims = 2;
+                    row = n2 * elem;
+                    total = n1 * row;
                 }
+            } else {
+                total = 8;
+            }
+            {
+                int li = add_local(name, total);
+                l_type[li] = tw;
+                l_elem[li] = elem;
+                l_dims[li] = dims;
+                l_row[li] = row;
+            }
+            if (ch('=')) {
+                emit_addr(name);
+                emit_hex("50");
+                emit_text("\n");
+                ex_expr();
+                emit_hex("59");
+                emit_text("\n");
+                store_rcx(tw, 0);
             }
             if (ch(',')) continue;
             ch(';');
@@ -888,10 +1131,17 @@ static void ex_function(char *name) {
     ch('(');
     word("void");
     while (!ch(')')) {
-        if (type_word()) {
+        {
+            int tw = type_word();
             char pn[64];
+            int li;
+            if (!tw) fail();
             if (!ident(pn)) fail();
-            add_local(pn, 4);
+            li = add_local(pn, 8);
+            l_type[li] = tw;
+            l_elem[li] = type_size(tw);
+            l_dims[li] = 0;
+            l_row[li] = 0;
             p++;
         }
         ch(',');
@@ -989,30 +1239,49 @@ int main(void) {
         }
         stage = 2;
         {
+            int gtw = last_type;
             char name[64];
             if (!ident(name)) fail();
-            if (ch('(')) ex_function(name);
-            else {
-                if (ch('[')) {
-                    u64 count = number();
-                    ch(']');
+            if (ch('(')) {
+                ex_function(name);
+            } else {
+                for (;;) {
+                    int elem = type_size(gtw);
+                    int dims = 0, row = 0;
+                    u64 total = (u64)elem;
+                    if (ch('[')) {
+                        u64 n1 = number();
+                        ch(']');
+                        dims = 1;
+                        total = n1 * elem;
+                        if (ch('[')) {
+                            u64 n2 = number();
+                            ch(']');
+                            dims = 2;
+                            row = n2 * elem;
+                            total = n1 * row;
+                        }
+                    }
                     if (g_count == 256) fail();
                     strcpy(g_name[g_count], name);
-                    g_type[g_count] = 1;
-                    g_elem[g_count] = 4;
-                    g_dims[g_count] = 1;
-                    g_row[g_count] = count * 4;
-                    g_size[g_count++] = count * 4;
-                } else {
-                    if (g_count == 256) fail();
-                    strcpy(g_name[g_count], name);
-                    g_type[g_count] = 1;
-                    g_elem[g_count] = 4;
-                    g_dims[g_count] = 0;
-                    g_row[g_count] = 0;
-                    g_size[g_count++] = 4;
+                    g_type[g_count] = gtw;
+                    g_elem[g_count] = elem;
+                    g_dims[g_count] = dims;
+                    g_row[g_count] = row;
+                    g_size[g_count] = total;
+                    g_has_init[g_count] = 0;
+                    if (ch('=')) {
+                        g_has_init[g_count] = 1;
+                        g_init[g_count] = (int)number();
+                    }
+                    g_count++;
+                    if (ch(',')) {
+                        if (!ident(name)) fail();
+                        continue;
+                    }
+                    ch(';');
+                    break;
                 }
-                ch(';');
             }
         }
     }
@@ -1023,7 +1292,12 @@ int main(void) {
         int i;
         for (i = 0; i < g_count; i++) {
             emit_named_label(g_name[i]);
-            emit_zero(g_size[i]);
+            if (g_has_init[i] && g_size[i] == 4) {
+                emit_imm32((u32)g_init[i]);
+                emit_text("\n");
+            } else {
+                emit_zero(g_size[i]);
+            }
         }
     }
     if (generated_bytes < 0x480000) emit_zero(0x480000 - generated_bytes);

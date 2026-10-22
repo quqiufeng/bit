@@ -186,12 +186,20 @@ bootstrap/linux/c0/c0v2.c
 - 现有 `c0.c`、A1、seed、bootstrap 链全部保留
 - 记录 `c1-stage0/1/2` 哈希
 
-### Phase 1：类型表与声明（进行中）
+### Phase 1：类型表与声明（完成）
 
 - 已创建 `c0v2.c` 和 `c0v2-build.sh`
-- 已加入 `g_type/g_elem/g_dims/g_row` 与 `l_type/l_elem/l_dims/l_row` 骨架
-- 当前仍保持旧的 int 行为；`c0v2` 对 `bootstrap.c` 的输出与旧 `c0` 逐字节一致
-- 下一步：让声明解析填充类型表
+- 已加入 `g_type/g_elem/g_dims/g_row` 与 `l_type/l_elem/l_dims/l_row`
+- 声明解析已填充类型表
+
+### Phase 2：char/数组/二维数组（完成）
+
+- `char` 1 字节 load/store
+- 一维/二维数组、行步长、数组退化
+- `char a[2][3]`、`char s[4]` 测试通过
+- `++/--`、复合赋值、简单 cast 已加入
+- c0v2 可继续编译 `bootstrap.c` 并接入 chain
+- `selfsource` 当前推进到 `strcmp(const char *a, ...)`，下一个阻塞是指针参数
 
 ### Phase 2：char、数组、二维数组
 
