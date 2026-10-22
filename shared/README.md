@@ -21,5 +21,5 @@ extraction can be checked instead of silently drifting.
 Run the manifest check with:
 
 ```sh
-python3 tools/check_sources.py
+./tools/check_sources.sh
 ```
