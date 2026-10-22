@@ -249,7 +249,10 @@ bootstrap/linux/c0/c0v2.c
 - 反汇编显示 stage1 实际进入了 `L2543`（extern true 块），随后执行 `ch(';')` 并在 pos=27 退出
 - 但顶层单独调用 `word("extern")` 返回假（退出码 62）
 - 因此问题变为：`word("extern")` 在 `while(word("static"))` 之后被调用时返回真，单独调用时返回假
-- 下一步：审计 `word("static")` 假分支后的 `pos`/字符串参数/栈状态，确认 `word("extern")` 是否收到错误字符串指针或返回了陈旧 RAX
+- 顺序测试 `if(word("static"))... else if(word("extern"))...` 返回 73，说明连续调用 word 本身正常
+- 但在真实主循环中，`while(word("static")) skip();` 之后注入的 `exit(pos)` 没有触发，stage1 仍直接输出 header
+- 因此问题进一步锁定为 `for(;;)` / `while` 控制流入口或标签，而不是 `word` 的连续调用
+- 下一步：检查 C0v2 生成的 `for(;;)` 回边与 `while(word("static"))` 的入口标签是否被布局变化影响
 - 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
 ### Phase 4：自增/复合赋值
