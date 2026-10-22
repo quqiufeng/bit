@@ -4,22 +4,16 @@ ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 mkdir -p "$BUILD"
 (cd "$ROOT" && sha256sum -c bootstrap/seed.sha256)
-python3 - "$ROOT/bootstrap" "$BUILD" <<'PY'
-import binascii, pathlib, sys, os
-source = pathlib.Path(sys.argv[1])
-build = pathlib.Path(sys.argv[2])
-artifacts = {
-    'seed-c1': 'seed-c1.hex',
-    'seed-link': 'seed-link.hex',
-    'seed-startup.o': 'seed-startup.hex',
-    'seed-syscalls.o': 'seed-syscalls.hex',
-}
-for name, hexname in artifacts.items():
-    data = binascii.unhexlify(''.join((source / hexname).read_text().split()))
-    path = build / name
-    path.write_bytes(data)
-    os.chmod(path, 0o755)
-PY
+for spec in \
+    seed-c1:seed-c1.hex \
+    seed-link:seed-link.hex \
+    seed-startup.o:seed-startup.hex \
+    seed-syscalls.o:seed-syscalls.hex; do
+    name=${spec%%:*}
+    hex=${spec#*:}
+    "$ROOT/bootstrap/linux/seed.elf" < "$ROOT/bootstrap/$hex" > "$BUILD/$name"
+    chmod +x "$BUILD/$name"
+done
 C1="$BUILD/seed-c1"
 LINK="$BUILD/seed-link"
 START="$BUILD/seed-startup.o"
