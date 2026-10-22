@@ -67,3 +67,6 @@ dkms.conf
 !**/bootstrap/**/*.hex
 !**/bootstrap/**/*.o
 !**/startup/**/*.o
+!bootstrap/linux/seed.elf
+!bootstrap/linux/a0/a0.seed.elf
+!bootstrap/linux/a1/a1.seed.elf
