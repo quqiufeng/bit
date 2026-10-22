@@ -18,7 +18,8 @@ seed.elf
   + a1.seed.hex       -> A1
   + c0v2.a1           -> C0v2
   + compiler-runtime.c-> native C1 (via C0v2 + A1)
-  + linker.seed.hex   -> native linker
+  + standalone-*.c    -> c1l standalone linker (via C0v2 + A1)
+  + linker.seed.hex   -> native linker (cross-check)
 ```
 
 The native script checks the fixed points:
@@ -26,7 +27,7 @@ The native script checks the fixed points:
 - A0 equals `a0.seed.elf`
 - A1 equals `a1.seed.elf`
 - `C0v2(c0v2.c)` equals `c0v2.a1`
-- the source-built native linker equals `linker.seed.hex`
+- the source-built standalone linker (`c1l`) equals `linker.seed.hex`
 - native C1 stage1 equals stage2
 - DDC: native C1 and gcc-built C1 produce identical compiler/runtime objects
 
@@ -40,7 +41,8 @@ The native script checks the fixed points:
 | `a1.seed.hex` | hex text | A0 |
 | `c0v2.a1` | A1 text | C0v2 fixed point |
 | `compiler-runtime.c` | C text | `make-seed-source.sh` (optional) |
-| `linker.seed.hex` | hex text | native linker fixed point |
+| `linker.seed.hex` | hex text | legacy native linker fixed point; cross-check only |
+| `linux/standalone-*.c` | C source | source-built `c1l` linker |
 
 ## Not yet lowered
 

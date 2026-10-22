@@ -9,7 +9,7 @@ A1 seed
  -> C0v2 seed
  -> native Linux C1
  -> compiler.c / runtime.c / linker.c
- -> native linker seed
+ -> c1l (standalone linker built from linux/standalone-*.c)
  -> stage1 -> stage2
 ```
 
@@ -23,10 +23,17 @@ The native path uses only committed seeds:
 - `bootstrap/linux/a1/a1.seed.hex`
 - `bootstrap/linux/c0/c0v2.a1`
 - `bootstrap/linux/c0/native/compiler-runtime.c`
-- `bootstrap/linux/c0/native/linker.seed.elf`
+- `bootstrap/linux/c0/native/linker.seed.elf` (cross-check only)
 
-It no longer invokes Windows PE, `pe2elf`, `build/c1link`, C1-built A1, a
-host C compiler, or Python.
+The native linker used for stage1/stage2 is now `c1l.elf`, built by C0v2/A1
+from `linux/standalone-runtime.c`, `linux/standalone-link.c` and
+`bootstrap/linux/c0/native/linker-helpers.a1` (A1 syscall stubs).  It reads output, entry and
+object paths as a line-based manifest on stdin.  The committed linker seed is
+still decoded and compared against the source-built linker, but it is not
+invoked to link any executable.
+
+The script no longer invokes Windows PE, `pe2elf`, `build/c1link`, C1-built
+A1, a host C compiler, or Python.
 
 ## C1 `-E` mode
 
@@ -62,7 +69,8 @@ The next reductions are:
 2. The native linker synthesizes `_start` and the `__c1_sysv_*` stubs directly
    as a text section with symbols and relocations; `startup.seed.o` /
    `syscalls.seed.o` are gone.
-3. Replace the committed native linker seed with a first linker generated from
-   source by the standalone path.
+3. The source-built standalone linker now links the native chain.  The next
+   step is to drop `linker.seed.hex`, its hash entry, and the cross-check from
+   the native script.
 4. Remove the remaining host `gcc`/`ld` and upstream PE bridge from the global
    `build.sh` seed chain.

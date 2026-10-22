@@ -1,0 +1,9 @@
+:__c1_sysv_open
+B8 02 00 00 00 0F 05 C3
+:__c1_sysv_close
+B8 03 00 00 00 0F 05 C3
+:__c1_sysv_mmap
+49 89 CA 
+B8 09 00 00 00 0F 05 C3
+:__c1_sysv_munmap
+B8 0B 00 00 00 0F 05 C3
