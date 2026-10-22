@@ -68,4 +68,4 @@ These are language-extension work, not chain-closure work.
 `c0v2.c` is the parallel type-system refactor.  Phase 1 adds type-table
 storage; Phase 2 adds char widths, 1D/2D arrays, ++/--, compound assignment and
 simple casts.  `c0v2` compiles `bootstrap.c` and still passes the C0 chain.
-`selfsource` now stops at the first pointer parameter in `strcmp`.
+Phase 3 adds pointer types, `&`, `*`, `p[i]` and pointer arithmetic.  `int *p` works; `char *p` indexing still has a fault.  `selfsource` now reaches `strcpy` and stops at `*d++ = *s++`.

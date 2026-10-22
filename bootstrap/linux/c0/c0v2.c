@@ -17,6 +17,14 @@ static int g_dims[256];
 static int g_row[256];
 static int g_has_init[256];
 static int g_init[256];
+static int g_pelem[256];
+static int l_pelem[256];
+static int fn_count;
+static char fn_name[256][64];
+static int fn_type[256];
+static int fn_elem[256];
+static int lv_ptrvar;
+static int cur_ret_type, cur_ret_elem;
 static int g_count;
 static char l_name[256][64];
 static int l_off[256];
@@ -356,8 +364,11 @@ static int type_size(int tw) {
     if (tw == 2) return 1;
     if (tw == 4) return 8;
     if (tw == 5) return 4;
+    if (tw == 6) return 8;
     return 4;
 }
+
+static int is_ptr(int tw) { return tw == 6; }
 
 static void emit_scale(int scale) {
     if (scale == 1) emit_hex("48 8D 04 08");
@@ -375,7 +386,7 @@ static void emit_scale(int scale) {
 static void store_rcx(int tw, int ptr) {
     if (ptr) fail();
     if (tw == 2) emit_hex("88 01");
-    else if (tw == 4) emit_hex("48 89 01");
+    else if (tw == 4 || tw == 6) emit_hex("48 89 01");
     else if (tw == 5) emit_hex("89 01");
     else emit_hex("89 01");
     emit_text("\n");
@@ -426,6 +437,24 @@ static void ex_lvalue(const char *name) {
     lv_type = tw;
     lv_elem = elem;
     lv_ptr = dims != 0;
+    lv_ptrvar = 0;
+    if (tw == 6 && dims == 0) {
+        if (!ch('[')) {
+            lv_ptrvar = 1;
+            return;
+        }
+        emit_hex("48 8B 00");
+        emit_text("\n");
+        emit_hex("50");
+        ex_expr();
+        ch(']');
+        emit_hex("48 89 C1 58");
+        emit_scale(elem);
+        lv_type = elem == 1 ? 2 : (elem == 8 ? 4 : 1);
+        lv_elem = elem;
+        lv_ptr = 0;
+        return;
+    }
     if (dims == 0) return;
     if (ch('[')) {
         emit_hex("50");
@@ -599,7 +628,19 @@ static void ex_primary(void) {
             emit_hex("E8");
             emit_named_ref(name);
             emit_text("\n");
-            ex_type = 1; ex_elem = 4; ex_ptr = 0;
+            {
+                int i;
+                int rt = 1, re = 4;
+                for (i = 0; i < fn_count; i++) {
+                    if (strcmp(fn_name[i], name) == 0) {
+                        rt = fn_type[i];
+                        re = fn_elem[i];
+                    }
+                }
+                ex_type = rt;
+                ex_elem = re;
+                ex_ptr = (rt == 6);
+            }
             return;
         }
         ex_lvalue(name);
@@ -611,6 +652,12 @@ static void ex_primary(void) {
         if (!lv_ptr && op("--")) {
             emit_incdec(-1, 1);
             ex_type = 1; ex_elem = 4; ex_ptr = 0;
+            return;
+        }
+        if (lv_ptrvar) {
+            emit_hex("48 8B 00");
+            emit_text("\n");
+            ex_type = 6; ex_elem = lv_elem; ex_ptr = 1;
             return;
         }
         if (lv_ptr) {
@@ -663,6 +710,26 @@ static void ex_unary(void) {
         ex_type = 1; ex_elem = 4; ex_ptr = 0;
         return;
     }
+    if (ch('*')) {
+        int pe;
+        ex_unary();
+        pe = ex_elem;
+        if (pe == 1) {
+            emit_hex("48 0F BE 00");
+            emit_text("\n");
+            ex_type = 2;
+        } else if (pe == 8) {
+            emit_hex("48 8B 00");
+            emit_text("\n");
+            ex_type = 6;
+        } else {
+            emit_hex("48 63 00");
+            emit_text("\n");
+            ex_type = 1;
+        }
+        ex_elem = pe; ex_ptr = 0;
+        return;
+    }
     if (ch('!')) {
         ex_unary();
         emit_hex("48 83 F8 00 0F 94 C0 48 0F B6 C0");
@@ -686,8 +753,11 @@ static void ex_unary(void) {
     }
     if (ch('&')) {
         char name[64];
+        int pe;
         if (!ident(name)) fail();
         ex_lvalue(name);
+        pe = type_size(lv_type);
+        ex_type = 6; ex_elem = pe; ex_ptr = 1;
         return;
     }
     ex_primary();
@@ -877,8 +947,12 @@ static void ex_expr(void) {
     if (assign_ahead()) {
         char name[64];
         int aop = assign_op;
+        int dt;
+        int dp;
         ident(name);
         ex_lvalue(name);
+        dt = lv_type;
+        dp = lv_ptr;
         if (aop == 0) {
             emit_hex("50");
             emit_text("\n");
@@ -886,8 +960,8 @@ static void ex_expr(void) {
             ex_expr();
             emit_hex("59");
             emit_text("\n");
-            store_rcx(lv_type, lv_ptr);
-            ex_type = lv_type; ex_elem = lv_elem; ex_ptr = 0;
+            store_rcx(dt, dp);
+            ex_type = dt; ex_elem = lv_elem; ex_ptr = 0;
             return;
         }
         emit_hex("50");
@@ -895,7 +969,7 @@ static void ex_expr(void) {
         emit_hex("48 8B 0C 24");
         emit_text("\n");
         if (lv_type == 2) emit_hex("48 0F BE 01");
-        else if (lv_type == 4) emit_hex("48 8B 01");
+        else if (lv_type == 4 || lv_type == 6) emit_hex("48 8B 01");
         else if (lv_type == 5) emit_hex("8B 01");
         else emit_hex("48 63 01");
         emit_text("\n");
@@ -912,6 +986,11 @@ static void ex_expr(void) {
         ex_expr();
         emit_hex("48 89 C1 58");
         emit_text("\n");
+        if (dt == 6 && lv_elem != 1) {
+            emit_hex("48 69 C9");
+            emit_imm32((u32)lv_elem);
+            emit_text("\n");
+        }
         if (aop == '+') emit_hex("48 01 C8");
         else if (aop == '-') emit_hex("48 29 C8");
         else if (aop == '*') emit_hex("48 0F AF C1");
@@ -923,8 +1002,8 @@ static void ex_expr(void) {
         emit_text("\n");
         emit_hex("5A");
         emit_text("\n");
-        if (lv_type == 2) emit_hex("88 02");
-        else if (lv_type == 4) emit_hex("48 89 02");
+        if (dt == 2) emit_hex("88 02");
+        else if (dt == 4 || dt == 6) emit_hex("48 89 02");
         else emit_hex("89 02");
         emit_text("\n");
         ex_type = lv_type; ex_elem = lv_elem; ex_ptr = 0;
@@ -1069,10 +1148,15 @@ static void ex_stmt(void) {
     }
     {
         int tw = type_word();
+        int pelem = type_size(tw);
         if (!tw) {
             ex_expr();
             ch(';');
             return;
+        }
+        while (ch('*')) {
+            tw = 6;
+            pelem = type_size(last_type);
         }
         for (;;) {
             char name[64];
@@ -1101,6 +1185,7 @@ static void ex_stmt(void) {
                 l_elem[li] = elem;
                 l_dims[li] = dims;
                 l_row[li] = row;
+                l_pelem[li] = pelem;
             }
             if (ch('=')) {
                 emit_addr(name);
@@ -1123,6 +1208,12 @@ static void ex_stmt(void) {
 
 static void ex_function(char *name) {
     int p = 0;
+    if (fn_count < 256) {
+        strcpy(fn_name[fn_count], name);
+        fn_type[fn_count] = cur_ret_type;
+        fn_elem[fn_count] = cur_ret_elem;
+        fn_count++;
+    }
     strcpy(cur_func, name);
     emit_named_label(name);
     emit_hex("55 48 89 E5 48 81 EC 00 40 00 00");
@@ -1133,13 +1224,19 @@ static void ex_function(char *name) {
     while (!ch(')')) {
         {
             int tw = type_word();
+            int pelem = type_size(tw);
             char pn[64];
             int li;
             if (!tw) fail();
+            while (ch('*')) {
+                tw = 6;
+                pelem = type_size(last_type);
+            }
             if (!ident(pn)) fail();
             li = add_local(pn, 8);
             l_type[li] = tw;
             l_elem[li] = type_size(tw);
+            l_pelem[li] = pelem;
             l_dims[li] = 0;
             l_row[li] = 0;
             p++;
@@ -1240,9 +1337,16 @@ int main(void) {
         stage = 2;
         {
             int gtw = last_type;
+            int pelem = type_size(gtw);
             char name[64];
+            while (ch('*')) {
+                gtw = 6;
+                pelem = type_size(last_type);
+            }
             if (!ident(name)) fail();
             if (ch('(')) {
+                cur_ret_type = gtw;
+                cur_ret_elem = pelem;
                 ex_function(name);
             } else {
                 for (;;) {
@@ -1268,6 +1372,7 @@ int main(void) {
                     g_elem[g_count] = elem;
                     g_dims[g_count] = dims;
                     g_row[g_count] = row;
+                    g_pelem[g_count] = pelem;
                     g_size[g_count] = total;
                     g_has_init[g_count] = 0;
                     if (ch('=')) {
