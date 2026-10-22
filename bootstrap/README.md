@@ -15,6 +15,7 @@ upstream A0/A1/C0 seed chain:
 - `compiler1.o == compiler2.o`
 - `seed-stage1 == seed-stage2`
 - the rebuilt compiler compiles and runs `examples/hello.c`
+- the seed compiler is a fixed point: `seed-c1 == seed-stage2`
 
 Regenerate the bundle after intentional compiler/linker changes with:
 

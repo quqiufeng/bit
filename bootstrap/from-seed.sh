@@ -35,6 +35,7 @@ cmp "$BUILD/seed-compiler1.o" "$BUILD/seed-compiler2.o"
 "$LINK" "$BUILD/seed-stage2" _start \
     "$START" "$BUILD/seed-runtime2.o" "$BUILD/seed-compiler2.o" "$SYSCALL"
 cmp "$BUILD/seed-stage1" "$BUILD/seed-stage2"
+cmp "$C1" "$BUILD/seed-stage2"
 "$BUILD/seed-stage2" < "$ROOT/examples/hello.c" > "$BUILD/seed-hello.o"
 "$LINK" "$BUILD/seed-hello" _start \
     "$START" "$BUILD/seed-runtime2.o" "$BUILD/seed-hello.o" "$SYSCALL"
