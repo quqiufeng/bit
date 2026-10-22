@@ -687,11 +687,11 @@ static void ex_expr(void) {
         char name[64];
         ident(name);
         ex_lvalue(name);
-        emit_hex("49 89 C1");
+        emit_hex("50");
         emit_text("\n");
         ch('=');
         ex_expr();
-        emit_hex("41 89 01");
+        emit_hex("59 89 01");
         emit_text("\n");
         return;
     }
@@ -842,10 +842,10 @@ static void ex_stmt(void) {
                 add_local(name, 4);
                 if (ch('=')) {
                     emit_addr(name);
-                    emit_hex("49 89 C1");
+                    emit_hex("50");
                     emit_text("\n");
                     ex_expr();
-                    emit_hex("41 89 01");
+                    emit_hex("59 89 01");
                     emit_text("\n");
                 }
             }
