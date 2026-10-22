@@ -252,8 +252,6 @@ bit/
 │   ├── upstream.lock
 │   └── upstream/              # 冻结的上游 Windows 参考树
 ├── tools/
-│   ├── check_sources.py
-│   ├── elflink.py             # 自制静态 ELF 链接器原型
 │   ├── pe2elf.c               # 上游 PE seed/工具 -> Linux ELF 运行（宿主 gcc 构建）
 │   ├── pe2elf_stubs.S         # Win64 ABI kernel32 shim 源
 │   └── pe2elf_stubs.json/.bin/.h  # shim 偏移、二进制和 C 头
