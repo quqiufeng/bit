@@ -40,7 +40,7 @@ Regenerate the bundle after intentional compiler/linker changes with:
 ## Hashes
 
 ```text
-8a6c02b78338aab1e64aa59ee128566e0e158f1ee58265605a8d54f2b9be51b0  bootstrap/seed-c1.hex
+ba5e879f9588e6beee80accadace8ab3644989f7e36992cbd940b4157822a364  bootstrap/seed-c1.hex
 0d94737820d1e2a18638bc97a944c6ebeb3fba3063656103926f1dafa3f1f8df  bootstrap/seed-link.hex
 1b778c4c307ad0552379d55f0a592ad50013d6cbb6c14f55236e940ddab23194  bootstrap/seed-startup.hex
 fe4219b0a528b9da7f583aa5569e38ab46f1cd7fbd5c572a89f8aecb78754023  bootstrap/seed-syscalls.hex

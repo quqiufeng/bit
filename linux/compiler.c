@@ -5,7 +5,6 @@
 /* C1 compiler, built by the frozen C-written bootstrap compiler.
    Reads C from stdin and emits an ELF64 relocatable object on stdout. */
 int source[1048576];
-extern long long __c1_sysv_write(long long, const void *, unsigned long long);
 int pp_condition;
 int c99_mode;
 int c89_identifiers;
@@ -11749,17 +11748,8 @@ int main(int argc, char **argv) {
     if (failed)
         return 1;
     if (preprocess_only) {
-        char out[4096];
-        int n = 0;
-        for (i = 0; i < size; i++) {
-            out[n++] = (char)(source[i] & 255);
-            if (n == 4096) {
-                __c1_sysv_write(1, out, 4096);
-                n = 0;
-            }
-        }
-        if (n)
-            __c1_sysv_write(1, out, (unsigned long long)n);
+        for (i = 0; i < size; i++)
+            __c0_putchar(source[i] & 255);
         return 0;
     }
     position = 4096;
