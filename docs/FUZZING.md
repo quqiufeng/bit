@@ -25,6 +25,11 @@ The current fuzz suites are deterministic `awk` templates, not AST generators:
 | `tests/fuzz-abi-struct.sh` | random struct field order, pass and return by value | Native C1 + native linker vs GCC |
 | `tests/fuzz-abi-longdouble-stack.sh` | 7 integer args plus long double stack arguments | Native C1 + native linker vs GCC |
 | `tests/fuzz-ast.sh` | precedence-aware nested expression ASTs | Native C1 + native linker vs GCC |
+| `tests/fuzz-iso.sh` | C89/C99 language subset | Native C1 + native linker vs GCC |
+| `tests/fuzz-hosted-abi.sh` | callee-saved pollution, stack alignment, C1/GCC/glibc calls | C1-hosted vs GCC-hosted |
+| `tests/fuzz-hosted-longdouble.sh` | long double across glibc math calls | C1-hosted vs GCC-hosted |
+| `tests/fuzz-hosted-struct.sh` | struct returns from glibc div/ldiv | C1-hosted vs GCC-hosted |
+| `tests/fuzz-hosted-varargs.sh` | printf/snprintf with ints/doubles/long doubles | C1-hosted vs GCC-hosted |
 
 Each case compares the process exit status. Some suites also share stdout
 checks through the normal test runners.
@@ -37,6 +42,10 @@ checks through the normal test runners.
   struct pass/return, and long-double stack arguments.
 - Missing: nested calls, deep recursive call frames, and full aggregate
   classification combinations.
+- Hosted coverage now includes callee-saved pollution, 16-byte stack
+  alignment, long double glibc math, struct returns, and varargs printing.
+- Hosted x87 tag-word leakage, >6 stack arguments through the pollution
+  trampoline, and full aggregate classification remain open.
 
 ## Next priority: ABI passing fuzz
 
