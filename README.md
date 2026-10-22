@@ -260,7 +260,9 @@ bit/
 │   ├── run-static-pie.sh
 │   ├── run-archive.sh
 │   ├── run-shared.sh
+│   ├── run-dynamic.sh
 │   ├── shlib/                  # C1 对象 -> .so 测试
+│   ├── dynamic/                # C1 动态可执行文件测试
 │   ├── sysv/                  # SysV ABI/语言回归测试
 │   ├── hosted/                # glibc hosted 互操作测试
 │   ├── interop/               # C1 <-> gcc ABI 双向互操作测试
@@ -280,7 +282,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP/UNIX sockets/select/poll/epoll/inotify/eventfd/timerfd/signalfd/memfd/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex/iconv/glob/ioctl/statvfs/getauxval 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE 和 `--shared` `.so`。最小 seed→A0/A1→C0→C1 链仍待做，hosted 测试仍用系统 `ld` |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。最小 seed→A0/A1→C0→C1 链仍待做，hosted glibc 测试仍用系统 `ld` |
 
 ## 快速开始
 
