@@ -127,11 +127,11 @@ int __c0_putchar(int c) {
     return (unsigned char)byte;
 }
 
-int main(void);
+int main(int argc, char **argv);
 int __c1_start(void) {
     typedef void Stop(unsigned int);
     Stop *stop = (Stop *)__c1_win_ExitProcess;
-    int result = main();
+    int result = main(0, 0);
     stop((unsigned int)result);
     return result;
 }
