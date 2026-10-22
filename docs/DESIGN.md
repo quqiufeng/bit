@@ -758,6 +758,7 @@ bit/
 - `./build.sh` 已打通 `c1-stage0` → `c1-stage1` → `c1-stage2`。
 - `compiler*.o`、`runtime*.o`、`c1-stage*` 均逐字节一致。
 - 编译器不链接 glibc，只使用 Linux syscall。
+- Linux `wchar_t` 为 32-bit int；宽字符串/宽字符按 4 字节编码。
 - 预定义宏包含 `__linux__`、`__unix__`、`__x86_64__`、`__LP64__`、`_LP64`、`__ELF__`、`__C1__`。
 - Linux 目标已切换到 SysV AMD64/LP64 标量 ABI：`long`/指针为 64 位，整数参数使用 `RDI`–`R9`，浮点使用 `XMM0`–`XMM7`，各自独立计数；溢出时按顺序走栈。
 - `tests/sysv/` 覆盖整数/浮点寄存器与栈参数、LP64、函数指针、全局初始化、递归和 `argc/argv`。

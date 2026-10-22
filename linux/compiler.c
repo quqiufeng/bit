@@ -606,7 +606,7 @@ int character(int wide) {
             return 0;
         }
         if (c == 92)
-            c = escape(wide ? 65535 : 255);
+            c = escape(wide ? 0x10ffff : 255);
         /* Defined implementation choice: narrow constants pack bytes from
            left to right modulo 32 bits; wide constants use the last unit. */
         if (wide)
@@ -622,7 +622,7 @@ int character(int wide) {
     value = (int)bits;
     if (!wide && count == 1 && bits >= 128)
         value = (int)bits - 256;
-    literal_type = wide ? 8 : 1;
+    literal_type = 1;
     literal_high = !wide && value < 0 ? -1 : 0;
     return 144;
 }
@@ -5706,26 +5706,34 @@ int join_strings(void) {
 }
 
 int emit_string(void) {
-    int skip, data, i;
-    if (joined_string_wide && !(position & 1))
-        emit(0x90);
+    int skip, data, i, c;
+    if (joined_string_wide)
+        while (position & 3)
+            emit(0x90);
     skip = jump(0);
     data = position;
     emitted_string_address = data + 0x400e00;
     for (i = 0; i < joined_string_length && !failed; i = i + 1) {
-        emit(string_pool[joined_string_start + i] & 255);
-        if (joined_string_wide)
-            emit(string_pool[joined_string_start + i] >> 8);
+        c = string_pool[joined_string_start + i];
+        emit(c & 255);
+        if (joined_string_wide) {
+            emit((c >> 8) & 255);
+            emit((c >> 16) & 255);
+            emit((c >> 24) & 255);
+        }
     }
     emit(0);
-    if (joined_string_wide)
+    if (joined_string_wide) {
         emit(0);
+        emit(0);
+        emit(0);
+    }
     patch(skip, position);
     sequence(0x058d48, 3);
     emit32(data - position - 4);
     sequence(0xc28948, 3);
     expression_load = position;
-    array_value(make_array(joined_string_wide ? 8 : 9, joined_string_length + 1));
+    array_value(make_array(joined_string_wide ? 1 : 9, joined_string_length + 1));
     return -1;
 }
 
@@ -5734,6 +5742,12 @@ int character_array(int t) {
         return 0;
     t = unqualified(array_base[(t - 4096) / 256]);
     return t == 8 ? 2 : (t == 5 || t == 6 || t == 9);
+}
+
+int wide_string_array(int t) {
+    if (!is_array(t))
+        return 0;
+    return unqualified(array_base[(t - 4096) / 256]) == 1;
 }
 
 int initializer_scalar_shape(void) {
@@ -5798,10 +5812,13 @@ int initializer_shape(int t) {
         if (token == '}')
             return error();
     }
-    if (character_array(t) && token == 145) {
+    if ((character_array(t) || (literal_string_wide && wide_string_array(t))) && token == 145) {
         join_strings();
         i = joined_string_length;
-        if (character_array(t) != (joined_string_wide ? 2 : 1))
+        if (joined_string_wide) {
+            if (!(character_array(t) == 2 || wide_string_array(t)))
+                return error();
+        } else if (character_array(t) != 1)
             return error();
         i++;
     } else if (complex_component(t)) {
@@ -5875,13 +5892,16 @@ int infer_initializer(int t, int id, int global) {
 
 int copy_string(int t, int base, int offset, int global) {
     int n = array_length[(t - 4096) / 256], bytes = joined_string_length + 1;
-    if (character_array(t) != (joined_string_wide ? 2 : 1))
+    if (joined_string_wide) {
+        if (!(character_array(t) == 2 || wide_string_array(t)))
+            return error();
+    } else if (character_array(t) != 1)
         return error();
     if (joined_string_length > n)
         return error();
     if (bytes > n)
         bytes = n;
-    bytes *= joined_string_wide ? 2 : 1;
+    bytes *= joined_string_wide ? 4 : 1;
     emit_string();
     emit(0x56);
     emit(0x57);
@@ -8135,7 +8155,8 @@ int initialize_object(int t, int base, int offset, int global, int constant_list
     }
     if (c89_identifiers && braces && (is_array(t) || is_record(t)))
         constant_list = 1;
-    if (!initializer_pending && character_array(t) && token == 145) {
+    if (!initializer_pending &&
+        (character_array(t) || (literal_string_wide && wide_string_array(t))) && token == 145) {
         join_strings();
         copy_string(t, base, offset, global);
     } else if (complex_component(t)) {
