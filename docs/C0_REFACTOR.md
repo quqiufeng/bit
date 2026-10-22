@@ -186,10 +186,12 @@ bootstrap/linux/c0/c0v2.c
 - 现有 `c0.c`、A1、seed、bootstrap 链全部保留
 - 记录 `c1-stage0/1/2` 哈希
 
-### Phase 1：类型表与声明
+### Phase 1：类型表与声明（进行中）
 
-- `c0v2.c` 支持 `int/char/u64/u32/void/const/static/typedef/extern`
-- 只实现 int 现有行为，确保老测试不变
+- 已创建 `c0v2.c` 和 `c0v2-build.sh`
+- 已加入 `g_type/g_elem/g_dims/g_row` 与 `l_type/l_elem/l_dims/l_row` 骨架
+- 当前仍保持旧的 int 行为；`c0v2` 对 `bootstrap.c` 的输出与旧 `c0` 逐字节一致
+- 下一步：让声明解析填充类型表
 
 ### Phase 2：char、数组、二维数组
 

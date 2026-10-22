@@ -61,3 +61,10 @@ Remaining source-level blockers:
 - string/char helpers used by `c0.c`
 
 These are language-extension work, not chain-closure work.
+
+
+## c0v2
+
+`c0v2.c` is the parallel type-system refactor.  Phase 1 adds type-table
+storage but keeps the legacy int behavior.  `c0v2-build.sh` builds it and runs
+the smoke test; its `bootstrap.c` A1 output is byte-identical to `c0`.
