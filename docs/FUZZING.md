@@ -20,19 +20,23 @@ The current fuzz suites are deterministic `awk` templates, not AST generators:
 | `tests/fuzz-struct.sh` | 8 seeds of random struct field order | Native C1 + native linker vs GCC |
 | `tests/fuzz-float.sh` | 8 seeds of random long double arithmetic | Native C1 + native linker vs GCC |
 | `tests/fuzz-varargs.sh` | 8 seeds of random values to fixed 8-argument varargs | Native C1 + native linker vs GCC |
+| `tests/fuzz-abi.sh` | integer arity 0..12, register-to-stack transitions | Native C1 + native linker vs GCC |
+| `tests/fuzz-abi-float.sh` | mixed int/double/float parameters | Native C1 + native linker vs GCC |
+| `tests/fuzz-abi-struct.sh` | random struct field order, pass and return by value | Native C1 + native linker vs GCC |
+| `tests/fuzz-abi-longdouble-stack.sh` | 7 integer args plus long double stack arguments | Native C1 + native linker vs GCC |
+| `tests/fuzz-ast.sh` | precedence-aware nested expression ASTs | Native C1 + native linker vs GCC |
 
 Each case compares the process exit status. Some suites also share stdout
 checks through the normal test runners.
 
 ## Gaps
 
-- The fuzz generator is template based, not grammar/AST based.
-- ABI coverage is concentrated in hand-written cases.
-- There is no complete ISO C test suite.
-- There is no generated test for register exhaustion with mixed
-  integer/SSE/aggregate arguments.
-- There is no generated test for nested calls, struct returns, or
-  long-double stack arguments.
+- Most generators are template based; `fuzz-ast.sh` now has nested precedence.
+- There is still no complete ISO C test suite.
+- Generated coverage now includes integer arity 0..12, mixed SSE/integer,
+  struct pass/return, and long-double stack arguments.
+- Missing: nested calls, deep recursive call frames, and full aggregate
+  classification combinations.
 
 ## Next priority: ABI passing fuzz
 
