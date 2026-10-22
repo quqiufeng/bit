@@ -20,6 +20,8 @@ static int g_dims[256];
 static int g_row[256];
 static int g_has_init[256];
 static int g_init[256];
+static int g_init_vals[256][512];
+static int g_init_count[256];
 static int g_pelem[256];
 static int l_pelem[256];
 static int fn_count;
@@ -284,6 +286,7 @@ static int type_word(void) {
     if (word("long")) { word("long"); last_type = 4; return 4; }
     if (word("int")) { last_type = 1; return 1; }
     if (word("char")) { last_type = 2; return 2; }
+    if (word("short")) { last_type = 7; return 7; }
     if (word("void")) { last_type = 3; return 3; }
     if (word("u64")) { last_type = 4; return 4; }
     if (word("u32")) { last_type = 5; return 5; }
@@ -381,6 +384,7 @@ static int type_size(int tw) {
     if (tw == 4) return 8;
     if (tw == 5) return 4;
     if (tw == 6) return 8;
+    if (tw == 7) return 2;
     return 4;
 }
 
@@ -753,6 +757,9 @@ static void ex_unary(void) {
             ex_unary();
             if (tw == 2) {
                 emit_hex("48 25 FF 00 00 00");
+                emit_text("\n");
+            } else if (tw == 7) {
+                emit_hex("48 0F BF C0");
                 emit_text("\n");
             }
             return;
@@ -1273,6 +1280,26 @@ static void ex_stmt(void) {
         ex_block();
         return;
     }
+    if (op("*")) {
+        int pt;
+        int pe;
+        ex_primary();
+        pt = 1;
+        pe = ex_elem;
+        ch('=');
+        emit_hex("50");
+        emit_text("\n");
+        ex_expr();
+        emit_hex("59");
+        emit_text("\n");
+        if (pt == 2) emit_hex("88 01");
+        else if (pt == 4 || pt == 6) emit_hex("48 89 01");
+        else emit_hex("89 01");
+        emit_text("\n");
+        ex_type = pt; ex_elem = pe; ex_ptr = 0;
+        ch(';');
+        return;
+    }
     {
         int tw = type_word();
         int pelem = type_size(tw);
@@ -1522,7 +1549,21 @@ int main(void) {
                     g_has_init[g_count] = 0;
                     if (ch('=')) {
                         g_has_init[g_count] = 1;
-                        g_init[g_count] = (int)number();
+                        if (ch('{')) {
+                            int nv = 0;
+                            for (;;) {
+                                if (nv < 512) g_init_vals[g_count][nv] = (int)number();
+                                nv++;
+                                if (ch(',')) continue;
+                                ch('}');
+                                break;
+                            }
+                            g_init_count[g_count] = nv;
+                        } else {
+                            int neg = ch('-');
+                            g_init[g_count] = (int)number();
+                            if (neg) g_init[g_count] = -g_init[g_count];
+                        }
                     }
                     g_count++;
                     if (ch(',')) {
@@ -1542,7 +1583,13 @@ int main(void) {
         int i;
         for (i = 0; i < g_count; i++) {
             emit_named_label(g_name[i]);
-            if (g_has_init[i] && g_size[i] == 4) {
+            if (g_init_count[i] > 0) {
+                int j;
+                for (j = 0; j < (int)(g_size[i] / 4); j++) {
+                    emit_imm32((u32)(j < g_init_count[i] ? g_init_vals[i][j] : 0));
+                    emit_text("\n");
+                }
+            } else if (g_has_init[i] && g_size[i] == 4) {
                 emit_imm32((u32)g_init[i]);
                 emit_text("\n");
             } else {
