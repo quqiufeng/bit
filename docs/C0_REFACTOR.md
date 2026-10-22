@@ -320,6 +320,15 @@ c0v2-stage1 < c0v2.c > c0v2-stage2.a1
 diff c0v2.a1 c0v2-stage2.a1
 ```
 
+## 9.1 已达成（C0v2 二进制固定点）
+
+- 根因：局部数组按 `rbp - used` 分配，正索引向高地址写，8 字节后踩到保存的 rbp/返回地址
+- 修复：`add_local` 改为按 `rbp - (used + size)` 分配数组
+- `c0v2` 编译 `c0v2.c` -> A1 -> stage1
+- stage1 再编译 `c0v2.c` -> stage2
+- `stage1.elf == stage2.elf`（二进制固定点）
+- A1 文本仍有非语义差异，但装配后二进制一致
+
 ## 10. 风险与回滚
 
 高风险点：

@@ -406,9 +406,9 @@ static void store_rcx(int tw, int ptr) {
 
 static int add_local(const char *name, u64 bytes) {
     int i = l_count;
-    int off = 8;
-    if (i) off = l_off[i - 1] + l_size[i - 1];
-    off = (off + 7) & -8;
+    int off = 0;
+    if (i) off = l_off[i - 1];
+    off = (off + (int)bytes + 7) & -8;
     if (i == 256) fail();
     strcpy(l_name[i], name);
     l_off[i] = off;
