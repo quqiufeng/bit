@@ -19,7 +19,7 @@ run_pe() {
     input=$2
     output=$3
     elf=${pe%.exe}.elf
-    python3 "$PE2ELF" "$pe" "$elf"
+    python3 "$PE2ELF" --allow-unresolved "$pe" "$elf"
     "$elf" < "$input" > "$output"
 }
 
@@ -41,4 +41,10 @@ run_pe "$OUT/c1-capacity.exe" c1/compiler.c "$OUT/c1-stage0.exe"
 run_pe "$OUT/c1-stage0.exe" c1/compiler.c "$OUT/c1-stage1.exe"
 run_pe "$OUT/c1-stage1.exe" c1/compiler.c "$OUT/c1-stage2.exe"
 cmp "$OUT/c1-stage1.exe" "$OUT/c1-stage2.exe"
+if python3 "$PE2ELF" "$OUT/c1-stage1.exe" "$OUT/strict-should-fail.elf" 2>"$OUT/strict-imports.log"; then
+    echo "FAIL: strict pe2elf accepted unresolved imports" >&2
+    exit 1
+fi
+grep -q "unresolved import KERNEL32.dll!HeapAlloc" "$OUT/strict-imports.log"
+echo "PASS: strict pe2elf rejects unresolved imports with symbol names"
 echo "PASS: minimal seed -> A0 -> A1 -> C0 -> C1 (upstream Windows C1) on Linux"
