@@ -699,6 +699,11 @@ static void ex_primary(void) {
             emit_hex("E8");
             emit_named_ref(name);
             emit_text("\n");
+            if (n > 4) {
+                emit_hex("48 81 C4");
+                emit_imm32((u32)(8 * (n - 4)));
+                emit_text("\n");
+            }
             {
                 int i;
                 int rt = 1, re = 4;
@@ -1315,9 +1320,13 @@ static void ex_stmt(void) {
             ch(';');
             return;
         }
-        while (ch('*')) {
-            tw = 6;
-            pelem = type_size(last_type);
+        {
+            int stars = 0;
+            while (ch('*')) {
+                stars++;
+                tw = 6;
+                pelem = stars > 1 ? 8 : type_size(last_type);
+            }
         }
         for (;;) {
             char name[64];
@@ -1395,9 +1404,13 @@ static void ex_function(char *name) {
             char pn[64];
             int li;
             if (!tw) fail();
-            while (ch('*')) {
-                tw = 6;
-                pelem = type_size(last_type);
+            {
+                int stars = 0;
+                while (ch('*')) {
+                    stars++;
+                    tw = 6;
+                    pelem = stars > 1 ? 8 : type_size(last_type);
+                }
             }
             if (!ident(pn)) fail();
             li = add_local(pn, 8);
@@ -1453,7 +1466,7 @@ static void emit_header(void) {
     emit_text("\n");
     emit_hex("01 00 00 00 06 00 00 00 00 00 20 00 00 00 00 00");
     emit_text("\n");
-    emit_hex("00 00 60 00 00 00 00 00 00 00 60 00 00 00 00 00");
+    emit_hex("00 00 80 00 00 00 00 00 00 00 80 00 00 00 00 00");
     emit_text("\n");
     emit_hex("00 00 80 01 00 00 00 00 00 00 80 01 00 00 00 00 00 10 00 00 00 00 00 00");
     emit_text("\n");
@@ -1516,9 +1529,13 @@ int main(void) {
             int gtw = last_type;
             int pelem = type_size(gtw);
             char name[64];
-            while (ch('*')) {
-                gtw = 6;
-                pelem = type_size(last_type);
+            {
+                int stars = 0;
+                while (ch('*')) {
+                    stars++;
+                    gtw = 6;
+                    pelem = stars > 1 ? 8 : type_size(last_type);
+                }
             }
             if (!ident(name)) fail();
             if (ch('(')) {
