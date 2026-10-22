@@ -263,7 +263,11 @@ bootstrap/linux/c0/c0v2.c
 - 已分别挂哨兵：只在 `word()` 挂哨兵不触发 188，只在 `ident()` 挂哨兵触发 188
 - 因此第一次把 `pos` 写成源码文本的是 `ident()` 的 `dst[n++] = src[pos]` 写入路径
 - 最可能：调用 `ident(name)` 时 `name` 的地址/`rbp` 已损坏，`dst` 指向了全局 `pos`，源码标识符文本被写进 `pos`
-- 下一步：在 `ident` 入口记录 `dst` 低位地址、在 main 调用点记录 `name` 地址，确认 `dst` 是否等于 `pos` 的地址；检查 `type_word()` 返回后 `rbp/name` 地址
+- 在 `ident` 入口检查 `pos>1048576` 触发 188，说明进入 `ident` 前 `pos` 已经是源码文本
+- 在 `type_word()` 后立即检查 `pos>1048576` 不触发 77
+- 因此污染窗口缩小到：`type_word()` 返回之后、`ident()` 调用之前
+- 该区间运行时只有：`stage = 2`、局部块 `char name[64]`（编译期分配）、`skip()`
+- 最大嫌疑：`skip()` 调用或 `stage`/局部块地址写入覆盖了 `pos`；下一步在 `stage=2` 后、`skip()` 前后分别挂退出码
 - 下一步：对最新 stage1 重新做地址断点，而不是复用旧 ELF
 - 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
