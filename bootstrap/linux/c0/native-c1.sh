@@ -16,6 +16,9 @@ printf 'int main(void){return 42;}\n' > "$OUT/tiny.c"
 head -c 4 "$OUT/tiny.o" | od -An -tx1 | grep -q '7f 45 4c 46'
 cd "$ROOT"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/compiler.c > "$OUT/compiler.o"
+C1_INCLUDE="$ROOT" "$OUT/c1.elf" -E < linux/compiler.c > "$OUT/compiler.i"
+C1_INCLUDE="$ROOT" "$OUT/c1.elf" < "$OUT/compiler.i" > "$OUT/compiler-i.o"
+cmp "$OUT/compiler.o" "$OUT/compiler-i.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
 "$ROOT/bootstrap/linux/c0/native/linker.seed.elf" "$OUT/native-linker" _start \

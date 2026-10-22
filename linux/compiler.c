@@ -11712,8 +11712,12 @@ int compiler_output(int total) {
 
 int main(int argc, char **argv) {
     int c, i, total, id, preprocess_only = 0;
-    if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'E' && argv[1][2] == 0)
-        preprocess_only = 1;
+    char *arg = 0;
+    if (argc > 1) {
+        arg = argv[1];
+        if (arg[0] == '-' && arg[1] == 'E' && arg[2] == 0)
+            preprocess_only = 1;
+    }
     initialize();
     configure_standard();
     configure_object();

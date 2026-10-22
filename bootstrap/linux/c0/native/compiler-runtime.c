@@ -11981,8 +11981,14 @@ int configure_object(void) {
     object_mode = 1;
     return 0;
 }
-int main(void) {
-    int c, i, total, id;
+int main(int argc, char **argv) {
+    int c, i, total, id, preprocess_only = 0;
+    char *arg = 0;
+    if (argc > 1) {
+        arg = argv[1];
+        if (arg[0] == '-' && arg[1] == 'E' && arg[2] == 0)
+            preprocess_only = 1;
+    }
     initialize();
     configure_standard();
     configure_object();
@@ -12014,6 +12020,13 @@ int main(void) {
     }
     source_phases();
     preprocess();
+    if (failed)
+        return 1;
+    if (preprocess_only) {
+        for (i = 0; i < size; i++)
+            __c0_putchar(source[i] & 255);
+        return 0;
+    }
     position = 4096;
     next();
     if (!failed && token == 0)
