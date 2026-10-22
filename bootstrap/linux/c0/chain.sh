@@ -4,7 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 BASE="$ROOT/windows/upstream/bootstrap-c99/base"
 WORK="$BUILD/c0/chain"
-C0="$BUILD/c0/c0"
+C0=${C0:-"$BUILD/c0/c0"}
 A1="$BUILD/a1/a1"
 PE2ELF="$ROOT/tools/pe2elf.py"
 mkdir -p "$WORK"
