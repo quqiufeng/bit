@@ -245,7 +245,11 @@ bootstrap/linux/c0/c0v2.c
 - 已反汇编 stage1 的 `main`：在 `word("extern")` 之后，代码进入了一条 `ch(';')` 路径（typedef 跳过逻辑），而不是 `word("typedef")` 检查
 - 该路径在输入开头就是 `int` 的情况下仍执行，随后把 `pos` 消费到源码末尾的 `;`，因此 `pos=27`
 - 说明 `if (word("typedef"))` 的条件/字符串/调用生成错误，导致把普通输入误判为 typedef 声明
-- 下一步：审计 C0v2 生成的 `word("typedef")` 调用和条件跳转
+- 已核对 A1：`extern`/`typedef` 的标签位置正确，不是标签错位
+- 反汇编显示 stage1 实际进入了 `L2543`（extern true 块），随后执行 `ch(';')` 并在 pos=27 退出
+- 但顶层单独调用 `word("extern")` 返回假（退出码 62）
+- 因此问题变为：`word("extern")` 在 `while(word("static"))` 之后被调用时返回真，单独调用时返回假
+- 下一步：审计 `word("static")` 假分支后的 `pos`/字符串参数/栈状态，确认 `word("extern")` 是否收到错误字符串指针或返回了陈旧 RAX
 - 下一步：在修复后的 stage1 上检查 `stage=2` 赋值、`char name[64]` 局部块和 `ident` 调用
 
 ### Phase 4：自增/复合赋值
