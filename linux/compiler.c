@@ -21,7 +21,10 @@ char *diagnostic_reason;
 int value;
 int literal_type;
 int literal_high;
-int string_pool[1048576];
+#ifndef C1_STRING_POOL_CAP
+#define C1_STRING_POOL_CAP 1048576
+#endif
+int string_pool[C1_STRING_POOL_CAP];
 int string_used;
 int literal_string_start;
 int literal_string_length;
@@ -583,7 +586,7 @@ int string_token(int wide) {
         }
         if (c == 92)
             c = escape(wide ? 65535 : 255);
-        if (string_used == 1048576) {
+        if (string_used == C1_STRING_POOL_CAP) {
             failed = 1;
             return 0;
         }

@@ -625,6 +625,16 @@ shim 维护方式：
 4. stage1 再编译同一份源码得到 stage2，`stage1 == stage2`。
 5. 桥接链不改变现有 `./build.sh` 的 SysV 自举结果。
 
+当前状态：
+
+- `windows/bridge/win32_runtime.c` 已实现 11 个 Linux 接口，并可由现有
+  Linux C1 编译成对象。
+- `windows/bridge/bridge.c` 组合运行时与 `linux/compiler.c`。
+- 上游 C1 对这份单体 `bridge.c` 仍报 `invalid or unsupported translation unit`；
+  尚未定位是上游资源上限还是某个未支持的构造。Linux C1 能编译同一组合。
+- 下一步是隔离上游 C1 的失败点，必要时把 `compiler.c` 拆成多个 `.c1o`
+  翻译单元，用上游 PE 链接器合并。
+
 ---
 
 ## 7. 构建系统
