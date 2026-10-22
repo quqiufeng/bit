@@ -630,15 +630,46 @@ shim 维护方式：
 - `windows/bridge/win32_runtime.c` 已实现 11 个 Linux 接口，并可由现有
   Linux C1 编译成对象。
 - `windows/bridge/bridge.c` 组合运行时与 `linux/compiler.c`。
-- 上游 C1 对这份单体 `bridge.c` 仍报 `invalid or unsupported translation unit`；
-  尚未定位是上游资源上限还是某个未支持的构造。Linux C1 能编译同一组合。
-- 已完成：用上游 `object/compiler.c` 构建对象编译器；它把单体
-  `linux/compiler.c` 编成 `.c1o`，经上游 PE 链接器链接为 `bridge.exe`。
+- 已完成：上游 `object/compiler.c` 生成的 object C1 把单体
+  `linux/compiler.c` 编成 `.c1o`；上游 PE 链接器链接出 `bridge.exe`。
 - 已完成：`bridge.exe` 在 Linux 上运行，输出 SysV ELF 对象；c1link 链接出
   Linux C1 stage1/stage2，二者逐字节一致；hello 正常运行。
 - 入口：`./bootstrap/bridge.sh`。该链仍使用上游 seed/A0/A1/C0/C1、Python
   `pe2elf` 和上游 PE 链接器；它去掉的是 gcc stage0，不是上游依赖。
-- 下一步是零依赖 Linux 链：手写 seed 解码器、Linux A1/C0/C1。
+- 下一步是零依赖 Linux 链：C0 扩到能编译 bootstrap C1，再完成 A1/C0 源码级自举。
+
+### 6.7 Linux C0 窄域契约（第一阶段）
+
+第一阶段 C0 的目标是编译：
+
+```text
+windows/upstream/bootstrap-c99/base/c1/bootstrap.c
+```
+
+该文件的实际可编译子集比完整 C 窄：
+
+- 变量只有 `int` 标量和 `int` 数组
+- 没有 `int*`/`char*` 指针声明
+- 没有 `char`/`unsigned` 变量声明
+- 全局数组都是零初始化，没有 `= { ... }`
+- 使用函数、`if/else`、`for/while`、`?:`、`==/!=/</<=/>/>=`
+- 使用 `!`、`&&`、`||`
+- 全局标量跨函数读写很多
+
+布局契约：
+
+- `int` 固定 4 字节，`int[]` 元素步长固定 4
+- 全局 BSS 总量 `0x371800`，第一阶段使用 4MB 数据段
+- 先接受 4MB 文件级零填充（方案 A）；真正的 `.bss` 后置
+- A1 `.zero` 只接受十进制常数
+- C0 自己维护 `generated_bytes`；头部/段表/字节/字符串/引用分别计数
+- 标量局部变量固定 8 字节槽，数组按元素宽度，栈帧 16 字节对齐
+- 局部偏移超过 127 使用 `disp32`
+- 全局/局部左值统一“地址优先”：地址进 RAX，值进 RAX，目的地址可锁 R9
+- 条件统一为 `expression -> RAX -> cmp rax,0 -> je`，不依赖比较 flags
+- `%label` 由 A1 写成 4 字节小端 PC 相对位移
+
+当前 C0 仍只支持 `int main(void){ return N; }`；上述契约是下一轮实现的边界。
 
 ---
 
@@ -973,8 +1004,8 @@ bit/
 
 - 自制 ELF 链接器（静态→动态）。
 - 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.py` + 4 个 kernel32 stub），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
-- Win64 PE C1 → SysV 桥接：`win32_runtime.c`（13 个符号）、`pe2elf.py` 扩到 12 个 stub、上游 C1 编译 `linux/compiler.c`、c1link 闭合 stage1/stage2；方案见 6.6，尚未实现。
-- Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并生成 `a0.seed.elf`；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 复现 A1，A1 可装配 `smoke.a1`；C0 尚未从零实现。
+- Win64 PE C1 → SysV 桥接：`bootstrap/bridge.sh` 已完成，上游 object C1 编译 `linux/compiler.c`，上游 PE 链接器生成 `bridge.exe`，c1link 闭合 Linux stage1/stage2；仍依赖上游 seed/PE 链接器。
+- Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并生成 `a0.seed.elf`；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 复现 A1；最小 C0 已完成 C→A1→ELF 的 `return N` 闭环，尚未实现函数/控制流。
 - PIC/PIE。
 - 更多系统头/扩展（E2）。
 - 性能优化。
