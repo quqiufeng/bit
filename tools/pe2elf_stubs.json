@@ -1,0 +1,13 @@
+{
+  "CloseHandle": 195,
+  "CreateFileA": 154,
+  "ExitProcess": 4,
+  "GetEnvironmentVariableA": 358,
+  "GetLocalTime": 232,
+  "GetProcessHeap": 229,
+  "GetStdHandle": 0,
+  "HeapAlloc": 248,
+  "HeapFree": 316,
+  "ReadFile": 15,
+  "WriteFile": 83
+}

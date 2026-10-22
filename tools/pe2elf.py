@@ -2,14 +2,11 @@
 import struct
 import sys
 
-STUBS = bytes.fromhex(
-    '4889c8c3'
-    '4889cfb83c0000000f05f4'
-    '57564d89ca4889cf48f7df4883ef0a4889d64c89c231c00f054885c0780b418902b8010000005e5fc3'
-    '41c7020000000031c05e5fc3'
-    '57564d89ca4889cf48f7df4883ef0a4889d64c89c2b8010000000f054885c0780b418902b8010000005e5fc3'
-    '41c7020000000031c05e5fc3')
-OFF = {'GetStdHandle': 0, 'ExitProcess': 4, 'ReadFile': 15, 'WriteFile': 68}
+import json
+import os
+HERE = os.path.dirname(os.path.abspath(__file__))
+STUBS = open(os.path.join(HERE, 'pe2elf_stubs.bin'), 'rb').read()
+OFF = json.load(open(os.path.join(HERE, 'pe2elf_stubs.json')))
 
 
 def u16(d, o):

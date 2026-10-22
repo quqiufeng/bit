@@ -598,19 +598,24 @@ ABI 边界只在最底层：
 
 当前实现是静态 stub section，不是动态解析：
 
-- `STUBS` 是手写机器码 blob（`tools/pe2elf.py:3`）。
-- `OFF` 把 4 个符号映射到 blob 内固定偏移（`:10`）。
-- IAT 项在转换时直接改成 `0x900000 + OFF[name]`（`:47`）。
-- stub blob 作为独立 LOAD 段固定映射到 `0x900000`（`:51`）。
-- 未识别的 import 不会报错，IAT 保持 0，运行时会崩。
+- `tools/pe2elf_stubs.S` 是 Win64 ABI stub 源，`make-pe2elf-stubs.sh` 生成
+  `pe2elf_stubs.bin` 和 `pe2elf_stubs.json`。
+- `pe2elf.py` 在转换时把 IAT 项改成 `0x900000 + OFF[name]`。
+- stub blob 作为独立 LOAD 段固定映射到 `0x900000`。
+- 当前已实现 11 个 stub：4 个标准 I/O + `CreateFileA`/`CloseHandle`/
+  `GetEnvironmentVariableA`/`GetLocalTime`/`GetProcessHeap`/`HeapAlloc`/`HeapFree`。
+- 未知 import 默认报错并打印 `DLL!symbol`、IAT RVA、thunk index；
+  `--allow-unresolved` 只用于上游参考链探测。
+- 上游 C1 仍额外导入 `HeapReAlloc`、`SetFilePointerEx`、`GetFileSizeEx`、
+  `CreateProcessA` 等完整 Win32 面；桥接编译器应只依赖 6.6.1 的 13 个符号。
 
-扩展到 12 个 shim 时需要：
+shim 维护方式：
 
-1. 为新增 8 个符号写 Win64 ABI stub 机器码。
-2. 重新计算 `OFF`，保持 blob 布局稳定。
-3. 对未知 import 直接报错，避免静默 0。
-4. 优先把 blob 由小汇编源生成，而不是继续手写十六进制；或提供通用
-   `win64_syscall_bridge`，各 stub 只做参数搬移后跳转。
+1. 在 `tools/pe2elf_stubs.S` 增加 Win64 ABI stub。
+2. 运行 `tools/make-pe2elf-stubs.sh` 重新生成 blob 和偏移表。
+3. 未知 import 默认报错，避免静默 0。
+4. 需要第 5 个栈参数或调用其他函数时，必须保留 32 字节 shadow space 并保证
+   16 字节栈对齐。
 
 #### 6.6.4 验收
 
