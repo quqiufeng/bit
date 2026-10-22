@@ -329,6 +329,13 @@ diff c0v2.a1 c0v2-stage2.a1
 - `stage1.elf == stage2.elf`（二进制固定点）
 - A1 文本仍有非语义差异，但装配后二进制一致
 
+## 9.2 A1 源码级固定点
+
+- `a1_self.c` 去除 `struct`，改用平行数组
+- C0v2 BSS 模式生成 A1 二进制，`out` 缓冲不再进入文件
+- `a1_self.sh` 验证 `stage1.elf == stage2.elf`（524288 字节）
+- A1 源码级二进制固定点完成
+
 ## 10. 风险与回滚
 
 高风险点：
