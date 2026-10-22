@@ -473,7 +473,7 @@ flowchart LR
 4. **P3：hosted 输出**
    - 编译器开始支持 hosted 用户程序：ELF `.o` + `crt1.o` + glibc + 动态链接器。
    - 这一阶段不改变编译器自身的 freestanding 属性。
-5. **P4（可选）：纯种子链**
+5. **P4（并行）：纯种子链**
    - 构造 Linux ELF seed；移植/重写 A0/A1/C0；从种子复现 C1。
    - 这一阶段的目标是复刻上游的“从种子自举”叙事，不是第一版的前提。
 
@@ -499,16 +499,121 @@ flowchart LR
 - **可复现**：固定时间戳、稳定排序、无绝对路径；PE 时间戳置 0，ELF build-id 关闭或固定。
 - **种子/stub 校验**：种子、汇编 stub、预编译目标文件都有哈希清单。
 
-### 6.5 纯种子链（后置）
+### 6.5 纯种子链（并行推进）
 
-Linux 纯种子链的候选方案：
+Linux 纯种子链不再把上游 Windows 链当作最终产物。目标是：
 
-1. 手写一个最小 ELF64 seed：读 stdin、写 stdout、退出；用十六进制文本固化为 `seed.hex`。
-2. 用该 seed 装配 A0；A0 装配 A1；A1 装配 C0；C0 编译桥接编译器；最终得到 C1。
-3. 每一级都要自举一致性和功能测试。
-4. 种子可以由一次性工具生成，但生成后必须能从文本复现，并记录来源。
+```
+Linux seed → Linux A0 → Linux A1 → Linux C0 → Linux C1
+```
 
-该方案不阻塞 M1/M2；在 gcc stage0 路线稳定后再做。
+当前基线：
+
+- `bootstrap/linux/seed.hex`：130 字节 ELF64，仅 `exit(0)`，是零依赖树的起点。
+- `bootstrap/linux/a0/`：A0 的输入/输出契约和 smoke 源，A0 本体尚未实现。
+- `bootstrap/minimal-chain.sh`：上游 `seed → A0 → A1 → C0 → C1` 在 Linux 上通过
+  `tools/pe2elf.py` + 4 个 kernel32 stub 运行；产物仍是 Windows PE C1，仅作为
+  上游链可执行性的对照，不作为 Linux 最终 C1。
+
+A0 的硬性约束：
+
+1. 必须从机器码/汇编 seed 开始，不能用“极小 C 子集”实现；130 字节 seed 不具备
+   编译 C 的能力。
+2. 第一阶段只支持 A1 所需的指令子集；标签回填、表达式、ELF64 写出、syscall I/O
+   必须自包含。
+3. 每一级 A0/A1/C0/C1 都要有 stage1/stage2 或等价固定点校验。
+4. 种子可以由一次性工具生成，但生成后必须能从文本复现并记录来源。
+
+### 6.6 Win64 PE C1 → SysV/Linux C1 桥接
+
+目的：用已经能在 Linux 上运行的上游 Win64 C1 编译当前 `linux/compiler.c`，
+得到一个“宿主是 PE、目标输出是 SysV ELF”的桥接编译器，再用 c1link 闭合
+Linux 原生链。
+
+```
+上游 C1 stage2 (Win64 PE)
+  + linux/compiler.c
+  + linux/elf-output.c
+  + shared/*.c
+  + win32_runtime.c
+        ↓ 上游 C1 链接
+桥接编译器 (Win64 PE，运行时通过 pe2elf 在 Linux 执行)
+        ↓ 读 C 源，写 ELF64 对象
+SysV .o
+        ↓ c1link + linux/runtime.c + startup
+Linux C1 stage1
+        ↓ 再编译一次
+Linux C1 stage2，验证 stage1 == stage2
+```
+
+#### 6.6.1 运行时符号
+
+`linux/compiler.c` 只依赖以下 13 个宿主符号，不使用 libc：
+
+```text
+__c1_linux_GetStdHandle
+__c1_linux_GetProcessHeap
+__c1_linux_HeapAlloc
+__c1_linux_HeapFree
+__c1_linux_ReadFile
+__c1_linux_WriteFile
+__c1_linux_CreateFileA
+__c1_linux_CloseHandle
+__c1_linux_GetEnvironmentVariableA
+__c1_linux_GetLocalTime
+__c1_linux_IsDBCSLeadByteEx
+__c0_getchar
+__c0_putchar
+```
+
+约束：
+
+- 没有 `stat`、目录遍历或 `GetLastError`；错误通过返回值表达。
+- `CreateFileA` 只需只读打开头文件（`GENERIC_READ + OPEN_EXISTING`）。
+- `GetEnvironmentVariableA` 必须支持 `C1_INCLUDE`、`C1_STANDARD`。
+- `GetLocalTime` 只影响 `__DATE__`/`__TIME__`，自举期可置零。
+- `IsDBCSLeadByteEx` 在当前 ASCII 源上返回 0。
+- `HeapAlloc`/`HeapFree` 可用 `mmap`/`munmap` 或 arena；`GetProcessHeap` 返回哨兵。
+
+#### 6.6.2 ABI 边界
+
+`win32_runtime.c` 与 `linux/compiler.c` 一样由上游 C1 编译，因此二者之间是
+原生 Win64 ABI，不需要 SysV thunk。
+
+ABI 边界只在最底层：
+
+- `pe2elf.py` 的 kernel32 stub、或 Win64 syscall stub，必须按 Win64 ABI 取参
+  （`RCX/RDX/R8/R9`，第 5 参数在影子空间之后）。
+- 不得把 SysV 的 `linux/syscalls-sysv.S` 直接链入 Win64 运行时；它的参数寄存器
+  不匹配。要么写 Win64 syscall stub，要么统一走 kernel32 shim。
+- 调用带栈参数的 Win64 函数时，必须保留 32 字节 shadow space，并保证
+  `(rsp + 8) % 16 == 0`。
+
+#### 6.6.3 `pe2elf.py` 现状与扩展
+
+当前实现是静态 stub section，不是动态解析：
+
+- `STUBS` 是手写机器码 blob（`tools/pe2elf.py:3`）。
+- `OFF` 把 4 个符号映射到 blob 内固定偏移（`:10`）。
+- IAT 项在转换时直接改成 `0x900000 + OFF[name]`（`:47`）。
+- stub blob 作为独立 LOAD 段固定映射到 `0x900000`（`:51`）。
+- 未识别的 import 不会报错，IAT 保持 0，运行时会崩。
+
+扩展到 12 个 shim 时需要：
+
+1. 为新增 8 个符号写 Win64 ABI stub 机器码。
+2. 重新计算 `OFF`，保持 blob 布局稳定。
+3. 对未知 import 直接报错，避免静默 0。
+4. 优先把 blob 由小汇编源生成，而不是继续手写十六进制；或提供通用
+   `win64_syscall_bridge`，各 stub 只做参数搬移后跳转。
+
+#### 6.6.4 验收
+
+1. 上游 C1 能编译并链接 `linux/compiler.c` + `win32_runtime.c`。
+2. `pe2elf.py` 能在 Linux 下运行桥接 PE，并产出一个合法 SysV ELF `.o`。
+3. c1link 链接该 `.o` 后得到可运行的 Linux C1 stage1。
+4. stage1 再编译同一份源码得到 stage2，`stage1 == stage2`。
+5. 桥接链不改变现有 `./build.sh` 的 SysV 自举结果。
 
 ---
 
@@ -842,8 +947,9 @@ bit/
 当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 只用于最初构建 bootstrap c1link，之后所有 C1 输出由 c1link 链接。`.a` 归档已支持按未定义符号选择性抽取成员；c1link 输出已包含 `.text`/`.data`/`.bss`/`.symtab`/`.strtab`/`.shstrtab` 节表。动态链接和其余重定位待补；hosted glibc 测试仍用系统 `ld`。
 
 - 自制 ELF 链接器（静态→动态）。
-- 最小 seed → A0/A1 → C0 → C1 链已在 Linux 上跑通（PE→ELF 转换 + syscall shim），产物是上游 Windows C1；桥接到 SysV/Linux C1 仍待做。
-- Linux 纯种子链（seed/A0/A1/C0）。
+- 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.py` + 4 个 kernel32 stub），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
+- Win64 PE C1 → SysV 桥接：`win32_runtime.c`（13 个符号）、`pe2elf.py` 扩到 12 个 stub、上游 C1 编译 `linux/compiler.c`、c1link 闭合 stage1/stage2；方案见 6.6，尚未实现。
+- Linux 纯种子链：`bootstrap/linux/seed.hex` 已建立 130 字节 `exit(0)` 起点；A0/A1/C0 尚未从零实现。
 - PIC/PIE。
 - 更多系统头/扩展（E2）。
 - 性能优化。

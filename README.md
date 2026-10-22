@@ -54,7 +54,7 @@
 | 用户程序标准库 | glibc（hosted） | 自带 CRT |
 | 链接 | 自制 `c1link`（Python 原型 bootstrap）；hosted 测试仍用系统 `ld` | 自制 PE 链接器 |
 | 编译器自身 | freestanding（syscall + 自带最小运行时） | freestanding（kernel32 导入 + 自带运行时） |
-| 升级路径 | gcc stage0 → C1 自举 → 纯种子链（后置） | 现有 BitKindle 链 → 自举 |
+| 升级路径 | gcc stage0 → C1 自举 → 纯种子链（并行） | 现有 BitKindle 链 → 自举 |
 | 第三方库 | `.so` ABI 级调用 | DLL 导出 ABI 级调用（含 MinGW 编出的 DLL） |
 
 Linux 与 Windows 不需要对称。对称本身就是另一种“什么都想要”。
@@ -135,7 +135,8 @@ flowchart LR
 - **stage1** 由 C1 自己编译；**stage2** 再编译一次；要求 stage1 与 stage2 逐字节一致。
 - 自举完成后，构建 C1 不再需要 gcc/MinGW GCC。
 - Linux freestanding 链已改用自制 `c1link`：gcc/ld 只负责构建最初的 bootstrap c1link，stage0/stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
-- Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）是后置目标，不在第一版阻塞自举。
+- Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）与 gcc stage0 路线并行推进：`bootstrap/linux/seed.hex` 已建立 130 字节 `exit(0)` 起点，A0 本体尚未实现；上游最小链只作为对照，不作为 Linux 最终 C1。
+- Win64 PE C1 → SysV 桥接方案见 [技术设计 6.6](docs/DESIGN.md#66-win64-pe-c1--sysvlinux-c1-桥接)：`win32_runtime.c`（13 个符号）+ `pe2elf.py` 12 个 stub + 上游 C1 编译 `linux/compiler.c` + c1link 闭合 stage1/stage2。
 
 ## 能做什么 / 不能做什么
 
@@ -240,7 +241,10 @@ bit/
 │   ├── minimal-chain.sh       # 上游 seed -> A0 -> A1 -> C0 -> C1
 │   ├── make-seed.sh
 │   ├── seed.sha256
-│   └── seed-*.hex
+│   ├── seed-*.hex
+│   └── linux/                 # 零依赖 Linux 自举树
+│       ├── seed.hex           # 130 字节 ELF64 exit(0) 起点
+│       └── a0/                # A0 契约与 smoke 源，本体待实现
 ├── windows/
 │   ├── README.md
 │   ├── upstream.lock
@@ -284,7 +288,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP/UNIX sockets/select/poll/epoll/inotify/eventfd/timerfd/signalfd/memfd/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex/iconv/glob/ioctl/statvfs/getauxval 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；上游最小 seed→A0/A1→C0→C1 链已能在 Linux 上跑通（产物仍是 Windows C1）；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。剩余是把最小 seed 链桥接到 SysV/Linux C1，hosted glibc 测试仍用系统 `ld` |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头 | 进行中：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；上游最小 seed→A0/A1→C0→C1 链已能在 Linux 上跑通（产物仍是 Windows C1，仅作对照）；零依赖 Linux 树已有 130 字节 `exit(0)` seed，A0 本体待实现；桥接方案已写入设计文档 6.6，`win32_runtime.c` 与 12 个 stub 尚未实现；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。hosted glibc 测试仍用系统 `ld` |
 
 ## 快速开始
 
