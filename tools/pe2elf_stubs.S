@@ -85,27 +85,46 @@ stub_WriteFile:
 
 .global stub_CreateFileA
 stub_CreateFileA:
+    mov r10, [rsp + 40]
+    mov r11, [rsp + 48]
     push rdi
     push rsi
     mov rdi, rcx
     xor esi, esi
-    xor edx, edx
+    test rdx, 0x40000000
+    jz .Lcf_read
+    mov esi, 1
+.Lcf_read:
+    cmp r10, 1
+    jne .Lcf_not_new
+    or esi, 0xc0
+    jmp .Lcf_open
+.Lcf_not_new:
+    cmp r10, 2
+    jne .Lcf_not_always
+    or esi, 0x240
+    jmp .Lcf_open
+.Lcf_not_always:
+    cmp r10, 4
+    jne .Lcf_open
+    or esi, 0x40
+.Lcf_open:
+    mov edx, 438
     mov eax, 2
     syscall
     test rax, rax
-    js 1f
+    js .Lcf_fail
     neg rax
     sub rax, 10
     pop rsi
     pop rdi
     ret
-1:
+.Lcf_fail:
     mov rax, -1
     pop rsi
     pop rdi
     ret
 
-.global stub_CloseHandle
 stub_CloseHandle:
     push rdi
     movsxd rdi, ecx
@@ -119,6 +138,224 @@ stub_CloseHandle:
     test rax, rax
     sete al
     movzx eax, al
+    pop rdi
+    ret
+
+.global stub_GetCommandLineA
+stub_GetCommandLineA:
+    mov rax, 0x910000
+    mov rdx, [rax]
+    test rdx, rdx
+    jz .Lcmd_empty
+    mov r11, [rdx]
+    lea r8, [rdx + 8]
+    mov r9, 0x910008
+    xor r10d, r10d
+.Lcmd_arg:
+    cmp r10, r11
+    jae .Lcmd_done
+    test r10, r10
+    jz .Lcmd_copy
+    mov byte ptr [r9], 32
+    inc r9
+.Lcmd_copy:
+    mov rdx, [r8 + r10 * 8]
+.Lcmd_char:
+    mov al, [rdx]
+    test al, al
+    jz .Lcmd_next
+    mov [r9], al
+    inc r9
+    inc rdx
+    jmp .Lcmd_char
+.Lcmd_next:
+    inc r10
+    jmp .Lcmd_arg
+.Lcmd_done:
+    mov byte ptr [r9], 0
+    mov rax, 0x910008
+    ret
+.Lcmd_empty:
+    mov byte ptr [0x910008], 0
+    mov rax, 0x910008
+    ret
+
+.global stub_GetLastError
+stub_GetLastError:
+    xor eax, eax
+    ret
+
+.global stub_GetFileType
+stub_GetFileType:
+    mov eax, 1
+    ret
+
+.global stub_FlushFileBuffers
+stub_FlushFileBuffers:
+    mov eax, 1
+    ret
+
+
+.global stub_GetConsoleMode
+stub_GetConsoleMode:
+    xor eax, eax
+    ret
+
+.global stub_GetSystemTimeAsFileTime
+stub_GetSystemTimeAsFileTime:
+    mov qword ptr [rcx], 0
+    ret
+
+.global stub_GetTimeZoneInformation
+stub_GetTimeZoneInformation:
+    xor eax, eax
+    ret
+
+.global stub_GetTickCount64
+stub_GetTickCount64:
+    xor eax, eax
+    ret
+
+.global stub_GetCurrentProcessId
+stub_GetCurrentProcessId:
+    mov eax, 1
+    ret
+
+.global stub_GetTempPathA
+stub_GetTempPathA:
+    mov byte ptr [rdx], 46
+    mov byte ptr [rdx + 1], 0
+    mov eax, 1
+    ret
+
+.global stub_GetTempFileNameA
+stub_GetTempFileNameA:
+    xor eax, eax
+    ret
+
+.global stub_GetProcessTimes
+stub_GetProcessTimes:
+    mov eax, 1
+    ret
+
+.global stub_GetCurrentProcess
+stub_GetCurrentProcess:
+    mov rax, -1
+    ret
+
+.global stub_GetDynamicTimeZoneInformation
+stub_GetDynamicTimeZoneInformation:
+    xor eax, eax
+    ret
+
+.global stub_GetTimeZoneInformationForYear
+stub_GetTimeZoneInformationForYear:
+    xor eax, eax
+    ret
+
+.global stub_RemoveDirectoryA
+stub_RemoveDirectoryA:
+    xor eax, eax
+    ret
+
+.global stub_GetFileAttributesA
+stub_GetFileAttributesA:
+    mov rax, -1
+    ret
+
+.global stub_GetSystemDirectoryA
+stub_GetSystemDirectoryA:
+    xor eax, eax
+    ret
+
+.global stub_CreateProcessA
+stub_CreateProcessA:
+    xor eax, eax
+    ret
+
+.global stub_WaitForSingleObject
+stub_WaitForSingleObject:
+    xor eax, eax
+    ret
+
+.global stub_GetExitCodeProcess
+stub_GetExitCodeProcess:
+    xor eax, eax
+    ret
+
+
+.global stub_SetFilePointerEx
+stub_SetFilePointerEx:
+    push rdi
+    push rsi
+    movsxd rdi, ecx
+    test rdi, rdi
+    jns .Lsfp_fd
+    neg rdi
+    sub rdi, 10
+.Lsfp_fd:
+    mov rsi, rdx
+    mov rdx, r9
+    mov eax, 8
+    syscall
+    test rax, rax
+    js .Lsfp_fail
+    test r8, r8
+    jz .Lsfp_ok
+    mov [r8], rax
+.Lsfp_ok:
+    mov eax, 1
+    pop rsi
+    pop rdi
+    ret
+.Lsfp_fail:
+    xor eax, eax
+    pop rsi
+    pop rdi
+    ret
+
+.global stub_GetFileSizeEx
+stub_GetFileSizeEx:
+    push rdi
+    push rsi
+    push rbx
+    push r12
+    movsxd rdi, ecx
+    test rdi, rdi
+    jns .Lgfs_fd
+    neg rdi
+    sub rdi, 10
+.Lgfs_fd:
+    mov rbx, rdx
+    xor esi, esi
+    mov edx, 1
+    mov eax, 8
+    syscall
+    test rax, rax
+    js .Lgfs_fail
+    mov r12, rax
+    xor esi, esi
+    mov edx, 2
+    mov eax, 8
+    syscall
+    test rax, rax
+    js .Lgfs_fail
+    mov [rbx], rax
+    mov rsi, r12
+    xor edx, edx
+    mov eax, 8
+    syscall
+    mov eax, 1
+    pop r12
+    pop rbx
+    pop rsi
+    pop rdi
+    ret
+.Lgfs_fail:
+    xor eax, eax
+    pop r12
+    pop rbx
+    pop rsi
     pop rdi
     ret
 

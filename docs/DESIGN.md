@@ -632,8 +632,13 @@ shim 维护方式：
 - `windows/bridge/bridge.c` 组合运行时与 `linux/compiler.c`。
 - 上游 C1 对这份单体 `bridge.c` 仍报 `invalid or unsupported translation unit`；
   尚未定位是上游资源上限还是某个未支持的构造。Linux C1 能编译同一组合。
-- 下一步是隔离上游 C1 的失败点，必要时把 `compiler.c` 拆成多个 `.c1o`
-  翻译单元，用上游 PE 链接器合并。
+- 已完成：用上游 `object/compiler.c` 构建对象编译器；它把单体
+  `linux/compiler.c` 编成 `.c1o`，经上游 PE 链接器链接为 `bridge.exe`。
+- 已完成：`bridge.exe` 在 Linux 上运行，输出 SysV ELF 对象；c1link 链接出
+  Linux C1 stage1/stage2，二者逐字节一致；hello 正常运行。
+- 入口：`./bootstrap/bridge.sh`。该链仍使用上游 seed/A0/A1/C0/C1、Python
+  `pe2elf` 和上游 PE 链接器；它去掉的是 gcc stage0，不是上游依赖。
+- 下一步是零依赖 Linux 链：手写 seed 解码器、Linux A1/C0/C1。
 
 ---
 

@@ -130,6 +130,13 @@ def main(argv):
         sys.stderr.write('pe2elf: --allow-unresolved, continuing with unresolved IAT entries\n')
 
     stub_off = align(0x1000 + size, 0x1000)
+    tramp_off = align(len(stubs), 16)
+    if len(stubs) < tramp_off:
+        stubs += b'\0' * (tramp_off - len(stubs))
+    entry_addr = base + entry
+    disp = 0x910000 - (0x900000 + tramp_off + 7)
+    stubs += b'\x48\x89\x25' + struct.pack('<i', disp)
+    stubs += b'\x48\xb8' + struct.pack('<Q', entry_addr) + b'\xff\xe0'
     shoff = align(stub_off + len(stubs), 8)
     out = bytearray(shoff)
     out[0:4] = b'\x7fELF'
@@ -139,13 +146,13 @@ def main(argv):
     p32(out, 16, 2)
     p32(out, 18, 62)
     p32(out, 20, 1)
-    struct.pack_into('<Q', out, 24, base + entry)
+    struct.pack_into('<Q', out, 24, 0x900000 + tramp_off)
     struct.pack_into('<Q', out, 32, 64)
     struct.pack_into('<Q', out, 40, 0)
     p32(out, 48, 0)
     p32(out, 52, 64)
     p32(out, 54, 56)
-    p32(out, 56, 3)
+    p32(out, 56, 4)
     p32(out, 58, 64)
     p32(out, 60, 0)
     p32(out, 62, 0)
@@ -153,6 +160,8 @@ def main(argv):
     struct.pack_into('<IIQQQQQQ', out, ph, 1, 7, 0x1000, base, base, size, size, 0x1000)
     ph += 56
     struct.pack_into('<IIQQQQQQ', out, ph, 1, 5, stub_off, 0x900000, 0x900000, len(stubs), len(stubs), 0x1000)
+    ph += 56
+    struct.pack_into('<IIQQQQQQ', out, ph, 1, 6, 0, 0x910000, 0x910000, 0, 0x10000, 0x1000)
     ph += 56
     struct.pack_into('<IIQQQQQQ', out, ph, 0x6474e551, 6, 0, 0, 0, 0, 0, 0x10)
     out[0x1000:0x1000 + size] = image
