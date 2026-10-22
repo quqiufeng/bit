@@ -69,6 +69,7 @@ static u64 text_size, data_size, bss_size;
 static unsigned char *text_image, *data_image;
 static u64 text_base, data_base, bss_base;
 static int global_selected[MAX_SYMBOLS];
+static int output_pie;
 
 static u32 get16(unsigned char *p) {
     return (u32)p[0] | ((u32)p[1] << 8);
@@ -348,7 +349,7 @@ static int layout_sections(void) {
             data_size = s->out_off + s->size;
         }
     }
-    text_base = 0x401000;
+    text_base = output_pie ? 0x1000 : 0x401000;
     data_base = align_up(text_base + text_size, 0x1000);
     bss_base = data_base + data_size;
     return 0;
@@ -481,6 +482,7 @@ static int strlen_c(const char *text) {
 }
 
 static int write_output(const char *path, u64 entry) {
+    u64 image_base = output_pie ? 0 : 0x400000;
     u64 text_file = 0x1000;
     u64 data_file = align_up(text_file + text_size, 0x1000);
     u64 data_end = data_file + data_size;
@@ -509,7 +511,7 @@ static int write_output(const char *path, u64 entry) {
     p = image;
     p[0] = 0x7f; p[1] = 'E'; p[2] = 'L'; p[3] = 'F';
     p[4] = 2; p[5] = 1; p[6] = 1;
-    put32(p + 16, 2);
+    put32(p + 16, output_pie ? 3 : 2);
     put32(p + 18, 62);
     put32(p + 20, 1);
     put64(p + 24, entry);
@@ -524,13 +526,13 @@ static int write_output(const char *path, u64 entry) {
     put32(p + 62, 6);
     p = image + 64;
     put32(p, 6); put32(p + 4, 5);
-    put64(p + 8, 64); put64(p + 16, 0x400040);
-    put64(p + 24, 0x400040); put64(p + 32, 288);
+    put64(p + 8, 64); put64(p + 16, image_base + 0x40);
+    put64(p + 24, image_base + 0x40); put64(p + 32, 288);
     put64(p + 40, 288); put64(p + 48, 8);
     p += 56;
     put32(p, 1); put32(p + 4, 5);
-    put64(p + 8, 0); put64(p + 16, 0x400000);
-    put64(p + 24, 0x400000); put64(p + 32, text_file + text_size);
+    put64(p + 8, 0); put64(p + 16, image_base);
+    put64(p + 24, image_base); put64(p + 32, text_file + text_size);
     put64(p + 40, text_file + text_size); put64(p + 48, 0x1000);
     p += 56;
     put32(p, 1); put32(p + 4, 6);
@@ -690,12 +692,16 @@ static int parse_input(const char *path) {
 }
 
 int main(int argc, char **argv) {
-    int i, entry_index = -1;
-    if (argc < 4) {
-        puts("usage: c1link output entry object...");
+    int i, entry_index = -1, base = 1;
+    if (argc > 1 && same_name(argv[1], "--pie")) {
+        output_pie = 1;
+        base = 2;
+    }
+    if (argc < base + 3) {
+        puts("usage: c1link [--pie] output entry object...");
         return 2;
     }
-    for (i = 3; i < argc; i++)
+    for (i = base + 2; i < argc; i++)
         if (parse_input(argv[i])) {
             puts("c1link: invalid object");
             return 1;
@@ -703,7 +709,7 @@ int main(int argc, char **argv) {
     activate_archives();
     select_globals();
     for (i = 0; i < symbol_count; i++)
-        if (symbols[i].bind != 0 && same_name(symbols[i].name, argv[2]) &&
+        if (symbols[i].bind != 0 && same_name(symbols[i].name, argv[base + 1]) &&
             symbols[i].shndx != 0 && objects[symbols[i].object].active)
             entry_index = i;
     if (entry_index < 0) {
@@ -713,7 +719,7 @@ int main(int argc, char **argv) {
     layout_sections();
     if (build_images() || apply_relocations())
         return 1;
-    if (write_output(argv[1], selected_address(entry_index)))
+    if (write_output(argv[base], selected_address(entry_index)))
         return 1;
     puts("c1link: linked");
     return 0;
