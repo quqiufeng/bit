@@ -4,8 +4,9 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 BUILD=${BUILD:-"$ROOT/build"}
 OUT="$BUILD/native-c1"
 mkdir -p "$OUT"
-C0V2="$BUILD/c0v2-from-a1/c0v2.elf"
-[ -x "$C0V2" ] || C0V2="$BUILD/c0v2/c0v2"
+C0V2="$OUT/c0v2-seed.elf"
+"$ROOT/bootstrap/linux/a1/a1.seed.elf" < "$ROOT/bootstrap/linux/c0/c0v2.a1" > "$C0V2"
+chmod +x "$C0V2"
 "$C0V2" < "$ROOT/bootstrap/linux/c0/native/compiler-runtime.c" > "$OUT/compiler.a1"
 "$ROOT/bootstrap/linux/c0/native/make.sh" "$OUT/compiler.a1" "$ROOT/bootstrap/linux/c0/native/helpers.a1" "$OUT/compiler-full.a1"
 "$ROOT/bootstrap/linux/a1/a1.seed.elf" < "$OUT/compiler-full.a1" > "$OUT/c1.elf"
@@ -18,17 +19,17 @@ C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/compiler.c > "$OUT/compiler.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/runtime.c > "$OUT/runtime.o"
 C1_INCLUDE="$ROOT" "$OUT/c1.elf" < linux/linker.c > "$OUT/linker.o"
 "$ROOT/bootstrap/linux/c0/native/linker.seed.elf" "$OUT/native-linker" _start \
-    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
+    "$ROOT/bootstrap/linux/c0/native/startup.seed.o" "$OUT/runtime.o" "$OUT/linker.o" "$ROOT/bootstrap/linux/c0/native/syscalls.seed.o"
 "$OUT/native-linker" "$OUT/native-linker2" _start \
-    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/linker.o" "$BUILD/syscalls_sysv.o"
+    "$ROOT/bootstrap/linux/c0/native/startup.seed.o" "$OUT/runtime.o" "$OUT/linker.o" "$ROOT/bootstrap/linux/c0/native/syscalls.seed.o"
 cmp "$OUT/native-linker" "$OUT/native-linker2"
 "$OUT/native-linker" "$OUT/stage1" _start \
-    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler.o" "$BUILD/syscalls_sysv.o"
+    "$ROOT/bootstrap/linux/c0/native/startup.seed.o" "$OUT/runtime.o" "$OUT/compiler.o" "$ROOT/bootstrap/linux/c0/native/syscalls.seed.o"
 "$OUT/stage1" < "$OUT/tiny.c" > "$OUT/tiny-stage1.o"
 cmp "$OUT/tiny.o" "$OUT/tiny-stage1.o"
 C1_INCLUDE="$ROOT" "$OUT/stage1" < linux/compiler.c > "$OUT/compiler-stage2.o"
 cmp "$OUT/compiler.o" "$OUT/compiler-stage2.o"
 "$OUT/native-linker" "$OUT/stage2" _start \
-    "$BUILD/startup_sysv.o" "$OUT/runtime.o" "$OUT/compiler-stage2.o" "$BUILD/syscalls_sysv.o"
+    "$ROOT/bootstrap/linux/c0/native/startup.seed.o" "$OUT/runtime.o" "$OUT/compiler-stage2.o" "$ROOT/bootstrap/linux/c0/native/syscalls.seed.o"
 cmp "$OUT/stage1" "$OUT/stage2"
 echo "PASS: native Linux C1 and native linker reach stage1 == stage2"
