@@ -6,13 +6,7 @@ OUT="$ROOT/build/minimal"
 PE2ELF="$ROOT/tools/pe2elf.py"
 mkdir -p "$OUT"
 
-python3 - "$BASE/seed.hex" "$OUT/a0-seed.exe" <<'PY'
-import binascii, re, sys
-text = open(sys.argv[1]).read()
-text = '\n'.join(line.split(';')[0].split('#')[0] for line in text.splitlines())
-data = binascii.unhexlify(''.join(re.findall(r'\b[0-9A-Fa-f]{2}\b', text)))
-open(sys.argv[2], 'wb').write(data)
-PY
+sed 's/#.*//' "$BASE/seed.hex" | "$ROOT/bootstrap/linux/seed.elf" > "$OUT/a0-seed.exe"
 
 run_pe() {
     pe=$1
