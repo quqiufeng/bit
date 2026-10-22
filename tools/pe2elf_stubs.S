@@ -264,7 +264,7 @@ stub_GetEnvironmentVariableA:
 .Lname_standard:
     .asciz "C1_STANDARD"
 .Lvalue_include:
-    .asciz "."
+    .asciz "include"
 .Lvalue_standard:
     .asciz "c99"
 .Lname_output:

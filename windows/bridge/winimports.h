@@ -1,5 +1,6 @@
 #ifndef C1_WIN_BRIDGE_IMPORTS_H
 #define C1_WIN_BRIDGE_IMPORTS_H
+extern void __c1_win_ExitProcess(void);
 extern void __c1_win_ReadFile(void);
 extern void __c1_win_WriteFile(void);
 extern void __c1_win_CreateFileA(void);
