@@ -7,8 +7,9 @@ OUT=${OUT:-"$ROOT/build/gcc48-owned"}
 if [ ! -x "$BUILD/gcc/cc1" ] || [ ! -x "$BUILD/gcc/cc1plus" ]; then
     echo "SKIP: owned GCC 4.8 build not found" >&2; exit 0
 fi
-if ! grep -q 'gcc47cxx/bin/g++' "$BUILD/config.log"; then
-    echo "FAIL: GCC 4.8 was not configured with GCC 4.7 g++" >&2; exit 1
+if ! grep -q '^CC = /tmp/gcc47-cc' "$BUILD/Makefile" || \
+   ! grep -q '^CXX = /tmp/gcc47-cxx' "$BUILD/Makefile"; then
+    echo "FAIL: GCC 4.8 was not configured with GCC 4.7 wrappers" >&2; exit 1
 fi
 mkdir -p "$OUT"
 printf 'int main(void){return 42;}\n' > "$OUT/c.c"
