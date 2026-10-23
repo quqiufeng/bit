@@ -663,8 +663,30 @@ TCC 构建的 xgcc 已能再编译 GCC C 前端源码：
 PASS: TCC-built GCC 4.7.4 xgcc compiles GCC C frontend sources
 ```
 
-这是“TCC 构建的 GCC 再编译 GCC”的自举探针；完整 GCC 自举和自有 libgcc
-仍未完成。
+这是“TCC 构建的 GCC 再编译 GCC”的自举探针。
+
+stage2 cc1 已成功构建并运行：
+
+```sh
+./tests/gcc47/stage2.sh
+```
+
+结果：
+
+```text
+PASS: GCC 4.7.4 stage2 cc1 built by TCC-built stage1 GCC
+```
+
+边界：
+
+```text
+stage1 cc1/xgcc 由 TCC 链接
+stage2 cc1 由 stage1 GCC 编译
+generator 使用系统 gcc
+最终 stage2 链接使用 stage1 GCC/collect2
+```
+
+完整自有 libgcc、GCC 驱动全量自举和现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
 

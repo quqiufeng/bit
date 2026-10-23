@@ -761,7 +761,10 @@ BusyBox 1.35 最小配置和 BusyBox 1.36.1 完整 `defconfig` 都已用 TCC 编
 `.S` 汇编源交给系统 as/gcc。TCC fork 还补了 glibc 兼容的 `__GNUC__` 预定义、
 packed 布局、透明 union、`-Wp,-MD`、未知链接选项忽略和归档重复扫描。
 GCC 4.7.4 的 `libiberty`、`libcpp`、`gcc` 基础设施、x86_64 后端和 C 前端
-probe 已通过（`tests/gcc47/run.sh`），cc1 和 xgcc 已由 TCC 链接并能编译运行 hello；TCC 构建的 xgcc 也已能编译 GCC C 前端源码，但完整 GCC 自举和自有 libgcc 尚未完成。Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
+probe 已通过（`tests/gcc47/run.sh`），cc1 和 xgcc 已由 TCC 链接并能编译运行 hello；TCC 构建的 xgcc 也已能编译 GCC C 前端源码，并已构建出可运行的 stage2 cc1
+（`tests/gcc47/stage2.sh`）。stage1 cc1/xgcc 由 TCC 链接，stage2 cc1 由
+stage1 GCC 编译；generator 暂用系统 gcc，最终 stage2 链接使用 stage1 GCC/
+collect2。完整自有 libgcc、驱动全量自举和现代 GCC 阶梯仍未完成。Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，
 不是“TCC 已完全替代系统 GCC/binutils”。BusyBox shell 试用方法见
 `tests/busybox/README.md`。
