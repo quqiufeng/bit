@@ -738,8 +738,13 @@ Native C1
 后续兼容补丁应提交到 `bit-tcc` fork 或 `tcc-0.9.27` 的独立分支，不在
 `/opt` 或构建产物中做不可追踪修改。
 
-TCC 自身原生链接所需的 `libtcc1`/`crt` 和 BusyBox/Lua/musl 实测尚未完成；
-当前里程碑是“C1 能编译 TCC，TCC 能编译自身”，不是“TCC 已完全替代系统链接器”。
+TCC 自身原生链接已经打通最小闭环：用 TCC 编译 `libtcc1`/`va_list`/`alloca`，
+使用系统 crt + glibc 生成可执行文件，并支持 `-shared`/`-L`/`-l` 的基础共享库链接。
+`tests/tcc/upstream.sh` 同时验证可执行文件、共享库和使用共享库的程序。
+
+BusyBox/Lua/musl 和更复杂的 libc/ELF 边界尚未实测；当前里程碑是
+“C1 编译 TCC，TCC 编译自身并完成基础 Linux hosted 链接”，不是
+“TCC 已完全替代系统 GCC/binutils”。
 
 ---
 

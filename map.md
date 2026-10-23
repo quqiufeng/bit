@@ -59,6 +59,9 @@ TCC 是钥匙，GCC 是门后的世界。
 C1 编译 TCC 0.9.27
 bit-tcc 运行
 bit-tcc 编译 hello.c
+bit-tcc 原生链接 hello
+bit-tcc 构建 libtcc1.a
+bit-tcc -shared 生成 .so
 bit-tcc 编译 tcc.c
 tcc-stage2 运行
 tcc-self1.o == tcc-self2.o
@@ -94,6 +97,9 @@ build/tcc/tcc-stage2        TCC 自举出的 TCC
 ```text
 TCC 自身编译和自举
 TCC 编译普通 C 程序
+TCC 构建 libtcc1.a
+TCC 原生链接可执行文件
+TCC -shared / -L / -l 基础共享库链接
 GCC 4.7.4 兼容性侦察尚未开始
 ```
 
@@ -105,6 +111,36 @@ GCC 4.7.4 自举
 GCC 4.8+ 构建
 binutils / glibc 原生构建
 BusyBox / Lua / musl 实测
+```
+
+### 1.4 TCC 原生链接闭环
+
+当前 `tests/tcc/upstream.sh` 已经验证：
+
+```text
+bit-tcc -c libtcc1.c / va_list.c / alloca86_64.S
+ar -> runtime/libtcc1.a
+bit-tcc -B runtime -o hello examples/hello.c
+bit-tcc -B runtime -shared -o libtccadd.so tcc-lib.c
+bit-tcc -B runtime -o tcc-app tcc-app.c -L. -ltccadd
+```
+
+依赖边界：
+
+```text
+TCC 自己编译 libtcc1
+TCC 自己完成 ELF 链接
+系统提供 crt1.o/crti.o/crtn.o
+系统提供 glibc 和动态加载器
+```
+
+仍未覆盖：
+
+```text
+系统没有安装 TCC 头文件时的 fallback
+复杂 libc 符号/版本脚本
+完整 -rpath / RUNPATH
+C++ 运行库
 ```
 
 ---
@@ -602,6 +638,83 @@ Autotools / Make / CMake
 ```
 
 不是“编译通过”就算完成。
+
+### 12.4 C/C++ 项目适配
+
+必须分成两条工具链，而不是让 TCC 直接支持 C++：
+
+```text
+C 项目   -> bit-tcc
+C++ 项目 -> GCC 4.7.4+ g++ / libstdc++
+```
+
+原因：
+
+```text
+TCC 0.9.27 没有 C++ 前端
+没有模板、异常、RTTI、命名空间、C++ ABI
+没有 libstdc++、__cxa_*、crtbegin/crtend
+```
+
+因此 C++ 适配不是改 TCC 语法，而是把 GCC C++ 工具链接进来。
+
+#### C 项目适配
+
+```text
+libc headers / sysroot
+-c / -o
+-L / -l
+-shared
+-rpath / RUNPATH
+pkg-config
+Make / CMake / Autotools
+```
+
+第一阶段目标：
+
+```text
+BusyBox
+Lua
+小型 C 库
+```
+
+#### C++ 项目适配
+
+```text
+GCC 4.7.4 cc1plus
+libstdc++
+libgcc_s
+crtbegin.o / crtend.o
+__cxa_* 异常和 RTTI
+动态加载器
+```
+
+构建顺序：
+
+```text
+系统 g++ 构建 GCC 4.7.4 cc1plus/libstdc++
+  -> GCC 4.7.4 g++ 构建 GCC 4.8.5
+  -> GCC 4.8.5 g++ 构建 GCC 4.9.4
+  -> 后续 GCC
+```
+
+C++ 标准边界：
+
+```text
+GCC 4.7   C++98 / 部分 C++11
+GCC 4.8   C++11 改善
+GCC 5+    C++11 更完整
+现代项目  往往需要 C++14/17/20，必须继续升级 GCC
+```
+
+驱动层建议：
+
+```text
+bitcc     -> C 项目，走 bit-tcc
+bitc++    -> C++ 项目，走 GCC g++
+```
+
+不要把两个前端硬塞进一个不完整的 C++ 实现里。
 
 ---
 

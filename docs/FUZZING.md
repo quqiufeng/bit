@@ -104,8 +104,10 @@ tcc-self1.o == tcc-self2.o
 tcc-stage2 runs
 ```
 
-The script skips cleanly when the TCC source or native C1 is absent. It does
-not yet cover TCC's own `libtcc1`/CRT native link path.
+The script skips cleanly when the TCC source or native C1 is absent. It now
+builds `libtcc1.a` with bit-tcc itself, links a native executable, builds a
+shared object, and links a program with `-L`/`-l`; the larger BusyBox/Lua/musl
+link tests remain future work.
 
 ## Commands
 
