@@ -928,6 +928,7 @@ int current_named_gpr;
 int current_named_sse;
 int current_named_stack;
 int record_pack;
+int attribute_align;
 int pack_marker(void);
 int long_double_convert(int t);
 int long_double_binary(int op, int left_type, int right_type);
@@ -1249,7 +1250,10 @@ int specifier_base(void) {
     decl_typedef = 0;
     decl_storage = 0;
     decl_inline = 0;
-    while (type_start(token) && !failed) {
+    while ((type_start(token) || token_word("__attribute__") ||
+            token_word("__extension__")) && !failed) {
+        if (skip_extension() || skip_attribute())
+            continue;
         if (token == 291) {
             decl_inline = 1;
             next();
@@ -4803,10 +4807,154 @@ int generic_math_selector(void) {
     return function_value(function_signature(chosen));
 }
 
+
+int token_word(const char *word) {
+    int id, i;
+    if (token < 302)
+        return 0;
+    id = token - 256;
+    i = 0;
+    while (word[i]) {
+        if (i >= lengths[id] || names[id * 256 + i] != word[i])
+            return 0;
+        i++;
+    }
+    return i == lengths[id];
+}
+
+int skip_extension(void) {
+    if (!token_word("__extension__"))
+        return 0;
+    next();
+    return 1;
+}
+
+int skip_attribute(void) {
+    int depth;
+    if (!token_word("__attribute__"))
+        return 0;
+    next();
+    if (token != '(')
+        return error();
+    next();
+    if (token != '(')
+        return error();
+    next();
+    depth = 2;
+    while (depth > 0 && token != 0) {
+        if (token_word("packed"))
+            record_pack = 1;
+        if (token_word("aligned")) {
+            next();
+            if (token != '(')
+                return error();
+            next();
+            if (token == 144)
+                attribute_align = value;
+            while (token != ')' && token != 0)
+                next();
+            if (token == ')')
+                next();
+            continue;
+        }
+        if (token == '(') {
+            depth++;
+            next();
+            continue;
+        }
+        if (token == ')') {
+            depth--;
+            next();
+            continue;
+        }
+        next();
+    }
+    if (depth != 0)
+        return error();
+    return 1;
+}
+
 int primary(void) {
     int id, result, t, n;
+    int saved_position, saved_calls, saved_allocation, saved_objects, saved_addresses;
+    int saved_type, saved_zero, saved_ice, saved_value, saved_load, saved_register;
+    int saved_array_bytes, saved_array_type;
+    skip_extension();
     if (failed)
         return 0;
+    if (token_word("__builtin_expect")) {
+        next();
+        expect('(');
+        expression(1);
+        saved_type = expression_type;
+        saved_zero = expression_zero;
+        saved_ice = expression_ice;
+        saved_value = expression_value;
+        saved_load = expression_load;
+        saved_register = expression_register;
+        saved_array_bytes = expression_array_bytes;
+        saved_array_type = expression_array_type;
+        expect(',');
+        saved_position = position;
+        saved_calls = call_count;
+        saved_allocation = allocation;
+        saved_objects = object_ref_count;
+        saved_addresses = address_ref_count;
+        expression(1);
+        expect(')');
+        rewind_code(saved_position);
+        call_count = saved_calls;
+        allocation = saved_allocation;
+        object_ref_count = saved_objects;
+        address_ref_count = saved_addresses;
+        expression_type = saved_type;
+        expression_zero = saved_zero;
+        expression_ice = saved_ice;
+        expression_value = saved_value;
+        expression_load = saved_load;
+        expression_register = saved_register;
+        expression_array_bytes = saved_array_bytes;
+        expression_array_type = saved_array_type;
+        return 0;
+    }
+    if (token_word("__builtin_constant_p")) {
+        next();
+        expect('(');
+        saved_position = position;
+        saved_calls = call_count;
+        saved_allocation = allocation;
+        saved_objects = object_ref_count;
+        saved_addresses = address_ref_count;
+        unevaluated_depth++;
+        expression(1);
+        unevaluated_depth--;
+        expect(')');
+        rewind_code(saved_position);
+        call_count = saved_calls;
+        allocation = saved_allocation;
+        object_ref_count = saved_objects;
+        address_ref_count = saved_addresses;
+        constant(expression_ice == 1);
+        expression_type = 1;
+        expression_zero = expression_ice != 1;
+        expression_ice = 1;
+        expression_value = expression_zero ? 0 : 1;
+        expression_load = position;
+        expression_register = 0;
+        expression_array_bytes = 0;
+        expression_array_type = 0;
+        return 0;
+    }
+    if (token_word("__builtin_unreachable")) {
+        next();
+        expect('(');
+        expect(')');
+        sequence(0x0b0f, 2);
+        expression_type = 1;
+        expression_zero = 0;
+        expression_ice = 0;
+        return 0;
+    }
     expression_array_bytes = 0;
     expression_array_type = 0;
     expression_register = 0;
@@ -5243,8 +5391,12 @@ int local(int t, int id) {
 }
 
 int declaration(void) {
-    int offset, base = specifiers(), is_alias = decl_typedef, storage = decl_storage, t, id,
-                inferred, original, staging;
+    int offset, base, is_alias, storage, t, id, inferred, original, staging;
+    while (skip_extension() || skip_attribute())
+        ;
+    base = specifiers();
+    is_alias = decl_typedef;
+    storage = decl_storage;
     if (token == ';' && (is_enum(base) || is_record(base)) && !storage) {
         if (decl_inline)
             return error();
@@ -5273,6 +5425,7 @@ int declaration(void) {
     while (!failed) {
         t = declarator(base, 0);
         id = decl_name;
+        skip_attribute();
         if (is_function(t)) {
             if (for_declaration || (token != ',' && token != ';'))
                 return error();
@@ -6494,11 +6647,16 @@ int pack_marker(void) {
 int record_specifier(void) {
     int kind = token == 285 ? 1 : 2, tag = -1, t = 0, index, base, mt, id, node, last;
     int width, align, offset = 0, total = 0, maximum = 1, create = 1, flexible = 0, bits, shift,
-                      unit = 0, used = 0, start = 0, previous = 0, named = 0;
+                      unit = 0, used = 0, start = 0, previous = 0, named = 0, saved_pack;
+    saved_pack = record_pack;
     record_depth++;
     if (record_depth > 64)
         return error();
     next();
+    skip_attribute();
+    if (attribute_align > maximum)
+        maximum = attribute_align;
+    attribute_align = 0;
     if (token != '{') {
         tag = name();
         next();
@@ -6565,6 +6723,7 @@ int record_specifier(void) {
             } else {
                 mt = declarator(base, 0);
                 id = decl_name;
+                skip_attribute();
             }
             if (variably_modified_type(mt))
                 return error_message("structure or union member has variably modified type");
@@ -6572,7 +6731,8 @@ int record_specifier(void) {
                 return error();
             if (token == ':') {
                 width = unqualified(mt);
-                if (width != 1 && width != 2 && width != 12)
+                if (width != 1 && width != 2 && width != 5 && width != 6 &&
+                    width != 7 && width != 8 && width != 12)
                     return error_message("unsupported bit-field base type");
                 next();
                 ce_expression(2, 1);
@@ -6583,6 +6743,9 @@ int record_specifier(void) {
                     return error_message("named bit-field has zero width");
                 width = type_size(mt);
                 align = type_align(mt);
+                if (attribute_align > align)
+                    align = attribute_align;
+                attribute_align = 0;
                 if (record_pack && align > record_pack)
                     align = record_pack;
                 if (!bits) {
@@ -6612,6 +6775,9 @@ int record_specifier(void) {
                 } else
                     width = type_size(mt);
                 align = type_align(mt);
+                if (attribute_align > align)
+                    align = attribute_align;
+                attribute_align = 0;
                 if (record_pack && align > record_pack)
                     align = record_pack;
             }
@@ -6680,6 +6846,7 @@ int record_specifier(void) {
     record_size[index] = ((total + maximum - 1) / maximum) * maximum;
     record_align[index] = maximum;
     record_open[index] = 0;
+    record_pack = saved_pack;
     record_depth--;
     return t;
 }
@@ -9000,6 +9167,8 @@ int function(void) {
     int id, i, n, t, pt, k2, class, base, known, storage, unnamed = 0, hidden, gpr, sse,
         stack_index, unspecified, old = 0, implicit = 0, declaration_base, declaration_result,
         variadic = 0;
+    while (skip_extension() || skip_attribute())
+        ;
     if (token == 302)
         return pack_marker();
     for (i = 0; i < 128; i++)
@@ -9150,6 +9319,7 @@ int function(void) {
         prototype_star_seen = 0;
     }
     n = parameter_count;
+    skip_attribute();
     if (id == 6 && ((n != 0 && n != 2) || variadic || unqualified(t) != 1))
         return error();
     if (old) {

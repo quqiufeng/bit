@@ -6,7 +6,7 @@ extern long long __c1_sysv_write(long long, const void *, unsigned long long);
 extern void __c1_sysv_exit(long long);
 extern long long __c1_sysv_mmap(long long, unsigned long long, long long, long long, long long, long long);
 
-#define MAX_LABELS 8192
+#define MAX_LABELS 16384
 #define MAX_NAME 64
 #define BUF_SIZE (8u << 20)
 #define OUT_SIZE (64u << 20)

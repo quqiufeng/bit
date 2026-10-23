@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LABELS 8192
+#define MAX_LABELS 16384
 #define MAX_NAME 64
 #define BUF_SIZE (1u << 20)
 #define OUT_SIZE (8u << 20)

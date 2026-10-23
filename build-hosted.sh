@@ -78,6 +78,7 @@ cmp "$BUILD/c1-stage1" "$BUILD/c1-stage2"
 ./bootstrap/linux/c0/c0v2-from-a1-selfhost.sh
 ./bootstrap/linux/c0/c0v2-chain.sh
 ./bootstrap/linux/c0/native-c1.sh
+./tests/tcc/run.sh
 ./tests/diff-native.sh
 ./tests/diff-sysv.sh
 ./tests/fuzz-expr.sh
