@@ -27,6 +27,10 @@ apply_47_patch() {
     if patch -d "$src" -p1 --dry-run < "$p" >/dev/null 2>&1; then
         patch -d "$src" -p1 < "$p"
     fi
+    p="$ROOT/tests/gcc-ladder/tcc-dso-handle.patch"
+    if patch -d "$src" -p1 --dry-run < "$p" >/dev/null 2>&1; then
+        patch -d "$src" -p1 < "$p"
+    fi
 }
 
 configure_and_build() {
@@ -45,7 +49,7 @@ configure_and_build() {
         CC="$HOST_CC" CXX="$HOST_CXX" "$src/configure" \
             --disable-bootstrap --enable-languages=c,c++ \
             --disable-multilib --disable-libgomp --disable-libssp \
-            --disable-libquadmath --disable-libatomic --disable-werror \
+            --disable-libquadmath --disable-libatomic --disable-decimal-float --disable-werror \
             --prefix="$prefix" --with-gmp=/usr \
             --with-mpfr="$DEPS" --with-mpc="$DEPS" >/tmp/gcc-ladder-$version-conf.log 2>&1
         make_cc="$TCC"
@@ -57,7 +61,7 @@ configure_and_build() {
         CC="$prev/bin/gcc" CXX="$prev/bin/g++" "$src/configure" \
             --disable-bootstrap --enable-languages=c,c++ \
             --disable-multilib --disable-libgomp --disable-libssp \
-            --disable-libquadmath --disable-libatomic --disable-werror \
+            --disable-libquadmath --disable-libatomic --disable-decimal-float --disable-werror \
             --prefix="$prefix" --with-gmp=/usr \
             --with-mpfr="$DEPS" --with-mpc="$DEPS" >/tmp/gcc-ladder-$version-conf.log 2>&1
         make_cc="$prev/bin/gcc"
@@ -66,12 +70,24 @@ configure_and_build() {
     fi
 
     export LD_LIBRARY_PATH="$DEPS/lib:$prev/lib64:$prev/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if [ "$version" = "4.7" ]; then
+        # First build GCC/support libraries with host tools, then rebuild all
+        # gcc objects with TCC while C++ sources remain on the host C++ bridge.
+        make -j2 all-gcc CC="$HOST_CC" CXX="$HOST_CXX" CC_FOR_BUILD="$HOST_CC" \
+            CXXFLAGS="$gcc_flags" >/tmp/gcc-ladder-4.7-host-bootstrap.log 2>&1
+        find gcc -name '*.o' -delete
+        rm -f gcc/libbackend.a gcc/libcommon.a gcc/libcommon-target.a
+    fi
     make -j2 all-gcc \
         CC="$make_cc" CXX="$make_cxx" CC_FOR_BUILD="$build_cc" \
         CXXFLAGS="$gcc_flags" >/tmp/gcc-ladder-$version-allgcc.log 2>&1
-    make -j2 all-target-libgcc \
-        CC="$make_cc" CXX="$make_cxx" CC_FOR_BUILD="$build_cc" \
-        CXXFLAGS="$gcc_flags" >/tmp/gcc-ladder-$version-libgcc.log 2>&1
+    if [ "$version" != "4.7" ]; then
+        make -j2 all-target-libgcc \
+            CC="$make_cc" CXX="$make_cxx" CC_FOR_BUILD="$build_cc" \
+            CXXFLAGS="$gcc_flags" >/tmp/gcc-ladder-$version-libgcc.log 2>&1
+    else
+        echo "SKIP: GCC 4.7 libgcc; use host libgcc for the C++ bridge" >/tmp/gcc-ladder-4.7-libgcc.log
+    fi
     make -j2 all-target-libstdc++-v3 \
         CC="$make_cc" CXX="$make_cxx" CC_FOR_BUILD="$build_cc" \
         CXXFLAGS="$lib_flags" >/tmp/gcc-ladder-$version-libstdcxx.log 2>&1

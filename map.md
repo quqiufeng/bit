@@ -101,17 +101,18 @@ TCC 编译普通 C 程序
 TCC 构建 libtcc1.a
 TCC 原生链接可执行文件
 TCC -shared / -L / -l 基础共享库链接
-GCC 4.7.4 兼容性侦察尚未开始
+GCC 4.7.4 libiberty/libcpp/gcc 基础设施/C 前端 probe
+TCC-linked GCC 4.7 cc1/xgcc
+TCC-built GCC 4.7 stage2 cc1
 ```
 
 未完成：
 
 ```text
-TCC 编译 GCC 4.7.4
-GCC 4.7.4 自举
-GCC 4.8+ 构建
+TCC 完整编译 GCC 4.7（含 target libgcc）
+TCC 起始的 GCC 4.7 自举链
+GCC 4.8+ 从 TCC 起始链构建
 binutils / glibc 原生构建
-BusyBox / Lua / musl 实测
 ```
 
 ### 1.4 TCC 原生链接闭环
@@ -528,7 +529,7 @@ $BUILD/gcc47/              GCC 4.7 out-of-tree 构建目录
 
 GCC/binutils/glibc 源码体积大，不建议 vendor 进 bit 主仓库。
 
-### 2.5.1 可复现 Pipeline
+### 2.5.1 GCC 阶梯 Pipeline 状态
 
 仓库入口：
 
@@ -536,9 +537,40 @@ GCC/binutils/glibc 源码体积大，不建议 vendor 进 bit 主仓库。
 ./tests/gcc-ladder/run.sh
 ```
 
-它从现有 `bit-tcc` 开始，构建并安装 GCC 4.7 到 14.2 的阶梯。
-GCC 4.7 的 C 部分由 bit-tcc 编译；C++ 前端仍需要一次 host g++ bootstrap。
-每个后续版本只使用前一版安装的 GCC。
+当前状态必须分成两条链记录，不能混为一谈：
+
+```text
+已验证：
+  host gcc/g++ -> GCC 4.7 -> GCC 4.8 -> ... -> GCC 14.2
+
+未打通：
+  C1 -> TCC -> GCC 4.7 -> ...
+```
+
+TCC 起始的 4.7 阶段卡在 target `libgcc`。TCC 0.9.27 不实现：
+
+```text
+__attribute__((mode(TI)))   128-bit integer
+__attribute__((mode(TF)))   128-bit float
+```
+
+GCC 4.7 的 `libgcc/soft-fp` 使用这两个类型，实际失败文件包括：
+
+```text
+libgcc/soft-fp/addtf3.c  -> addtf3_s.o
+libgcc/soft-fp/divtf3.c  -> divtf3_s.o
+```
+
+失败现象：
+
+```text
+xgcc: 编译器内部错误：段错误 (program cc1)
+make[1]: *** [libgcc/shared-object.mk:17：addtf3_s.o] 错误 4
+make[1]: *** [libgcc/shared-object.mk:17：divtf3_s.o] 错误 4
+```
+
+仓库中的 `tests/gcc-ladder/run.sh` 目前带有临时跳过 4.7 `libgcc` 的改动；
+该跳过不是成功结果，pipeline 不能标记为 green。
 
 边界和参数表见：
 
@@ -789,6 +821,12 @@ generator 使用系统 gcc
 PASS: GCC 4.7.4 libgcc built and linked by stage1 GCC
 ```
 
+注意：这是既有 stage1 build tree 上的探针，不等于
+`tests/gcc-ladder/run.sh` 中从 TCC 起始的 4.7 `target libgcc` 阶段。
+新 pipeline 在 `addtf3_s.o` / `divtf3_s.o` 上失败；上述探针的 cc1 来源
+和 128-bit ABI 正确性尚未完成独立验证，不能作为 TCC 已完整编译 libgcc
+的证据。
+
 为兼容现代 glibc，`libgcc/config/i386/linux-unwind.h` 使用 `ucontext_t`，
 补丁为 `tests/gcc47/libgcc-ucontext.patch`。
 
@@ -838,8 +876,12 @@ GCC 4.8.5 已开始接力：
 PASS: GCC 4.8.5 cc1 and cc1plus compile C and C++ hello
 ```
 
-GCC 4.8 由系统 g++ 构建，需 `-std=gnu++98` 兼容现代 g++。自有 GCC 4.7
-尚未提供 C++ 前端，因此 4.8 仍是系统 C++ 桥接。
+GCC 4.8 已由 host-built GCC 4.7 C++ 桥接构建，需 `-std=gnu++98`
+兼容现代 g++。这里的 4.7 是 host gcc/g++ 构建的，不是 TCC 起始链；
+因此这条 4.8+ 结果不能证明 TCC 已经进入 GCC 阶梯。
+
+GCC 4.7 的 `gcc/cp/*.c` 本身是 C 源码，`cc1plus` 默认由 `$(CC)` 编译；
+host g++ 主要承担 `libstdc++` 的 C++ 源码，而不是 C++ 前端实现。
 
 GCC 4.8 的 libstdc++ 也已构建，C++ `std::string`/`iostream` 程序可运行：
 
@@ -1183,25 +1225,50 @@ TCC 使用 LGPL。fork、修改、分发时必须保留版权和许可证文本�
 
 ## 10. C++ 过渡方案
 
-TCC 不负责 C++ 前端。
-
-GCC 4.8 起需要 C++ host，建议：
+先纠正一个容易混淆的事实：
 
 ```text
-GCC 4.7.4 C 前端
-  -> 系统 g++ 构建 GCC 4.7.4 cc1plus
-  -> GCC 4.7.4 g++ 构建 GCC 4.8.5
-  -> GCC 4.8.5 g++ 构建 GCC 4.9.4
-  -> GCC 4.9.4 构建 GCC 5.5.0
+GCC 4.7 的编译器主体是 C 源码
+gcc/cp/*.c 是 C 源码，不是 C++ 源码
+cc1plus 是 C 源码编出来的 C++ 前端
+libstdc++-v3/src/*.cc 才是 C++ 源码
 ```
 
-明确边界：
+GCC 4.7 默认由 `$(CC)` 编译 `gcc/cp/*.c`；只有显式
+`--enable-build-with-cxx` 才用 C++ 编译器实现 GCC。因此：
 
 ```text
-TCC 只负责 C
-GCC 4.7 g++ 负责 C++ 桥接
+TCC 可以尝试编译 cc1plus
+TCC 不需要理解 C++ 语言
+TCC 不能编译 libstdc++ 的 C++ 源码
+```
+
+当前建议的边界：
+
+```text
+GCC 4.7 C 部分        -> TCC
+GCC 4.7 cc1plus       -> TCC（若 TCC 支持所需 C 扩展）
+GCC 4.7 libstdc++     -> host g++，或 TCC-built GCC 4.7 cc1plus
+GCC 4.7 target libgcc -> 当前被 TCC 的 TI/TF 缺失阻塞
+```
+
+如果接受 bootstrap 例外：
+
+```text
+GCC 4.7 target libgcc -> host gcc
+libstdc++             -> host g++ 或 GCC 4.7 cc1plus
+```
+
+之后：
+
+```text
+GCC 4.7.4 g++ 构建 GCC 4.8.5
+GCC 4.8.5 g++ 构建 GCC 4.9.4
+GCC 4.9.4 构建 GCC 5.5.0
 后续 GCC 负责现代 C++
 ```
+
+不能把“host g++ 编 libstdc++”说成“host g++ 编 cc1plus”。
 
 ---
 
@@ -1286,12 +1353,18 @@ C++ 项目 -> GCC 4.7.4+ g++ / libstdc++
 原因：
 
 ```text
-TCC 0.9.27 没有 C++ 前端
+TCC 0.9.27 没有 C++ 语言前端
 没有模板、异常、RTTI、命名空间、C++ ABI
 没有 libstdc++、__cxa_*、crtbegin/crtend
 ```
 
-因此 C++ 适配不是改 TCC 语法，而是把 GCC C++ 工具链接进来。
+但 GCC 4.7 的 `cc1plus` 本身是 C 源码。TCC 不能编译 C++ 源码，
+不等于 TCC 不能编译 `cc1plus`。C++ 适配的边界应写成：
+
+```text
+cc1plus 实现  -> C 源码，可由 TCC 尝试
+libstdc++     -> C++ 源码，需要 C++ 编译器
+```
 
 #### C 项目适配
 
@@ -1324,13 +1397,21 @@ __cxa_* 异常和 RTTI
 动态加载器
 ```
 
-构建顺序：
+构建顺序（修正版）：
 
 ```text
-系统 g++ 构建 GCC 4.7.4 cc1plus/libstdc++
+TCC 编译 GCC 4.7.4 的 C 源码，包括 gcc/cp/*.c -> cc1plus
+host g++ 或 GCC 4.7.4 cc1plus 编译 libstdc++ 的 C++ 源码
   -> GCC 4.7.4 g++ 构建 GCC 4.8.5
   -> GCC 4.8.5 g++ 构建 GCC 4.9.4
   -> 后续 GCC
+```
+
+当前前置阻塞：
+
+```text
+TCC 不实现 mode(TI)/mode(TF)
+  -> 不能正确编译 GCC 4.7 target libgcc 的 soft-fp
 ```
 
 C++ 标准边界：
@@ -1401,11 +1482,11 @@ glibc 2.17
 
 | 风险 | 影响 | 缓解 |
 | --- | --- | --- |
-| TCC 不支持 `__int128` | GCC 4.7 大量文件失败 | 先做最小 int128 支持 |
+| TCC 不支持 `mode(TI)`/`mode(TF)` 和 `__int128` | GCC 4.7 `libgcc/soft-fp` 无法正确构建，已出现 cc1 段错误 | host gcc 构建 4.7 libgcc，或扩展 TCC 的 128-bit 类型和 ABI |
 | TCC 不支持 GNU asm | 后端文件失败 | 初期绕开或补最小 asm |
 | GCC configure 依赖 host gcc | 无法纯 TCC 启动 | 先 host configure，再替换 CC |
 | GCC 4.7 与现代 glibc 不兼容 | 头文件/ABI 失败 | 固定 glibc 2.17 sysroot |
-| GCC 4.8 需要 C++ | TCC 无法直接跨级 | GCC 4.7 g++ 过渡 |
+| GCC 4.8 用 C++ 实现 | TCC 无法直接跨级 | GCC 4.7 g++ 过渡；4.7 的 `gcc/cp/*.c` 仍是 C |
 | 旧 GCC 构建链缺 GMP/MPFR/MPC | configure 失败 | 固定旧版本依赖 |
 | 修改 TCC 破坏 TCC 自举 | 自举链断裂 | 每补丁重跑 tests/tcc/upstream.sh |
 | 直接用系统头文件 | 结果不可复现 | 固定 sysroot/include 基线 |

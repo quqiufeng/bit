@@ -1,0 +1,32 @@
+Subject: [PATCH] gcc: provide __dso_handle for TCC links
+
+--- a/gcc/main.c
++++ b/gcc/main.c
+@@ -35,3 +35,7 @@
+ {
+   return toplev_main (argc, argv);
+ }
++
++#if defined(__TINYC__)
++void *__dso_handle;
++#endif
+--- a/gcc/collect2.c
++++ b/gcc/collect2.c
+@@ -3278,3 +3278,7 @@
+ process_args (int *argcp ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED) { }
+ static void post_ld_pass (bool temp_file ATTRIBUTE_UNUSED) { }
+ #endif
++
++#if defined(__TINYC__)
++void *__dso_handle;
++#endif
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -8427,3 +8427,7 @@
+   else
+     return orig;
+ }
++
++#if defined(__TINYC__)
++void *__dso_handle;
++#endif

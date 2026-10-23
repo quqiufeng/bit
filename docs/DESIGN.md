@@ -761,10 +761,23 @@ BusyBox 1.35 最小配置和 BusyBox 1.36.1 完整 `defconfig` 都已用 TCC 编
 `.S` 汇编源交给系统 as/gcc。TCC fork 还补了 glibc 兼容的 `__GNUC__` 预定义、
 packed 布局、透明 union、`-Wp,-MD`、未知链接选项忽略和归档重复扫描。
 GCC 4.7.4 的 `libiberty`、`libcpp`、`gcc` 基础设施、x86_64 后端和 C 前端
-probe 已通过（`tests/gcc47/run.sh`），cc1 和 xgcc 已由 TCC 链接并能编译运行 hello；TCC 构建的 xgcc 也已能编译 GCC C 前端源码，并已构建出可运行的 stage2 cc1
-（`tests/gcc47/stage2.sh`）。stage1 cc1/xgcc 由 TCC 链接，stage2 cc1 由
+probe 已通过（`tests/gcc47/run.sh`），cc1 和 xgcc 已由 TCC 链接并能编译运行
+hello；TCC 构建的 xgcc 也已能编译 GCC C 前端源码，并已构建出可运行的 stage2
+cc1（`tests/gcc47/stage2.sh`）。stage1 cc1/xgcc 由 TCC 链接，stage2 cc1 由
 stage1 GCC 编译；generator 暂用系统 gcc，最终 stage2 链接使用 stage1 GCC/
-collect2。自有 libgcc 已由 stage1 GCC 构建；stage2 xgcc 驱动也已构建并使用自有 libgcc。stage2/stage3 cc1 对同一源码生成相同汇编；GCC 4.8.5 的 cc1/cc1plus、libstdc++ 已能编译运行 C++ hello 和 std::string 程序；现代 GCC 阶梯仍未完成。Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
+collect2。stage2/stage3 cc1 对同一源码生成相同汇编。
+
+GCC 4.7 的完整 TCC 起始链尚未打通。当前阻塞在 target `libgcc` 的
+`soft-fp`：TCC 0.9.27 不实现 `__attribute__((mode(TI)))` 和
+`__attribute__((mode(TF)))`，而 GCC 4.7 的 `addtf3.c` / `divtf3.c`
+需要 128-bit 整数和浮点类型。pipeline 曾在该阶段出现 cc1 段错误，因此
+不能把 4.7 `libgcc` 标记为 TCC 构建通过。
+
+GCC 4.8 起使用 C++ 实现，需要 C++ 编译器；GCC 4.8.5 及后续版本的
+host-built 4.7 阶梯已经验证，但这条链的 4.7 起点由 host gcc/g++ 构建，
+不是 TCC 起始链。GCC 4.7 的 `gcc/cp/*.c` 本身仍是 C 源码，`cc1plus`
+默认由 `$(CC)` 编译；需要 C++ 编译器的是 `libstdc++` 的 C++ 源文件。
+Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，
 不是“TCC 已完全替代系统 GCC/binutils”。BusyBox shell 试用方法见
 `tests/busybox/README.md`。
