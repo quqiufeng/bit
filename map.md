@@ -798,6 +798,16 @@ stage3 cc1 也已构建；stage2 与 stage3 对同一源码生成相同汇编：
 PASS: GCC 4.7.4 stage2 and stage3 cc1 produce identical assembly
 ```
 
+GCC 4.8.5 已由 GCC 4.7 C++ 桥梁构建：
+
+```sh
+./tests/gcc48/owned.sh
+```
+
+```text
+PASS: GCC 4.8.5 built by GCC 4.7 C++ bridge, C and C++ hello run
+```
+
 GCC 4.8.5 已开始接力：
 
 ```sh
