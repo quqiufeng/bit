@@ -727,7 +727,7 @@ Native C1
 
 ```sh
 ./bootstrap/linux/c0/native-c1.sh
-TCC_SRC=/tmp/tcc-0.9.27 ./tests/tcc/upstream.sh
+TCC_SRC=/opt/tcc-0.9.27 ./tests/tcc/upstream.sh
 ```
 
 TCC 自身原生链接所需的 `libtcc1`/`crt` 和 BusyBox/Lua/musl 实测尚未完成；

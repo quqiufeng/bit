@@ -92,7 +92,7 @@ function calls
 ## TCC 0.9.27 compatibility
 
 `tests/tcc/upstream.sh` is the real-world integration gate. It requires
-`TCC_SRC` (default `/tmp/tcc-0.9.27`) and checks:
+`TCC_SRC` (default `/opt/tcc-0.9.27`) and checks:
 
 ```text
 Native C1 -> tcc.o
@@ -115,7 +115,7 @@ BUILD=/tmp/fuzz tests/fuzz-struct.sh
 BUILD=/tmp/fuzz tests/fuzz-float.sh
 BUILD=/tmp/fuzz tests/fuzz-varargs.sh
 HOSTED=1 ./build.sh
-TCC_SRC=/tmp/tcc-0.9.27 tests/tcc/upstream.sh
+TCC_SRC=/opt/tcc-0.9.27 tests/tcc/upstream.sh
 ```
 
 The zero-dependency native checks remain:
