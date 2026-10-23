@@ -318,6 +318,7 @@ Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 - [C0 重构计划](docs/C0_REFACTOR.md
 - `docs/FUZZING.md`：现有 SysV/fuzz 覆盖、缺口和 ABI-first fuzz 计划)
 - [技术设计](docs/DESIGN.md)：平台契约、ABI、对象/链接、运行时、自举、测试、风险和决策记录。
+- [白皮书：从种子到 GCC 14.2](docs/WHITEPAPER.zh-CN.md)：第一推动力、C1/TCC 自举、GCC 天梯、构建边界与验证。
 
 ## 许可证
 
