@@ -16,7 +16,16 @@ fi
 mkdir -p "$OUT"
 gcc -c "$ROOT/tools/c1-init.c" -o "$OUT/c1-init.o"
 C1_INCLUDE="$TCC_SRC;$INC" "$C1" < "$TCC_SRC/tcc.c" > "$OUT/tcc.o"
-gcc -o "$OUT/bit-tcc" "$OUT/tcc.o" "$OUT/c1-init.o" -ldl -lm
+gcc -o "$OUT/bit-tcc-bin" "$OUT/tcc.o" "$OUT/c1-init.o" -ldl -lm
+cat > "$OUT/bit-tcc" <<'EOF'
+#!/bin/sh
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ "$#" -eq 1 ] && [ "$1" = "-v" ]; then
+    exec "$DIR/bit-tcc-bin" -v
+fi
+exec "$DIR/bit-tcc-bin" -B"$DIR/runtime" "$@"
+EOF
+chmod +x "$OUT/bit-tcc"
 "$OUT/bit-tcc" -v >/dev/null
 
 # Build the TCC runtime bundle with TCC itself: libtcc1 + headers.
@@ -30,7 +39,7 @@ cp "$TCC_SRC"/include/*.h "$TCC_SRC"/tcclib.h "$RUNTIME/include/"
 ar rcs "$RUNTIME/libtcc1.a" "$RUNTIME/libtcc1.o" "$RUNTIME/va_list.o" "$RUNTIME/alloca86_64.o"
 
 # Native TCC link: executable, shared object, and -l/-L resolution.
-"$OUT/bit-tcc" -B "$RUNTIME" -o "$OUT/hello" "$ROOT/examples/hello.c"
+"$OUT/bit-tcc" -o "$OUT/hello" "$ROOT/examples/hello.c"
 "$OUT/hello" >/dev/null
 cat > "$OUT/tcc-lib.c" <<'EOF'
 int add(int a, int b) { return a + b; }
@@ -40,8 +49,8 @@ cat > "$OUT/tcc-app.c" <<'EOF'
 int add(int, int);
 int main(void) { printf("%d\n", add(20, 22)); return 0; }
 EOF
-"$OUT/bit-tcc" -B "$RUNTIME" -shared -o "$OUT/libtccadd.so" "$OUT/tcc-lib.c"
-LD_LIBRARY_PATH="$OUT" "$OUT/bit-tcc" -B "$RUNTIME" -o "$OUT/tcc-app" \
+"$OUT/bit-tcc" -shared -o "$OUT/libtccadd.so" "$OUT/tcc-lib.c"
+LD_LIBRARY_PATH="$OUT" "$OUT/bit-tcc" -o "$OUT/tcc-app" \
     "$OUT/tcc-app.c" -L"$OUT" -ltccadd
 LD_LIBRARY_PATH="$OUT" "$OUT/tcc-app" >/dev/null
 
@@ -50,7 +59,6 @@ LD_LIBRARY_PATH="$OUT" "$OUT/tcc-app" >/dev/null
 "$OUT/bit-tcc" -nostdinc -c "$TCC_SRC/tcc.c" -o "$OUT/tcc-self2.o" \
     -I"$TCC_SRC" -I"$TCC_SRC/include" -I"$INC"
 cmp "$OUT/tcc-self1.o" "$OUT/tcc-self2.o"
-gcc -Wl,-z,noexecstack -o "$OUT/tcc-stage2" "$OUT/tcc-self1.o" \
-    "$RUNTIME/libtcc1.o" "$RUNTIME/va_list.o" -ldl -lm
+"$OUT/bit-tcc" -o "$OUT/tcc-stage2" "$OUT/tcc-self1.o" -ldl -lm
 "$OUT/tcc-stage2" -v >/dev/null
 echo "PASS: C1 -> TCC -> TCC self-host + TCC native link"

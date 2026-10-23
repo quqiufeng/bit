@@ -106,7 +106,9 @@ tcc-stage2 runs
 
 The script skips cleanly when the TCC source or native C1 is absent. It now
 builds `libtcc1.a` with bit-tcc itself, links a native executable, builds a
-shared object, and links a program with `-L`/`-l`; the larger BusyBox/Lua/musl
+shared object, and links a program with `-L`/`-l`. The final executable, shared
+object and self-hosted compiler are linked by bit-tcc, not gcc; gcc is only used
+for the bootstrap `bit-tcc` binary and `c1-init.o`. The larger BusyBox/Lua/musl
 link tests remain future work.
 
 ## Commands

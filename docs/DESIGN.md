@@ -740,7 +740,19 @@ Native C1
 
 TCC 自身原生链接已经打通最小闭环：用 TCC 编译 `libtcc1`/`va_list`/`alloca`，
 使用系统 crt + glibc 生成可执行文件，并支持 `-shared`/`-L`/`-l` 的基础共享库链接。
+`bit-tcc` 包装器把 runtime 路径作为默认 `-B` 注入，因此命令行可直接使用
+`bit-tcc hello.c -o hello`；安装到系统时则对应 `CONFIG_TCCDIR`。
+
+产物控制原则：系统只提供头文件、crt、glibc、动态加载器和 make/ar 等输入依赖；
+C 编译、目标代码生成、重定位和最终 ELF 链接必须由 TCC/C1 完成。
+`bit-tcc` 自身和 `c1-init.o` 是 bootstrap 例外，由 gcc 链接；但 `hello`、
+`libtccadd.so`、`tcc-app` 和 `tcc-stage2` 都必须由 TCC 链接。
 `tests/tcc/upstream.sh` 同时验证可执行文件、共享库和使用共享库的程序。
+
+“干净产物”的判定标准是：机器码、重定位和最终 ELF 由 C1/TCC 生成；系统只提供
+crt、glibc、动态加载器和头文件等已固定输入；最终链接链路中不存在隐藏的
+gcc/ld 代工。可以用 `readelf -h/-d`、`ldd` 和构建命令日志检查产物，但外部
+`crt*.o`/`libc.so` 本身仍属于允许的系统输入。
 
 BusyBox/Lua/musl 和更复杂的 libc/ELF 边界尚未实测；当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成基础 Linux hosted 链接”，不是

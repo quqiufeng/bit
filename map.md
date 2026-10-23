@@ -120,9 +120,9 @@ BusyBox / Lua / musl 实测
 ```text
 bit-tcc -c libtcc1.c / va_list.c / alloca86_64.S
 ar -> runtime/libtcc1.a
-bit-tcc -B runtime -o hello examples/hello.c
-bit-tcc -B runtime -shared -o libtccadd.so tcc-lib.c
-bit-tcc -B runtime -o tcc-app tcc-app.c -L. -ltccadd
+bit-tcc -o hello examples/hello.c
+bit-tcc -shared -o libtccadd.so tcc-lib.c
+bit-tcc -o tcc-app tcc-app.c -L. -ltccadd
 ```
 
 依赖边界：
@@ -130,6 +130,7 @@ bit-tcc -B runtime -o tcc-app tcc-app.c -L. -ltccadd
 ```text
 TCC 自己编译 libtcc1
 TCC 自己完成 ELF 链接
+bit-tcc 包装器自动加上 -B runtime
 系统提供 crt1.o/crti.o/crtn.o
 系统提供 glibc 和动态加载器
 ```
@@ -141,6 +142,101 @@ TCC 自己完成 ELF 链接
 复杂 libc 符号/版本脚本
 完整 -rpath / RUNPATH
 C++ 运行库
+```
+
+### 1.5 产物控制原则
+
+路线约束：
+
+```text
+编译和最终 ELF 链接由我们自己的工具链完成
+系统只提供输入依赖：头文件、crt、glibc、动态加载器、binutils/make
+```
+
+可以交给系统的部分：
+
+```text
+系统 glibc headers
+crt1.o / crti.o / crtn.o
+libc.so / libm.so / libdl.so
+动态加载器
+ar / make / sed / awk
+```
+
+必须由我们控制的部分：
+
+```text
+C 预处理和语义
+目标代码生成
+重定位
+最终 ELF 链接
+可执行文件 / 共享库产物
+```
+
+bootstrap 例外：
+
+```text
+bit-tcc 自身由 gcc 链接（因为是 C1 ELF 对象 + c1-init）
+c1-init.o 由系统 gcc 编译
+```
+
+但 TCC 产出的最终测试产物不能退回 gcc 链接：
+
+```text
+hello        -> bit-tcc 链接
+libtccadd.so -> bit-tcc 链接
+tcc-app      -> bit-tcc 链接
+tcc-stage2   -> bit-tcc 链接
+```
+
+当前 `tests/tcc/upstream.sh` 已经按这个原则执行：gcc 只用于 bootstrap
+`bit-tcc` 和 `c1-init.o`，不再参与 `tcc-stage2` 的最终链接。
+
+#### “干净产物”的定义
+
+干净不是“所有代码都由我们编写”，而是：
+
+```text
+机器码由 C1/TCC 生成
+目标文件重定位由 C1/TCC 完成
+最终 ELF 由 C1/TCC 链接
+外部输入版本固定
+没有隐藏的 gcc/ld 代工最终产物
+```
+
+允许存在的外部输入：
+
+```text
+crt*.o
+libc.so / libm.so / libdl.so
+动态加载器
+系统头文件
+```
+
+不允许：
+
+```text
+bit-tcc -o out ... 内部实际调用 gcc 链接
+最终产物依赖未记录的宿主临时文件
+使用未固定版本的 libc/headers 生成发布产物
+```
+
+产物验收：
+
+```sh
+readelf -h build/tcc/hello
+readelf -d build/tcc/hello
+readelf -d build/tcc/libtccadd.so
+ldd build/tcc/hello
+```
+
+检查目标：
+
+```text
+ELF 头合法
+动态段来自系统 glibc / 动态加载器
+存在我们生成的 .text/.data/.bss
+没有 gcc 包装脚本参与最终链接
 ```
 
 ---
