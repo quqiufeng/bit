@@ -12,6 +12,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC libiberty/libcpp | 4.7.4 | `/opt/gcc-4.7.4` | none | probes PASS |
 | GCC cc1 | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC xgcc | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
+| GCC C frontend selfhost probe | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 
 ## Commands
 
@@ -23,6 +24,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 ./tests/gcc47/run.sh
 ./tests/gcc47/cc1.sh
 ./tests/gcc47/xgcc.sh
+./tests/gcc47/selfhost.sh
 ```
 
 The project scripts skip when their source directory is absent.

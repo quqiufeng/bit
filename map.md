@@ -649,8 +649,22 @@ xgcc 驱动也已由 bit-tcc 链接，并能编译/运行 hello：
 PASS: TCC-linked GCC 4.7.4 xgcc compiles and runs hello
 ```
 
-xgcc 当前仍使用系统 libgcc/crtbegin 来完成 libgcc 链接；下一步是 GCC 自举
-和自有 libgcc 构建。
+xgcc 当前仍使用系统 libgcc/crtbegin 来完成 libgcc 链接。
+
+TCC 构建的 xgcc 已能再编译 GCC C 前端源码：
+
+```sh
+./tests/gcc47/selfhost.sh
+```
+
+结果：
+
+```text
+PASS: TCC-built GCC 4.7.4 xgcc compiles GCC C frontend sources
+```
+
+这是“TCC 构建的 GCC 再编译 GCC”的自举探针；完整 GCC 自举和自有 libgcc
+仍未完成。
 
 ### 5.2 libcpp
 
