@@ -68,3 +68,10 @@ dkms.conf
 !**/bootstrap/**/*.o
 !**/startup/**/*.o
 !bootstrap/linux/seed.elf
+
+# Vendored TCC build products
+/tcc-0.9.27/tcc
+/tcc-0.9.27/config.mak
+/tcc-0.9.27/config.log
+/tcc-0.9.27/config.status
+/tcc-0.9.27/lib/tcc
