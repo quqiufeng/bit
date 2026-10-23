@@ -601,19 +601,21 @@ pex-unix.c
 bit-tcc 能稳定生成 libiberty 对象
 ```
 
-当前状态：已通过。入口：
+当前状态：libiberty 和 libcpp 都已通过。入口：
 
 ```sh
 ./tests/gcc47/run.sh
 ```
 
-已编译对象：
+已编译：
 
 ```text
-cplus-dem.c argv.c obstack.c hashtab.c splay-tree.c fibheap.c pex-unix.c
+libiberty: cplus-dem.c argv.c obstack.c hashtab.c splay-tree.c fibheap.c pex-unix.c
+libcpp:    lex.c macro.c directives.c expr.c files.c identifiers.c init.c
+           line-map.c symtab.c charset.c traditional.c pch.c mkdeps.c errors.c
 ```
 
-这是 GCC 4.7.4 的第一层兼容验证。
+这是 GCC 4.7.4 的前两层兼容验证。下一层是 gcc 基础设施和 C 前端。
 
 ### 5.2 libcpp
 

@@ -9,7 +9,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | SQLite | 3.45.3 | `/opt/sqlite-amalgamation-3450300` | none | PASS |
 | Lua | 5.4.7 | `/opt/lua-5.4.7` | none | PASS |
 | BusyBox | 1.36.1 | `/opt/busybox-1.36.1` | `tests/busybox/busybox-1.36.1-tcc.patch` | PASS |
-| GCC libiberty | 4.7.4 | `/opt/gcc-4.7.4` | none | probe PASS |
+| GCC libiberty/libcpp | 4.7.4 | `/opt/gcc-4.7.4` | none | probes PASS |
 
 ## Commands
 
@@ -30,7 +30,7 @@ cJSON     single-file library, malloc/stdio/math
 SQLite    very large single-file amalgamation, pthread/dl/math link
 Lua       multi-file build, liblua.a archive, hosted executable
 BusyBox   full defconfig applet build, shell/init userland target
-GCC 4.7   libiberty component probe, first GCC bootstrap layer
+GCC 4.7   libiberty and libcpp component probes, first GCC bootstrap layers
 ```
 
 Only BusyBox currently needs source patches. The other three compile directly
