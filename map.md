@@ -528,6 +528,24 @@ $BUILD/gcc47/              GCC 4.7 out-of-tree 构建目录
 
 GCC/binutils/glibc 源码体积大，不建议 vendor 进 bit 主仓库。
 
+### 2.5.1 可复现 Pipeline
+
+仓库入口：
+
+```sh
+./tests/gcc-ladder/run.sh
+```
+
+它从现有 `bit-tcc` 开始，构建并安装 GCC 4.7 到 14.2 的阶梯。
+GCC 4.7 的 C 部分由 bit-tcc 编译；C++ 前端仍需要一次 host g++ bootstrap。
+每个后续版本只使用前一版安装的 GCC。
+
+边界和参数表见：
+
+```text
+tests/gcc-ladder/README.md
+```
+
 ### 2.5 GCC 跨代构建总线
 
 必须使用全新的 out-of-tree 目录，不能复用系统 g++ 配置过的 build tree。
