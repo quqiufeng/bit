@@ -486,6 +486,172 @@ DTB 是否与板卡匹配
 7. 再考虑安装器/写 eMMC
 ```
 
+### 6.6 x86 小机箱验证
+
+本机另有一台 x86 小机箱，可作为“裸机 x86_64”验证平台：
+
+```text
+QEMU x86_64      -> 快速迭代
+x86 小机箱       -> 裸机启动、真实固件、真实磁盘、真实网卡
+ARM/MIPS 机顶盒  -> 交叉编译、U-Boot/DTB、SoC 驱动
+```
+
+x86 小机箱上优先验证：
+
+```text
+BIOS/UEFI 启动
+GRUB 菜单
+内核 + initramfs / rootfs
+网卡 DHCP 或静态 IP
+SSH 登录
+磁盘读写与持久化
+重启 / 断电重启
+从上一版镜像回滚
+```
+
+建议先做 live USB/ISO，不直接覆盖内部磁盘：
+
+```text
+制作 live ISO
+  -> USB 启动
+  -> 走完网络/SSH/存储测试
+  -> 再决定是否安装到内部磁盘
+```
+
+x86 小机箱的验证价值：
+
+```text
+证明镜像不只能在 QEMU 的 virtio 环境运行
+证明真实固件、真实磁盘、真实网卡可用
+证明 rootfs/启动链/回滚流程可落地
+```
+
+机顶盒的验证价值：
+
+```text
+证明交叉编译、目标 ABI、U-Boot/DTB 和 SoC 驱动可用
+```
+
+两者合起来，才构成“x86 裸机 + 交叉目标硬件”的完整工程证据。
+
+### 6.7 努比亚 Z18 / ARM64 验证
+
+实测设备：
+
+```text
+型号：Nubia Z18 / NX606J
+SoC：Qualcomm SDM845（骁龙 845）
+架构：ARM64
+内存/存储：6/8GB RAM，64/128GB UFS 2.1
+当前系统：LineageOS 22.2（Android 15），已成功启动
+Recovery：Lineage Recovery 22.2
+Bootloader：Device unlocked: true；Nubia fastboot unlocked: true
+```
+
+已完成的关键工作：
+
+```text
+EDL 备份关键分区
+EDL 写入 V2.31 modem/xbl/tz/hyp 等固件
+写入自定义 ABL + Lineage Recovery
+设置 Nubia fastboot unlock flag
+Factory data reset
+sideload LineageOS 22.2
+首次启动成功
+```
+
+详细刷机记录：
+
+```text
+https://github.com/quqiufeng/my-agent/blob/main/nubia.md
+```
+
+现状边界：
+
+```text
+Z18 可以刷 LineageOS，已经验证
+没有成熟的桌面 Linux / Ubuntu Touch / postmarketOS 日常方案
+通用最小 Linux 仍属于实验，不是当前稳定路径
+```
+
+源码构建 ROM 也要分层：
+
+```text
+1. 刷官方/预编译 ROM
+   只是安装，不是源码构建
+
+2. 基于 AOSP/LineageOS 源码构建 ROM
+   是真正的源码编译
+   但仍使用 AOSP prebuilt Clang、Soong/Ninja、vendor blobs
+
+3. 用本项目工具链构建整个 ROM
+   Android framework/HAL/Bionic 仍不现实
+```
+
+对本项目最有价值的混合验证是：
+
+```text
+LineageOS 源码构建 ROM
+  + 自有 GCC 14.2 交叉构建 kernel
+  + 自有工具链构建 BusyBox/Lua/SSH（独立环境）
+  + AOSP framework 仍用 prebuilt Clang
+```
+
+这可以验证：
+
+```text
+自有交叉编译器能生成该设备可启动的内核
+目标 ABI / 启动链 / 分区 / 驱动集成正确
+自有工具链能生成真实 ARM64 用户态
+源码构建和镜像打包流程可重复
+```
+
+但不能写成：
+
+```text
+整个 Android ROM 都由本项目编译器构建
+```
+
+因此手机在项目里应定位为“高级 ARM64 验证平台”，不是第一步：
+
+```text
+A. 自建 Android ROM
+   AOSP/LineageOS + device tree + vendor blobs + prebuilt clang
+   能验证系统集成，但不等于自有编译器血统
+
+B. 最小 Linux initramfs（实验）
+   需要适配 SDM845 内核/DTB、USB gadget、显示/存储驱动
+   先用 fastboot boot，不直接写 boot/recovery
+
+C. 完全自举手机 OS
+   长期目标，不作为当前阶段目标
+```
+
+如果做 B，安全顺序是：
+
+```text
+1. 保留 EDL loader 和关键分区备份
+2. 确认 fastboot oem device-info 的两个 unlocked 都是 true
+3. 基于已有内核/DTB 先做 fastboot boot 临时镜像
+4. 启动到 initramfs 后再做 USB 网络/SSH
+5. 不先写 boot/recovery
+6. 每次改动前确认可以 EDL 恢复
+```
+
+手机测试验收项：
+
+```text
+[ ] fastboot boot 能加载自定义 kernel/initramfs
+[ ] 内核启动到 BusyBox
+[ ] Lua 5.4 可运行
+[ ] USB 网络或 WiFi 可用
+[ ] SSH 可登录（如果做得到）
+[ ] 重启能回到 LineageOS 或自定义系统
+[ ] EDL 备份可恢复
+```
+
+手机行的验收状态必须区分“LineageOS 已验证”和“本项目自定义镜像已验证”，不能混为一谈。
+
 ---
 
 ## 7. 编译器血统
@@ -514,20 +680,34 @@ GCC 14.2 -> 构建内核
 ## 8. 推荐执行顺序
 
 ```text
-P1 修复/稳定当前 QEMU SSH 镜像
-P2 做 live ISO（BIOS + UEFI）
-P3 做可写 ext4 磁盘镜像
-P4 做 installer ISO
+P1 稳定当前 QEMU SSH 镜像
+P2 做 x86 live ISO（BIOS + UEFI）
+P3 在 x86 小机箱完成 USB 启动、网络、SSH、磁盘、回滚验证
+P4 做可写 ext4 磁盘镜像和 installer ISO
 P5 选定一款机顶盒，确认 SoC/串口/U-Boot
 P6 构建该 SoC 的内核 + DTB + 驱动
-P7 做 SD/USB 启动镜像并实测
-P8 再考虑写入 eMMC/NAND
+P7 做 SD/USB 启动镜像并在机顶盒实测
+P8 手机 ARM64（高级）：基于 Z18/LineageOS 内核评估自定义 initramfs，先 fastboot boot
+P9 手机 USB 网络/SSH/重启/回滚验证（如果继续推进）
+P10 再考虑写入 eMMC/NAND 或手机 boot 分区
+P11 把 QEMU、x86 裸机、机顶盒、手机四类验证固化为同一套回归矩阵
 ```
 
 最终目标是：
 
 ```text
 同一套用户态和启动脚本，
-在 QEMU 上验证，
-再针对真实 SoC 替换内核、DTB、驱动和启动链。
+先在 QEMU 上验证，
+再在 x86 小机箱上做裸机验证，
+再针对真实 SoC 做实机验证，
+最后把内核、DTB、驱动和启动链按平台替换。
 ```
+
+验收矩阵：
+
+| 平台 | 启动 | 网络 | SSH | 持久化 | 回滚 |
+| --- | --- | --- | --- | --- | --- |
+| QEMU x86_64 | 已验证 | 已验证 | 已验证 | initramfs，无 | 重建镜像 |
+| x86 小机箱 | 待验证 | 待验证 | 待验证 | 待验证 | 待验证 |
+| ARM/MIPS 机顶盒 | 待验证 | 待验证 | 待验证 | 待验证 | 待验证 |
+| 努比亚 Z18（SDM845/ARM64） | LineageOS 已验证；自定义镜像待验证 | 自定义镜像待验证 | 自定义镜像待验证 | LineageOS 已验证；自定义待验证 | EDL 备份可用 |
