@@ -185,7 +185,7 @@ make 依赖文件格式
 完整 BusyBox 1.36.1 `defconfig` 也已通过，使用仓库内补丁：
 
 ```sh
-BUSYBOX_SRC=/tmp/busybox-1.36.1 tests/busybox/run.sh
+BUSYBOX_SRC=/opt/busybox-1.36.1 tests/busybox/run.sh
 ```
 
 补丁：

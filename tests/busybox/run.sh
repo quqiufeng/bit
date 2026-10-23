@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-BUSYBOX_SRC=${BUSYBOX_SRC:-/tmp/busybox-1.36.1}
+BUSYBOX_SRC=${BUSYBOX_SRC:-/opt/busybox-1.36.1}
 CC=${CC:-"$ROOT/build/tcc/bit-tcc"}
 OUT=${OUT:-"$ROOT/build/busybox-full"}
 PATCH="$ROOT/tests/busybox/busybox-1.36.1-tcc.patch"
