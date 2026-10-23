@@ -110,7 +110,7 @@ shared object, and links a program with `-L`/`-l`. The final executable, shared
 object and self-hosted compiler are linked by bit-tcc, not gcc; gcc is only used
 for the bootstrap `bit-tcc` binary and `c1-init.o`. BusyBox is covered in two levels: minimal 1.35 by `tests/tcc/busybox.sh`,
 and full 1.36.1 `defconfig` by `tests/busybox/run.sh` with the tracked
-`tests/busybox/busybox-1.36.1-tcc.patch`. Lua/musl link tests remain future work.
+`tests/busybox/busybox-1.36.1-tcc.patch`. Lua 5.4.7 build/link is covered by `tests/lua/run.sh`; musl link tests remain future work.
 
 ## Commands
 

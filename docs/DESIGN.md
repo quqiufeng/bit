@@ -754,7 +754,7 @@ crt、glibc、动态加载器和头文件等已固定输入；最终链接链路
 gcc/ld 代工。可以用 `readelf -h/-d`、`ldd` 和构建命令日志检查产物，但外部
 `crt*.o`/`libc.so` 本身仍属于允许的系统输入。
 
-BusyBox 1.35 最小配置和 BusyBox 1.36.1 完整 `defconfig` 都已用 TCC 编译并运行。
+BusyBox 1.35 最小配置和 BusyBox 1.36.1 完整 `defconfig` 都已用 TCC 完整编译、链接并运行。
 完整配置入口为 `tests/busybox/run.sh`，源码补丁为
 `tests/busybox/busybox-1.36.1-tcc.patch`：现代 kernel headers 缺少 CBQ 定义时
 跳过 CBQ 打印，并为 TCC 提供 `__dso_handle`。C 代码由 TCC 编译和链接，只有
@@ -784,7 +784,7 @@ C++ 实现，但 GCC 4.7 的 `gcc/cp/*.c` 仍是 C 源码，`cc1plus` 由
 
 仍未完成的是：完整 `make install`
 和 GCC testsuite 未逐级通过；C1 -> TCC 尚未并入同一个 driver；
-Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
+Lua 5.4.7 已由 TCC 实测通过；musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，
 不是“TCC 已完全替代系统 GCC/binutils”。BusyBox shell 试用方法见
 `tests/busybox/README.md`。

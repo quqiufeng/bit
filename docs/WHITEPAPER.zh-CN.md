@@ -247,16 +247,21 @@ seed.hex / seed.elf
 
 C1 已能编译 TCC 0.9.27，产出 `build/tcc/bit-tcc`。TCC 随后完成自举，并构建 `libtcc1.a`、`va_list.c`、`alloca86_64.S` 等运行时构件。
 
-验证范围包括：
+验证分为两层：先证明 C1 能编出 TCC、TCC 能编出自身，再证明这个 TCC 能编译真实用户态项目。
 
-```text
-TCC 自举
-基础原生链接
-BusyBox 1.36.1
-cJSON / SQLite / Lua
-```
+| 阶段 | 产物 | 验证入口 | 结果 |
+| --- | --- | --- | --- |
+| C1 编译 TCC | `build/tcc/bit-tcc` | `tests/tcc/upstream.sh` | PASS |
+| TCC 自举 | `build/tcc/tcc-stage2` | `tests/tcc/upstream.sh` | PASS |
+| TCC 编译 BusyBox 1.35 最小配置 | `busybox_unstripped` | `tests/tcc/busybox.sh` | PASS |
+| TCC 完整构建 BusyBox 1.36.1 defconfig（带维护补丁） | `busybox_unstripped` | `tests/busybox/run.sh` | 编译、链接、运行 PASS |
+| TCC 编译 Lua 5.4.7 | `lua` / `liblua.a` | `tests/lua/run.sh` | PASS |
+| TCC 编译 cJSON 1.7.18 | 测试程序 | `tests/cjson/run.sh` | PASS |
+| TCC 编译 SQLite 3.45.3 | 测试程序 | `tests/sqlite/run.sh` | PASS |
 
-这一阶段的意义是：TCC 成为一个足够小、可审计、能承接 C 生态的编译器。它不是最终目标，而是从 C1 走向 GCC 的桥梁。
+BusyBox 1.36.1 使用 `tests/busybox/busybox-1.36.1-tcc.patch`，处理现代 kernel headers 的 CBQ 定义和 `__dso_handle`；完整 `defconfig` 已由 TCC 编译、链接并运行通过。C 源由 TCC 编译和链接，少量 `.S` 汇编源由系统 as 处理。Lua 5.4.7、cJSON 和 SQLite 使用无补丁源码构建。
+
+这一阶段的意义是：TCC 不只是一个能编译自身的小编译器，它还能编译 BusyBox、Lua 5.4.7、cJSON、SQLite 这类真实 C 项目。它不是最终目标，而是从 C1 走向 GCC 的桥梁。
 
 ### 4.2 TCC 的边界
 
@@ -403,6 +408,34 @@ C++ iostream             PASS
 ```
 
 因此，GCC 4.8 的起点不是 host GCC，而是 TCC-built、再由 GCC 4.7 重建的 stage2 4.7。
+
+### 5.5 GCC 的 self-hosting 与链式自举
+
+GCC 源码本身是 self-hosting 的：只要有一个可用的 C/C++ 编译器，GCC 就能编译自己的源码。这里的“self-hosting”描述的是源码能力，不是“从零启动”或“每个版本都必须执行 stage2/stage3”。
+
+本项目的实际门禁是：
+
+```text
+GCC 4.7：
+  TCC -> 4.7 pass1 -> 4.7 pass2
+  这两遍是启动所必需的
+
+GCC 4.8 ~ 14.2：
+  前一级 GCC -> 下一级 GCC
+  只要能构建下一级，并通过 all-gcc/libgcc/libstdc++/C++ iostream，
+  就认为该级天梯通过
+```
+
+GCC 的 `make bootstrap` 会构建 stage1/stage2/stage3 并做一致性检查，但它是可选的验证流程，不是生成可用编译器的前提。`--disable-bootstrap` 下由上一代 GCC 构建出的编译器仍然是 self-hosting 的 GCC；本项目没有要求每个版本额外再编译自己一遍。
+
+准确的结论是：
+
+```text
+GCC 源码是 self-hosting 的；
+4.7 通过 TCC -> pass1 -> pass2 证明了启动路径；
+4.8~14.2 由上一代 GCC 逐级构建；
+不要求每个版本都额外执行自身 stage2。
+```
 
 ---
 
