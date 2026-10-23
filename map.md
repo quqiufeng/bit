@@ -725,6 +725,21 @@ stage3 cc1 也已构建；stage2 与 stage3 对同一源码生成相同汇编：
 PASS: GCC 4.7.4 stage2 and stage3 cc1 produce identical assembly
 ```
 
+GCC 4.8.5 已开始接力：
+
+```sh
+./tests/gcc48/run.sh
+```
+
+结果：
+
+```text
+PASS: GCC 4.8.5 cc1 and cc1plus compile C and C++ hello
+```
+
+GCC 4.8 由系统 g++ 构建，需 `-std=gnu++98` 兼容现代 g++。自有 GCC 4.7
+尚未提供 C++ 前端，因此 4.8 仍是系统 C++ 桥接。
+
 完整现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
