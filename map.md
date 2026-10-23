@@ -620,7 +620,22 @@ c-family:  c-common.c c-format.c c-lex.c c-cppbuiltin.c c-opts.c
            c-pragma.c c-semantics.c
 ```
 
-这是 GCC 4.7.4 的前四层兼容验证。下一步是链接 cc1 并尝试 GCC 自举。
+这是 GCC 4.7.4 的前四层兼容验证。
+
+cc1 链接和运行已通过：
+
+```sh
+./tests/gcc47/cc1.sh
+```
+
+结果：
+
+```text
+PASS: TCC-linked GCC 4.7.4 cc1 compiles and runs hello
+```
+
+cc1 由 bit-tcc 链接；它使用动态 MPFR/MPC，需要
+`LD_LIBRARY_PATH=/opt/gcc47-deps/lib`。下一步是 GCC 4.7 自举。
 
 ### 5.2 libcpp
 
