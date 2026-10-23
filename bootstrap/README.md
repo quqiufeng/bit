@@ -60,5 +60,6 @@ c1-bootstrap + compiler.c/runtime.c -> final C1
 
 The final C1 can compile TCC 0.9.27 and TCC can compile itself.  See
 `tests/tcc/upstream.sh` and `docs/DESIGN.md` section 6.8.  The old upstream PE
-bridge is skipped when its fixed C1 capacity cannot represent the expanded
-`linux/compiler.c`.
+bridge tests `tests/upstream/compiler-v1.c`, a frozen v1.0 compiler source
+snapshot that fits its fixed C1 capacity; the expanded current compiler is
+covered by the Native C1/TCC chain.

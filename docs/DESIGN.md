@@ -648,8 +648,9 @@ shim 维护方式：
   仍使用上游源码、C 工具 `pe2elf` 和上游 PE 链接器。
 - 下一步是零依赖 Linux 链：C0 扩到能编译 bootstrap C1，再完成 A1/C0 源码级自举。
 - 容量扩展后，上游旧 C1 的 1 MiB/2048 标识符限制已无法表示完整
-  `linux/compiler.c`；`bootstrap/bridge.sh` 现在检测到该容量失败时输出
-  `SKIP`，不再把旧上游 bridge 作为扩容 C1 的阻塞项。
+  `linux/compiler.c`；`bootstrap/bridge.sh` 因此改用固定的
+  `tests/upstream/compiler-v1.c`（v1.0 编译器源码快照）验证旧 bridge，
+  当前扩容后的 `linux/compiler.c` 由 Native C1/TCC 链验证。
 
 ### 6.7 Linux C0 窄域契约（第一阶段）
 
@@ -1070,7 +1071,7 @@ bit/
 - 自制 ELF 链接器（静态→动态）。
 - C1 → TCC 0.9.27：C1 编译 TCC，bit-tcc 编译自身，`tcc-self1.o == tcc-self2.o`；入口见 `tests/tcc/upstream.sh`。
 - 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.c` + kernel32 shim），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
-- Win64 PE C1 → SysV 桥接：历史路径由 `bootstrap/bridge.sh` 完成；容量扩展后旧上游 C1 无法表示完整 `linux/compiler.c`，脚本改为容量不足时 `SKIP`，不影响 Native C1/TCC 链。
+- Win64 PE C1 → SysV 桥接：`bootstrap/bridge.sh` 继续用固定快照 `tests/upstream/compiler-v1.c` 验证旧 bridge；当前扩容后的 `linux/compiler.c` 由 Native C1/TCC 链验证。
 - Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并从 `a0.seed.hex` 按需物化 A0；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 按需物化 A1（A0/A1 二进制不提交）；最小 C0 已完成 C→A1→ELF 的 `return N` 闭环，尚未实现函数/控制流。
 - PIC/PIE。
 - 更多系统头/扩展（E2）。

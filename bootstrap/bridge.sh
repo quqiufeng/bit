@@ -6,6 +6,7 @@ MIN="$BUILD/minimal"
 C1_STAGE1=${C1_STAGE1:-"$MIN/c1-stage1.elf"}
 WORK="$BUILD/bridge"
 UP="$ROOT/windows/upstream/bootstrap-c99"
+BRIDGE_SOURCE=${BRIDGE_SOURCE:-"$ROOT/tests/upstream/compiler-v1.c"}
 PE2ELF="$("$ROOT/tools/build-pe2elf.sh")"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/bit-bridge.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
@@ -27,10 +28,7 @@ cd "$TMP"
 "$PE2ELF" --allow-unresolved "$TMP/link.exe" "$TMP/link.elf"
 
 cd "$ROOT"
-if ! "$TMP/object-c1-obj.elf" < "$ROOT/linux/compiler.c" > "$TMP/compiler.c1o"; then
-    echo "SKIP: upstream C1 capacity cannot represent expanded compiler.c"
-    exit 0
-fi
+"$TMP/object-c1-obj.elf" < "$BRIDGE_SOURCE" > "$TMP/compiler.c1o"
 "$TMP/object-c1-obj.elf" < "$ROOT/windows/bridge/win32_runtime.c" > "$TMP/runtime.c1o"
 
 "$TMP/link.elf" "$TMP/bridge.exe" __c1_start "$TMP/compiler.c1o" "$TMP/runtime.c1o" \
@@ -46,12 +44,12 @@ fi
     --import __c1_win_HeapFree KERNEL32.dll HeapFree
 
 "$PE2ELF" "$TMP/bridge.exe" "$TMP/bridge.elf"
-"$TMP/bridge.elf" < "$ROOT/linux/compiler.c" > "$TMP/compiler-bridge.o"
+"$TMP/bridge.elf" < "$BRIDGE_SOURCE" > "$TMP/compiler-bridge.o"
 
 "$BUILD/c1link" "$WORK/c1-stage1" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime1.o" \
     "$TMP/compiler-bridge.o" "$BUILD/syscalls_sysv.o"
-"$WORK/c1-stage1" < "$ROOT/linux/compiler.c" > "$TMP/compiler-stage2.o"
+"$WORK/c1-stage1" < "$BRIDGE_SOURCE" > "$TMP/compiler-stage2.o"
 "$BUILD/c1link" "$WORK/c1-stage2" _start \
     "$BUILD/startup_sysv.o" "$BUILD/runtime1.o" \
     "$TMP/compiler-stage2.o" "$BUILD/syscalls_sysv.o"
