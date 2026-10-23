@@ -23,10 +23,21 @@ cat "$ROOT/linux/standalone-runtime.c" "$ROOT/linux/standalone-link.c" > "$OUT/l
     "$ROOT/bootstrap/linux/c0/native/linker-helpers.a1" "$OUT/linker-full.a1"
 "$A1" < "$OUT/linker-full.a1" > "$OUT/c1l.elf"
 chmod +x "$OUT/c1l.elf"
-"$C0V2" < "$ROOT/bootstrap/linux/c0/native/compiler-runtime.c" > "$OUT/compiler.a1"
-"$ROOT/bootstrap/linux/c0/native/make.sh" "$OUT/compiler.a1" "$ROOT/bootstrap/linux/c0/native/helpers.a1" "$OUT/compiler-full.a1"
-"$A1" < "$OUT/compiler-full.a1" > "$OUT/c1.elf"
+"$C0V2" < "$ROOT/bootstrap/linux/c0/native/compiler-bootstrap.c" > "$OUT/bootstrap.a1"
+"$ROOT/bootstrap/linux/c0/native/make.sh" "$OUT/bootstrap.a1" "$ROOT/bootstrap/linux/c0/native/helpers.a1" "$OUT/bootstrap-full.a1"
+"$A1" < "$OUT/bootstrap-full.a1" > "$OUT/c1-bootstrap.elf"
+chmod +x "$OUT/c1-bootstrap.elf"
+cd "$ROOT"
+C1_INCLUDE="$ROOT" "$OUT/c1-bootstrap.elf" < linux/compiler.c > "$OUT/compiler.o"
+C1_INCLUDE="$ROOT" "$OUT/c1-bootstrap.elf" < linux/runtime.c > "$OUT/runtime.o"
+{
+    printf '%s\n' "$OUT/c1.elf"
+    printf '%s\n' _start
+    printf '%s\n' "$OUT/runtime.o"
+    printf '%s\n' "$OUT/compiler.o"
+} | "$OUT/c1l.elf" >/dev/null
 chmod +x "$OUT/c1.elf"
+cd "$ROOT"
 printf 'int main(void){return 42;}\n' > "$OUT/tiny.c"
 "$OUT/c1.elf" < "$OUT/tiny.c" > "$OUT/tiny.o"
 head -c 4 "$OUT/tiny.o" | od -An -tx1 | grep -q '7f 45 4c 46'

@@ -4,15 +4,15 @@
 
 /* C1 compiler, built by the frozen C-written bootstrap compiler.
    Reads C from stdin and emits an ELF64 relocatable object on stdout. */
-int source[1048576];
+int source[2097152];
 int pp_condition;
 int c99_mode;
 int c89_identifiers;
 
-unsigned char names[524288];
-int lengths[2048];
-int spelling_start[2048];
-int spelling_length[2048];
+unsigned char names[2097152];
+int lengths[8192];
+int spelling_start[8192];
+int spelling_length[8192];
 int size;
 int cursor;
 int count;
@@ -342,7 +342,7 @@ int intern(void) {
             return 256 + i;
         }
     }
-    if (count == 2048) {
+    if (count == 8192) {
         diagnostic_reason = "identifier capacity exceeded";
         failed = 1;
         return 0;
@@ -805,35 +805,35 @@ int lex(void) {
 }
 
 /* Machine code and PE image are generated here, inside the C compiler. */
-int image[1049088];
+int image[2097152];
 int position;
 int token;
-int label_address[2048];
-int label_head[2048];
-int label_vm[2048];
+int label_address[8192];
+int label_head[8192];
+int label_vm[8192];
 int vm_current, vm_count, vm_goto_count;
 int vm_parent[4096], vm_binding[4096], vm_stack[4096];
 int vm_goto_label[4096], vm_goto_from[4096], vm_goto_code[4096];
-int local_offset[2048];
-int local_depth[2048];
+int local_offset[8192];
+int local_depth[8192];
 int binding_name[256];
 int binding_offset[256];
 int binding_depth[256];
-int local_type[2048];
+int local_type[8192];
 int binding_type[256];
 int binding_bytes[256];
-int alias_type[2048];
+int alias_type[8192];
 int binding_alias[256];
 int decl_typedef;
 int decl_storage;
 int decl_inline;
-int inline_seen[2048];
-int inline_external[2048];
+int inline_seen[8192];
+int inline_external[8192];
 int inline_body = -1;
-int inline_invalid[2048];
-int register_object[2048];
+int inline_invalid[8192];
+int register_object[8192];
 int binding_register[256];
-int local_static_address[2048];
+int local_static_address[8192];
 int binding_static_address[256];
 int unevaluated_depth;
 int for_declaration;
@@ -848,9 +848,9 @@ int initializer_probe;
 int inferred_elements;
 int initializer_start;
 int initializer_tail;
-int array_base[2048];
-int array_length[2048];
-int array_bytes[2048];
+int array_base[8192];
+int array_length[8192];
+int array_bytes[8192];
 int array_count;
 int decl_kind[256];
 int decl_next[256];
@@ -871,15 +871,15 @@ int definition_parameter_count;
 int definition_parameter_name[128];
 int definition_parameter_type[128];
 int function_type_count;
-int function_result[2048];
-int function_arity[2048];
+int function_result[8192];
+int function_arity[8192];
 int function_parameter[131072];
 int decl_depth;
 int decl_parentheses;
 int declarator_active;
-int global_type[2048];
-int file_function_type[2048];
-int parameter_type[262144];
+int global_type[8192];
+int file_function_type[8192];
+int parameter_type[1048576];
 int expression_type;
 int sizeof_value;
 int evaluated_sizeof;
@@ -893,11 +893,11 @@ int expression_record_ready;
 int expression_bit;
 int expression_array_bytes;
 int expression_array_type;
-int global_extent[2048];
+int global_extent[8192];
 int return_type;
-int global_address[2048];
-int global_initialized[2048];
-int global_tentative[2048];
+int global_address[8192];
+int global_initialized[8192];
+int global_tentative[8192];
 int object_ref_position[16384];
 int object_ref_symbol[16384];
 int object_ref_count;
@@ -905,19 +905,19 @@ int object_mode;
 int address_ref_count;
 int address_ref_position[16384];
 int address_ref_target[16384];
-int symbol_flags[2048];
-int global_visible[2048];
-int entity_type[2048];
+int symbol_flags[8192];
+int global_visible[8192];
+int entity_type[8192];
 int enum_count;
-int enum_complete[2048];
-int enum_global[2048];
-int enum_global_value[2048];
-int tag_type[2048];
-int tag_depth[2048];
+int enum_complete[8192];
+int enum_global[8192];
+int enum_global_value[8192];
+int tag_type[8192];
+int tag_depth[8192];
 int tag_count;
-int tag_binding_name[2048];
-int tag_binding_type[2048];
-int tag_binding_depth[2048];
+int tag_binding_name[8192];
+int tag_binding_type[8192];
+int tag_binding_depth[8192];
 int parameter_count;
 int parameter_name[128];
 int current_variadic;
@@ -945,12 +945,12 @@ int parameter_decl_type[128];
 int return_address_offset;
 int record_count;
 int record_depth;
-int record_size[2048];
-int record_align[2048];
-int record_kind[2048];
-int record_open[2048];
-int record_first[2048];
-int record_last[2048];
+int record_size[8192];
+int record_align[8192];
+int record_kind[8192];
+int record_open[8192];
+int record_first[8192];
+int record_last[8192];
 int member_count;
 int member_name[8192];
 int member_type[8192];
@@ -959,9 +959,9 @@ int member_next[8192];
 int member_bits[8192];
 int member_shift[8192];
 int expression_register;
-int arity[2048];
+int arity[8192];
 int call_arity[16384];
-int function_address[2048];
+int function_address[8192];
 int call_position[16384];
 int call_symbol[16384];
 int call_count;
@@ -1015,7 +1015,7 @@ int error_message(char *message) {
 int emit(int b) {
     if (failed)
         return 0;
-    if (position >= 1049088)
+    if (position >= 2097152)
         return error();
     image[position] = b & 255;
     position = position + 1;
@@ -1222,7 +1222,7 @@ int complex_type(int base) {
     for (i = 0; i < record_count; i++)
         if (record_kind[i] == base)
             return 0x20000e + i * 256;
-    if (record_count == 1024)
+    if (record_count == 4096)
         return error();
     i = record_count++;
     record_kind[i] = base;
@@ -1577,7 +1577,7 @@ int qualify_type(int t, int q) {
         if (qualified_base[i] == t && qualified_flags[i] == q)
             return 0x40000c + i * 256;
     }
-    if (qualified_count == 2048)
+    if (qualified_count == 8192)
         return error_message("qualified type capacity exceeded");
     i = qualified_count++;
     qualified_base[i] = t;
@@ -2149,8 +2149,6 @@ int pointer_common(int a, int b, int allow_void) {
     a = unqualified(a);
     b = unqualified(b);
     if (allow_void && (!a || !b)) {
-        if (is_function(a) || is_function(b))
-            return error();
         base = 0;
     } else
         base = composite_type(a, b);
@@ -2288,9 +2286,6 @@ int convert(int t) {
         return long_double_convert(t);
     if (is_function(t) || is_function(expression_type))
         return error();
-    if ((void_pointer(t) && function_pointer(expression_type)) ||
-        (void_pointer(expression_type) && function_pointer(t) && !expression_zero))
-        return error();
     if (is_record(t)) {
         type_size(t);
         if (expression_type != t)
@@ -2328,7 +2323,7 @@ int convert(int t) {
             if ((type_qualifiers(a) & type_qualifiers(b)) != type_qualifiers(b))
                 return error_message("pointer conversion discards qualifier");
             pointer_common(t, expression_type, 1);
-        } else if (!expression_zero)
+        } else if (is_record(expression_type) || floating_type(expression_type))
             return error();
         expression_type = t;
         expression_ice = 0;
@@ -6583,7 +6578,7 @@ int enum_specifier(void) {
             return error();
         return tag_type[tag];
     }
-    if (enum_count == 1024)
+    if (enum_count == 4096)
         return error();
     index = enum_count++;
     t = 0x10000d + index * 256;
@@ -6591,7 +6586,7 @@ int enum_specifier(void) {
         if (tag_type[tag] && tag_depth[tag] == block_depth)
             return error();
         if (block_depth) {
-            if (tag_count == 1024)
+            if (tag_count == 4096)
                 return error();
             tag_binding_name[tag_count] = tag;
             tag_binding_type[tag_count] = tag_type[tag];
@@ -6676,14 +6671,14 @@ int record_specifier(void) {
         }
     }
     if (create) {
-        if (record_count == 1024)
+        if (record_count == 4096)
             return error();
         index = record_count++;
         t = 0x20000e + index * 256;
         record_kind[index] = kind;
         if (tag >= 0) {
             if (block_depth) {
-                if (tag_count == 1024)
+                if (tag_count == 4096)
                     return error();
                 tag_binding_name[tag_count] = tag;
                 tag_binding_type[tag_count] = tag_type[tag];
@@ -6718,6 +6713,9 @@ int record_specifier(void) {
             bits = 0;
             shift = 0;
             if (token == ':') {
+                mt = base;
+                id = -1;
+            } else if (token == ';' && is_record(base)) {
                 mt = base;
                 id = -1;
             } else {
@@ -6761,6 +6759,42 @@ int record_specifier(void) {
                     goto member_done;
                 }
             } else {
+                if (id < 0 && is_record(mt)) {
+                    int child_index = (unqualified(mt) - 0x20000e) / 256;
+                    int child_node = record_first[child_index], copy, child_base = 0;
+                    int child_align = type_align(mt), child_size = type_size(mt);
+                    int child_tail = record_last[index];
+                    if (kind == 1)
+                        child_base = ((total + child_align - 1) / child_align) * child_align;
+                    for (; child_node; child_node = member_next[child_node]) {
+                        if (member_count == 8191)
+                            return error();
+                        copy = ++member_count;
+                        member_name[copy] = member_name[child_node];
+                        member_type[copy] = member_type[child_node];
+                        member_offset[copy] = child_base + member_offset[child_node];
+                        member_bits[copy] = member_bits[child_node];
+                        member_shift[copy] = member_shift[child_node];
+                        if (member_name[copy] >= 0)
+                            named++;
+                        if (child_tail)
+                            member_next[child_tail] = copy;
+                        else
+                            record_first[index] = copy;
+                        child_tail = copy;
+                    }
+                    record_last[index] = child_tail;
+                    if (child_align > maximum)
+                        maximum = child_align;
+                    if (kind == 1)
+                        total = child_base + child_size;
+                    else if (child_size > total)
+                        total = child_size;
+                    previous = 0;
+                    unit = 0;
+                    used = 0;
+                    goto member_done;
+                }
                 if (id < 0)
                     return error();
                 if (kind == 1 && record_has_flexible(mt))
@@ -7440,7 +7474,7 @@ int switch_label(void) {
             if (case_value[node - 1] == value_bits)
                 return error();
         }
-        if (case_count == 2048)
+        if (case_count == 8192)
             return error();
         node = case_count;
         case_count++;
@@ -8571,7 +8605,7 @@ int static_declaration(int base) {
             inline_invalid[inline_body] = 1;
         align = type_align(t);
         allocation = ((allocation + align - 1) / align) * align;
-        if (allocation + width > 0x2000000)
+        if (allocation + width > 0x10000000)
             return error();
         address = allocation;
         allocation += width;
@@ -8620,6 +8654,8 @@ int composite_type(int a, int b) {
         return error_message("incompatible type qualification");
     if (type_qualifiers(a))
         return qualify_type(composite_type(unqualified(a), unqualified(b)), type_qualifiers(a));
+    if ((a == 5 || a == 6 || a == 9) && (b == 5 || b == 6 || b == 9))
+        return 9;
     if (is_enum(a) && b == 1)
         return a;
     if (is_enum(b) && a == 1)
@@ -8673,7 +8709,7 @@ int allocate_global(int id) {
         element = array_base[(element - 4096) / 256];
     align = type_align(t);
     allocation = ((allocation + align - 1) / align) * align;
-    if (allocation + width > 0x2000000)
+    if (allocation + width > 0x10000000)
         return error();
     global_address[id] = allocation;
     allocation += width;
@@ -9118,7 +9154,7 @@ int predefined_function_name(int function_id) {
             break;
     }
     if (id == count) {
-        if (count == 2048)
+        if (count == 8192)
             return error_message("identifier capacity exceeded");
         seed(count, 0x75665f5f, 0x5f5f636e, 0);
         count++;
@@ -9387,7 +9423,7 @@ function_body:
         return error();
     symbol_flags[id] = symbol_flags[id] | 1;
     function_address[id] = position;
-    for (i = 0; i < 2048; i = i + 1) {
+    for (i = 0; i < 8192; i = i + 1) {
         label_address[i] = 0;
         label_head[i] = 0;
         label_vm[i] = 0;
@@ -9524,7 +9560,7 @@ function_body:
     return_type = t;
     block_depth = 0;
     statement();
-    for (i = 0; i < 2048; i = i + 1) {
+    for (i = 0; i < 8192; i = i + 1) {
         if (label_head[i])
             return error();
     }
@@ -9543,7 +9579,7 @@ function_body:
 
 /* Transactional type-aware pass for automatic inferred aggregate arrays.
    Interned identifier text is retained; semantic bindings and emitted code are restored. */
-int initializer_backup[309248];
+int initializer_backup[1236992];
 int initializer_state[58];
 int initializer_checkpoint_depth;
 int *initializer_checkpoint_stack[128];
@@ -9557,13 +9593,13 @@ int initializer_checkpoint_push(void) {
     if (initializer_checkpoint_depth == 128)
         return error_message("initializer checkpoint nesting exceeded");
     if (initializer_checkpoint_depth) {
-        p = allocate(heap(), 0, (309248ULL + 58) * 4);
+        p = allocate(heap(), 0, (1236992ULL + 58) * 4);
         if (!p)
             return error_message("initializer checkpoint allocation failed");
-        for (i = 0; i < 309248; i++)
+        for (i = 0; i < 1236992; i++)
             p[i] = initializer_backup[i];
         for (i = 0; i < 58; i++)
-            p[309248 + i] = initializer_state[i];
+            p[1236992 + i] = initializer_state[i];
         initializer_checkpoint_stack[initializer_checkpoint_depth] = p;
     }
     initializer_checkpoint_depth++;
@@ -9579,10 +9615,10 @@ int initializer_checkpoint_pop(void) {
     initializer_checkpoint_depth--;
     if (initializer_checkpoint_depth) {
         p = initializer_checkpoint_stack[initializer_checkpoint_depth];
-        for (i = 0; i < 309248; i++)
+        for (i = 0; i < 1236992; i++)
             initializer_backup[i] = p[i];
         for (i = 0; i < 58; i++)
-            initializer_state[i] = p[309248 + i];
+            initializer_state[i] = p[1236992 + i];
         release(heap(), 0, p);
     }
     return 0;
@@ -9595,101 +9631,101 @@ int initializer_checkpoint(int save) {
         if (failed)
             return 0;
     }
-    for (i = 0; i < 2048; i++) {
+    for (i = 0; i < 8192; i++) {
         if (save)
             initializer_backup[0 + i] = local_offset[i];
         else
             local_offset[i] = initializer_backup[0 + i];
         if (save)
-            initializer_backup[2048 + i] = local_depth[i];
+            initializer_backup[8192 + i] = local_depth[i];
         else
-            local_depth[i] = initializer_backup[2048 + i];
+            local_depth[i] = initializer_backup[8192 + i];
         if (save)
-            initializer_backup[4096 + i] = local_type[i];
+            initializer_backup[16384 + i] = local_type[i];
         else
-            local_type[i] = initializer_backup[4096 + i];
+            local_type[i] = initializer_backup[16384 + i];
         if (save)
-            initializer_backup[6144 + i] = alias_type[i];
+            initializer_backup[24576 + i] = alias_type[i];
         else
-            alias_type[i] = initializer_backup[6144 + i];
+            alias_type[i] = initializer_backup[24576 + i];
         if (save)
-            initializer_backup[8192 + i] = register_object[i];
+            initializer_backup[32768 + i] = register_object[i];
         else
-            register_object[i] = initializer_backup[8192 + i];
+            register_object[i] = initializer_backup[32768 + i];
         if (save)
-            initializer_backup[10240 + i] = local_static_address[i];
+            initializer_backup[40960 + i] = local_static_address[i];
         else
-            local_static_address[i] = initializer_backup[10240 + i];
+            local_static_address[i] = initializer_backup[40960 + i];
         if (save)
-            initializer_backup[12288 + i] = global_type[i];
+            initializer_backup[49152 + i] = global_type[i];
         else
-            global_type[i] = initializer_backup[12288 + i];
+            global_type[i] = initializer_backup[49152 + i];
         if (save)
-            initializer_backup[14336 + i] = symbol_flags[i];
+            initializer_backup[57344 + i] = symbol_flags[i];
         else
-            symbol_flags[i] = initializer_backup[14336 + i];
+            symbol_flags[i] = initializer_backup[57344 + i];
         if (save)
-            initializer_backup[16384 + i] = global_visible[i];
+            initializer_backup[65536 + i] = global_visible[i];
         else
-            global_visible[i] = initializer_backup[16384 + i];
+            global_visible[i] = initializer_backup[65536 + i];
         if (save)
-            initializer_backup[18432 + i] = entity_type[i];
+            initializer_backup[73728 + i] = entity_type[i];
         else
-            entity_type[i] = initializer_backup[18432 + i];
+            entity_type[i] = initializer_backup[73728 + i];
         if (save)
-            initializer_backup[20480 + i] = enum_complete[i];
+            initializer_backup[81920 + i] = enum_complete[i];
         else
-            enum_complete[i] = initializer_backup[20480 + i];
+            enum_complete[i] = initializer_backup[81920 + i];
         if (save)
-            initializer_backup[22528 + i] = enum_global[i];
+            initializer_backup[90112 + i] = enum_global[i];
         else
-            enum_global[i] = initializer_backup[22528 + i];
+            enum_global[i] = initializer_backup[90112 + i];
         if (save)
-            initializer_backup[24576 + i] = enum_global_value[i];
+            initializer_backup[98304 + i] = enum_global_value[i];
         else
-            enum_global_value[i] = initializer_backup[24576 + i];
+            enum_global_value[i] = initializer_backup[98304 + i];
         if (save)
-            initializer_backup[26624 + i] = tag_type[i];
+            initializer_backup[106496 + i] = tag_type[i];
         else
-            tag_type[i] = initializer_backup[26624 + i];
+            tag_type[i] = initializer_backup[106496 + i];
         if (save)
-            initializer_backup[28672 + i] = tag_depth[i];
+            initializer_backup[114688 + i] = tag_depth[i];
         else
-            tag_depth[i] = initializer_backup[28672 + i];
+            tag_depth[i] = initializer_backup[114688 + i];
         if (save)
-            initializer_backup[30720 + i] = record_size[i];
+            initializer_backup[122880 + i] = record_size[i];
         else
-            record_size[i] = initializer_backup[30720 + i];
+            record_size[i] = initializer_backup[122880 + i];
         if (save)
-            initializer_backup[32768 + i] = record_align[i];
+            initializer_backup[131072 + i] = record_align[i];
         else
-            record_align[i] = initializer_backup[32768 + i];
+            record_align[i] = initializer_backup[131072 + i];
         if (save)
-            initializer_backup[34816 + i] = record_kind[i];
+            initializer_backup[139264 + i] = record_kind[i];
         else
-            record_kind[i] = initializer_backup[34816 + i];
+            record_kind[i] = initializer_backup[139264 + i];
         if (save)
-            initializer_backup[36864 + i] = record_open[i];
+            initializer_backup[147456 + i] = record_open[i];
         else
-            record_open[i] = initializer_backup[36864 + i];
+            record_open[i] = initializer_backup[147456 + i];
         if (save)
-            initializer_backup[38912 + i] = record_first[i];
+            initializer_backup[155648 + i] = record_first[i];
         else
-            record_first[i] = initializer_backup[38912 + i];
+            record_first[i] = initializer_backup[155648 + i];
         if (save)
-            initializer_backup[40960 + i] = record_last[i];
+            initializer_backup[163840 + i] = record_last[i];
         else
-            record_last[i] = initializer_backup[40960 + i];
+            record_last[i] = initializer_backup[163840 + i];
         if (save)
-            initializer_backup[43008 + i] = arity[i];
+            initializer_backup[172032 + i] = arity[i];
         else
-            arity[i] = initializer_backup[43008 + i];
+            arity[i] = initializer_backup[172032 + i];
     }
-    for (i = 0; i < 262144; i++) {
+    for (i = 0; i < 1048576; i++) {
         if (save)
-            initializer_backup[45056 + i] = parameter_type[i];
+            initializer_backup[180224 + i] = parameter_type[i];
         else
-            parameter_type[i] = initializer_backup[45056 + i];
+            parameter_type[i] = initializer_backup[180224 + i];
     }
     for (i = 0; i < 2048; i++) {
         if (save)
@@ -9967,7 +10003,7 @@ int infer_aggregate_array(int t, int id) {
 
 /* Preprocessing tokens retain their spelling and whitespace boundaries.
    The input arena is immutable while expanded tokens are written to source. */
-int pp_input[1048576];
+int pp_input[2097152];
 int pp_input_size;
 int pp_cursor;
 int pp_output;
@@ -9981,11 +10017,11 @@ int pp_token_length[65536];
 int pp_token_kind[65536];
 int pp_token_space[65536];
 int pp_macros;
-int pp_name_start[1024];
-int pp_name_length[1024];
-int pp_body_start[1024];
-int pp_body_length[1024];
-int pp_defined[1024];
+int pp_name_start[4096];
+int pp_name_length[4096];
+int pp_body_start[4096];
+int pp_body_length[4096];
+int pp_defined[4096];
 
 int pp_pack_current;
 int pp_pack_stack[16];
@@ -9996,10 +10032,10 @@ int pp_parent[128];
 int pp_taken[128];
 int pp_else[128];
 
-int pp_arity[1024];
-int pp_variadic[1024];
+int pp_arity[4096];
+int pp_variadic[4096];
 int pp_allow_va;
-int pp_parameter_start[1024];
+int pp_parameter_start[4096];
 int pp_nodes;
 int pp_free;
 int pp_node_start[65536];
@@ -10054,7 +10090,7 @@ int pp_char(int start, int offset) {
 }
 
 int pp_generate(int c) {
-    if (pp_generated == 1049088)
+    if (pp_generated == 2097152)
         return error();
     image[pp_generated++] = c;
     return 0;
@@ -11039,7 +11075,7 @@ int pp_find(int start, int length) {
 }
 
 int pp_put(int c) {
-    if (pp_output == 1048576)
+    if (pp_output == 2097152)
         return error();
     source[pp_output++] = c;
     return 0;
@@ -11105,7 +11141,7 @@ int pp_define(void) {
         return error_message("cannot define or undefine reserved preprocessing name");
     id = pp_find(pp_start, pp_length);
     if (id < 0) {
-        if (pp_macros == 1024)
+        if (pp_macros == 4096)
             return error_message("macro name capacity exceeded");
         id = pp_macros++;
         pp_name_start[id] = pp_start;
@@ -11394,7 +11430,7 @@ int pp_load_header(int quoted) {
         }
         if (!got)
             break;
-        if (got > 1048576 - pp_arena_used) {
+        if (got > 2097152 - pp_arena_used) {
             error();
             break;
         }
@@ -11909,7 +11945,7 @@ int main(int argc, char **argv) {
     file_function_type[10] = function_entity_signature(10);
     file_function_type[11] = function_entity_signature(11);
     while ((c = __c0_getchar()) != -1) {
-        if (size == 1048576) {
+        if (size == 2097152) {
             diagnostic_text("C1 error: source input exceeds 1048576 bytes");
             diagnostic_end();
             return 1;

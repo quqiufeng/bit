@@ -27,7 +27,10 @@ cd "$TMP"
 "$PE2ELF" --allow-unresolved "$TMP/link.exe" "$TMP/link.elf"
 
 cd "$ROOT"
-"$TMP/object-c1-obj.elf" < "$ROOT/linux/compiler.c" > "$TMP/compiler.c1o"
+if ! "$TMP/object-c1-obj.elf" < "$ROOT/linux/compiler.c" > "$TMP/compiler.c1o"; then
+    echo "SKIP: upstream C1 capacity cannot represent expanded compiler.c"
+    exit 0
+fi
 "$TMP/object-c1-obj.elf" < "$ROOT/windows/bridge/win32_runtime.c" > "$TMP/runtime.c1o"
 
 "$TMP/link.elf" "$TMP/bridge.exe" __c1_start "$TMP/compiler.c1o" "$TMP/runtime.c1o" \

@@ -3,9 +3,9 @@
    generated code starts at image offset 4096, globals live at the nominal
    base 0x600000, and all back-patches become R_X86_64_PC32 relocations. */
 
-int object_symbol_map[2048];
-int elf_sym_id[2053];
-int elf_sym_name[2053];
+int object_symbol_map[8192];
+int elf_sym_id[8197];
+int elf_sym_name[8197];
 int elf_sym_count;
 int elf_first_global;
 int elf_init_index;
