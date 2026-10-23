@@ -777,6 +777,18 @@ GCC 5.5.0 已开始：
 PASS: GCC 5.5.0 cc1 and cc1plus compile C and C++ hello
 ```
 
+GCC 7.5.0 已开始：
+
+```sh
+./tests/gcc75/run.sh
+```
+
+结果：
+
+```text
+PASS: GCC 7.5.0 cc1 and cc1plus compile C and C++ hello
+```
+
 完整现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
