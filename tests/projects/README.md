@@ -22,6 +22,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC 4.8 owned by 4.7 | 4.8.5 | `/opt/gcc-4.8.5` | none | PASS |
 | GCC 4.8 owned libstdc++ | 4.8.5 | `/opt/gcc-4.8.5` | none | PASS |
 | GCC 4.9 cc1/cc1plus | 4.9.4 | `/opt/gcc-4.9.4` | none | PASS |
+| GCC 4.9 owned by 4.8 | 4.9.4 | `/opt/gcc-4.9.4` | none | PASS |
 | GCC 5.5 cc1/cc1plus | 5.5.0 | `/opt/gcc-5.5.0` | none | PASS |
 | GCC 7.5 cc1/cc1plus | 7.5.0 | `/opt/gcc-7.5.0` | none | PASS |
 | GCC 9.5 cc1/cc1plus | 9.5.0 | `/opt/gcc-9.5.0` | none | PASS |

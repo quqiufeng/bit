@@ -836,7 +836,17 @@ PASS: GCC 4.8.5 C++ program runs with built libstdc++
 ```
 
 GCC 4.8 libgcc 的现代 glibc 兼容补丁为
-`tests/gcc48/libgcc-ucontext.patch`。GCC 4.9.4 已开始：
+`tests/gcc48/libgcc-ucontext.patch`。GCC 4.9.4 已由 GCC 4.8 自有链构建：
+
+```sh
+./tests/gcc49/owned.sh
+```
+
+```text
+PASS: GCC 4.9.4 built by GCC 4.8 C++ bridge, C and C++ hello run
+```
+
+GCC 4.9.4 已开始：
 
 ```sh
 ./tests/gcc49/run.sh
