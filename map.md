@@ -740,7 +740,20 @@ PASS: GCC 4.8.5 cc1 and cc1plus compile C and C++ hello
 GCC 4.8 由系统 g++ 构建，需 `-std=gnu++98` 兼容现代 g++。自有 GCC 4.7
 尚未提供 C++ 前端，因此 4.8 仍是系统 C++ 桥接。
 
-完整现代 GCC 阶梯仍未完成。
+GCC 4.8 的 libstdc++ 也已构建，C++ `std::string`/`iostream` 程序可运行：
+
+```sh
+./tests/gcc48/libstdcxx.sh
+```
+
+结果：
+
+```text
+PASS: GCC 4.8.5 C++ program runs with built libstdc++
+```
+
+GCC 4.8 libgcc 的现代 glibc 兼容补丁为
+`tests/gcc48/libgcc-ucontext.patch`。完整现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
 

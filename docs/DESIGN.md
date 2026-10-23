@@ -764,7 +764,7 @@ GCC 4.7.4 的 `libiberty`、`libcpp`、`gcc` 基础设施、x86_64 后端和 C �
 probe 已通过（`tests/gcc47/run.sh`），cc1 和 xgcc 已由 TCC 链接并能编译运行 hello；TCC 构建的 xgcc 也已能编译 GCC C 前端源码，并已构建出可运行的 stage2 cc1
 （`tests/gcc47/stage2.sh`）。stage1 cc1/xgcc 由 TCC 链接，stage2 cc1 由
 stage1 GCC 编译；generator 暂用系统 gcc，最终 stage2 链接使用 stage1 GCC/
-collect2。自有 libgcc 已由 stage1 GCC 构建；stage2 xgcc 驱动也已构建并使用自有 libgcc。stage2/stage3 cc1 对同一源码生成相同汇编；GCC 4.8.5 的 cc1/cc1plus 已能编译 C/C++ hello；现代 GCC 阶梯仍未完成。Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
+collect2。自有 libgcc 已由 stage1 GCC 构建；stage2 xgcc 驱动也已构建并使用自有 libgcc。stage2/stage3 cc1 对同一源码生成相同汇编；GCC 4.8.5 的 cc1/cc1plus、libstdc++ 已能编译运行 C++ hello 和 std::string 程序；现代 GCC 阶梯仍未完成。Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，
 不是“TCC 已完全替代系统 GCC/binutils”。BusyBox shell 试用方法见
 `tests/busybox/README.md`。
