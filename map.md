@@ -62,6 +62,7 @@ bit-tcc 编译 hello.c
 bit-tcc 原生链接 hello
 bit-tcc 构建 libtcc1.a
 bit-tcc -shared 生成 .so
+bit-tcc 编译并链接 BusyBox 1.35（最小配置）
 bit-tcc 编译 tcc.c
 tcc-stage2 运行
 tcc-self1.o == tcc-self2.o
@@ -143,6 +144,48 @@ bit-tcc 包装器自动加上 -B runtime
 完整 -rpath / RUNPATH
 C++ 运行库
 ```
+
+#### BusyBox 1.35 实测
+
+最小 BusyBox 配置已经由 TCC 编译并链接：
+
+```sh
+BUSYBOX_SRC=/tmp/busybox-1.35.0 tests/tcc/busybox.sh
+```
+
+启用 applet：
+
+```text
+CAT / ECHO / LS / TRUE / FALSE
+```
+
+运行验证：
+
+```text
+busybox_unstripped echo hello
+busybox_unstripped cat file
+busybox_unstripped ls file
+```
+
+BusyBox 构建脚本未打补丁；通过的是 TCC fork 的兼容修正：
+
+```text
+__GNUC__ / glibc attribute 保留
+packed union 布局
+__INT_MAX__ 等预定义宏
+__builtin_alloca
+__USER_LABEL_PREFIX__
+透明 union 参数
+-Wp,-MD 依赖文件
+未知链接选项忽略
+归档重复扫描（--start-group 等价）
+make 依赖文件格式
+```
+
+完整 BusyBox `defconfig` 仍受 BusyBox 与现代内核头兼容问题影响；
+`TCA_CBQ_MAX` 在现代 GCC 下也会失败，不是 TCC 单独的问题。
+
+---
 
 ### 1.5 产物控制原则
 

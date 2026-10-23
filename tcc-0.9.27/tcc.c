@@ -339,6 +339,22 @@ redo:
             break;
     }
 
+    /* Emulate the linker's --start-group by rescanning .a archives. */
+    if (!ret) {
+        int pass, fi, len;
+        for (pass = 0; pass < 8 && !ret; pass++) {
+            for (fi = 0; fi < s->nb_files; fi++) {
+                struct filespec *f = s->files[fi];
+                len = strlen(f->name);
+                if (f->type != AFF_TYPE_LIB && len >= 2 &&
+                    f->name[len - 2] == '.' && f->name[len - 1] == 'a') {
+                    if (tcc_add_file(s, f->name) < 0)
+                        ret = 1;
+                }
+            }
+        }
+    }
+
     if (s->run_test) {
         t = 0;
     } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {

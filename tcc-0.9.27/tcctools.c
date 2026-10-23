@@ -536,10 +536,17 @@ ST_FUNC void gen_makedeps(TCCState *s, const char *target, const char *filename)
     if (!depout)
         tcc_error("could not open '%s'", filename);
 
-    fprintf(depout, "%s: \\\n", target);
-    for (i=0; i<s->nb_target_deps; ++i)
-        fprintf(depout, " %s \\\n", s->target_deps[i]);
-    fprintf(depout, "\n");
+    if (s->nb_target_deps) {
+        fprintf(depout, "%s: %s", target, s->target_deps[0]);
+        for (i = 1; i < s->nb_target_deps; ++i) {
+            fprintf(depout, " %s", s->target_deps[i]);
+            if ((i % 4) == 0 && i + 1 < s->nb_target_deps)
+                fprintf(depout, " \\\n ");
+        }
+        fprintf(depout, "\n");
+    } else {
+        fprintf(depout, "%s:\n", target);
+    }
     fclose(depout);
 }
 

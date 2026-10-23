@@ -871,10 +871,40 @@ LIBTCCAPI TCCState *tcc_new(void)
        that are unconditionally used in FreeBSDs other system headers :/ */
     tcc_define_symbol(s, "__GNUC__", "2");
     tcc_define_symbol(s, "__GNUC_MINOR__", "7");
+    tcc_define_symbol(s, "__INT_MAX__", "2147483647");
+    tcc_define_symbol(s, "__LONG_MAX__", "9223372036854775807L");
+    tcc_define_symbol(s, "__LONG_LONG_MAX__", "9223372036854775807LL");
+    tcc_define_symbol(s, "__SCHAR_MAX__", "127");
+    tcc_define_symbol(s, "__SHRT_MAX__", "32767");
+    tcc_define_symbol(s, "__CHAR_BIT__", "8");
+    tcc_define_symbol(s, "__SIZEOF_INT__", "4");
+    tcc_define_symbol(s, "__SIZEOF_LONG__", "8");
+    tcc_define_symbol(s, "__SIZEOF_LONG_LONG__", "8");
+    tcc_define_symbol(s, "__SIZEOF_POINTER__", "8");
+    tcc_define_symbol(s, "__SIZEOF_SIZE_T__", "8");
+    tcc_define_symbol(s, "__STDC_NO_VLA__", NULL);
+    tcc_define_symbol(s, "__USER_LABEL_PREFIX__", "");
     tcc_define_symbol(s, "__builtin_alloca", "alloca");
 #  endif
 # else
     tcc_define_symbol(s, "__WINT_TYPE__", "unsigned int");
+    /* Pretend to be an old GCC so glibc's sys/cdefs.h keeps __attribute__. */
+    tcc_define_symbol(s, "__GNUC__", "2");
+    tcc_define_symbol(s, "__GNUC_MINOR__", "7");
+    tcc_define_symbol(s, "__INT_MAX__", "2147483647");
+    tcc_define_symbol(s, "__LONG_MAX__", "9223372036854775807L");
+    tcc_define_symbol(s, "__LONG_LONG_MAX__", "9223372036854775807LL");
+    tcc_define_symbol(s, "__SCHAR_MAX__", "127");
+    tcc_define_symbol(s, "__SHRT_MAX__", "32767");
+    tcc_define_symbol(s, "__CHAR_BIT__", "8");
+    tcc_define_symbol(s, "__SIZEOF_INT__", "4");
+    tcc_define_symbol(s, "__SIZEOF_LONG__", "8");
+    tcc_define_symbol(s, "__SIZEOF_LONG_LONG__", "8");
+    tcc_define_symbol(s, "__SIZEOF_POINTER__", "8");
+    tcc_define_symbol(s, "__SIZEOF_SIZE_T__", "8");
+    tcc_define_symbol(s, "__STDC_NO_VLA__", NULL);
+    tcc_define_symbol(s, "__USER_LABEL_PREFIX__", "");
+    tcc_define_symbol(s, "__builtin_alloca", "alloca");
     /* glibc defines */
     tcc_define_symbol(s, "__REDIRECT(name, proto, alias)",
         "name proto __asm__ (#alias)");
@@ -1362,7 +1392,15 @@ static int tcc_set_linker(TCCState *s, const char *option)
             } else
                 goto err;
 
-        } else if (link_option(option, "as-needed", &p)) {
+        } else if (link_option(option, "as-needed", &p)
+                || link_option(option, "start-group", &p)
+                || link_option(option, "end-group", &p)
+                || link_option(option, "gc-sections", &p)
+                || link_option(option, "warn-common", &p)
+                || link_option(option, "sort-common", &p)
+                || link_option(option, "sort-section=", &p)
+                || link_option(option, "Map=", &p)
+                || link_option(option, "verbose", &p)) {
             ignoring = 1;
         } else if (link_option(option, "O", &p)) {
             ignoring = 1;
@@ -1878,6 +1916,16 @@ reparse:
             break;
 	case TCC_OPTION_Wp:
 	    r = optarg;
+	    if (!strncmp(r, "-MD,", 4)) {
+	        s->gen_deps = 1;
+	        s->deps_outfile = tcc_strdup(r + 4);
+	        break;
+	    }
+	    if (!strncmp(r, "-MMD,", 5)) {
+	        s->gen_deps = 1;
+	        s->deps_outfile = tcc_strdup(r + 5);
+	        break;
+	    }
 	    goto reparse;
         case TCC_OPTION_E:
             x = TCC_OUTPUT_PREPROCESS;

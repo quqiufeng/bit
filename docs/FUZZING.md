@@ -108,8 +108,8 @@ The script skips cleanly when the TCC source or native C1 is absent. It now
 builds `libtcc1.a` with bit-tcc itself, links a native executable, builds a
 shared object, and links a program with `-L`/`-l`. The final executable, shared
 object and self-hosted compiler are linked by bit-tcc, not gcc; gcc is only used
-for the bootstrap `bit-tcc` binary and `c1-init.o`. The larger BusyBox/Lua/musl
-link tests remain future work.
+for the bootstrap `bit-tcc` binary and `c1-init.o`. The minimal BusyBox 1.35 build is covered by
+`tests/tcc/busybox.sh`; larger Lua/musl link tests remain future work.
 
 ## Commands
 
@@ -120,6 +120,7 @@ BUILD=/tmp/fuzz tests/fuzz-float.sh
 BUILD=/tmp/fuzz tests/fuzz-varargs.sh
 HOSTED=1 ./build.sh
 tests/tcc/upstream.sh
+BUSYBOX_SRC=/tmp/busybox-1.35.0 tests/tcc/busybox.sh
 ```
 
 The zero-dependency native checks remain:

@@ -3053,6 +3053,10 @@ static void gen_assign_cast(CType *dt)
         break;
     case VT_STRUCT:
     case_VT_STRUCT:
+        /* GNU transparent-union parameters (e.g. glibc __SOCKADDR_ARG). */
+        if (dbt == VT_STRUCT && sbt == VT_PTR && dt->ref &&
+            dt->ref->type.t == VT_UNION && dt->ref->c == PTR_SIZE)
+            goto type_ok;
         if (!is_compatible_unqualified_types(dt, st)) {
         error:
             type_to_str(buf1, sizeof(buf1), st, NULL);
