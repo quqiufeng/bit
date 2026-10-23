@@ -613,9 +613,10 @@ bit-tcc 能稳定生成 libiberty 对象
 libiberty: cplus-dem.c argv.c obstack.c hashtab.c splay-tree.c fibheap.c pex-unix.c
 libcpp:    lex.c macro.c directives.c expr.c files.c identifiers.c init.c
            line-map.c symtab.c charset.c traditional.c pch.c mkdeps.c errors.c
+gcc:       ggc-page.c bitmap.c vec.c double-int.c tree.c diagnostic.c
 ```
 
-这是 GCC 4.7.4 的前两层兼容验证。下一层是 gcc 基础设施和 C 前端。
+这是 GCC 4.7.4 的前三层兼容验证。下一层是 x86_64 后端和 C 前端。
 
 ### 5.2 libcpp
 

@@ -32,4 +32,17 @@ for f in lex.c macro.c directives.c expr.c files.c identifiers.c init.c \
         -I"$SRC/include" -I"$SRC/libiberty" \
         -c "$SRC/libcpp/$f" -o "${f%.c}.o"
 done
-echo "PASS: bit-tcc compiles GCC 4.7.4 libiberty and libcpp probes"
+GCC47_BUILD=${GCC47_BUILD:-/opt/gcc47-build/gcc}
+if [ -f "$GCC47_BUILD/gcc/gtype-desc.h" ] && [ -f "$GCC47_BUILD/gcc/bversion.h" ]; then
+    rm -rf "$OUT/gcc-infra"
+    mkdir -p "$OUT/gcc-infra"
+    cd "$OUT/gcc-infra"
+    for f in ggc-page.c bitmap.c vec.c double-int.c tree.c diagnostic.c; do
+        "$CC" -DIN_GCC -DHAVE_CONFIG_H -I"$GCC47_BUILD/gcc" \
+            -I"$SRC/gcc" -I"$SRC/include" -I"$SRC/libcpp/include" \
+            -I"$SRC/libiberty" -c "$SRC/gcc/$f" -o "${f%.c}.o"
+    done
+    echo "PASS: bit-tcc compiles GCC 4.7.4 libiberty, libcpp and gcc infrastructure probes"
+else
+    echo "PASS: bit-tcc compiles GCC 4.7.4 libiberty and libcpp probes (infra skipped)"
+fi
