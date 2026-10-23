@@ -182,8 +182,31 @@ __USER_LABEL_PREFIX__
 make 依赖文件格式
 ```
 
-完整 BusyBox `defconfig` 仍受 BusyBox 与现代内核头兼容问题影响；
-`TCA_CBQ_MAX` 在现代 GCC 下也会失败，不是 TCC 单独的问题。
+完整 BusyBox 1.36.1 `defconfig` 也已通过，使用仓库内补丁：
+
+```sh
+BUSYBOX_SRC=/tmp/busybox-1.36.1 tests/busybox/run.sh
+```
+
+补丁：
+
+```text
+tests/busybox/busybox-1.36.1-tcc.patch
+  - 现代 kernel headers 缺少 CBQ 定义时跳过 CBQ 打印
+  - TCC 不链接 crtbegin.o，提供 __dso_handle
+```
+
+完整构建的配置补充：
+
+```text
+CONFIG_FEATURE_CLEAN_UP=y
+CONFIG_FEATURE_SH_NOFORK=y
+CONFIG_FEATURE_SUN_LABEL=y
+CONFIG_EXTRA_LDLIBS="resolv"
+```
+
+C 代码仍由 TCC 编译和链接；仅 `.S` 汇编源交给系统 as/gcc。
+这是 BusyBox 1.36.1 与 TCC 的维护补丁，不是 TCC 编译器本体的一部分。
 
 ---
 

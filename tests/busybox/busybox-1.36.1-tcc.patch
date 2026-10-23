@@ -1,0 +1,42 @@
+From: bit-tcc compatibility
+Subject: [PATCH] BusyBox 1.36.1 TCC compatibility
+
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -231,6 +231,13 @@
+ 	return 0;
+ }
+ #endif
++#ifndef TCA_CBQ_MAX
++static int cbq_print_opt(struct rtattr *opt)
++{
++    (void)opt;
++    return 0;
++}
++#else
+ static int cbq_print_opt(struct rtattr *opt)
+ {
+ 	struct rtattr *tb[TCA_CBQ_MAX+1];
+@@ -323,6 +330,8 @@
+ 	return 0;
+ }
+ 
++#endif
++
+ static FAST_FUNC int print_qdisc(
+ 		const struct sockaddr_nl *who UNUSED_PARAM,
+ 		struct nlmsghdr *hdr,
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -32,6 +32,11 @@
+ 
+ #include "busybox.h"
+ 
++#if defined(__TINYC__)
++/* TCC does not link crtbegin.o, which normally provides this. */
++void *__dso_handle;
++#endif
++
+ #if !(defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \
+     || defined(__APPLE__) \
+     )
