@@ -114,7 +114,7 @@ TCC -> GCC 4.7 两遍 -> GCC 4.8 ~ 14.2 全 pipeline
 ```text
 GCC configure 的 AC_PATH_PROG 探测不进入目标构建
 完整 make install / GCC testsuite
-C1 -> TCC 并入同一 pipeline
+两阶段 driver 已完成：TCC 验收（含 Lua/BusyBox）与 TCC -> GCC 14.2
 binutils / glibc 原生构建
 ```
 
@@ -595,14 +595,13 @@ tests/gcc47/tcc-softfp.patch
 ```text
 GCC 4.7 configure 的 AC_PATH_PROG 路径探测不参与目标构建
 完整 make install 和逐级 GCC testsuite 未通过
-C1 -> TCC 尚未并入同一个 driver
 ```
 
 因此可以说：
 
 ```text
 TCC -> GCC 14.2 目标编译器/libgcc/libstdc++ pipeline 已跑通
-但完整 install/testsuite、C1 -> TCC 统一 driver 还没有闭合
+但完整 install/testsuite 还没有闭合
 ```
 
 证明边界：

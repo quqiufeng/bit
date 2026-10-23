@@ -28,7 +28,7 @@ GCC 4.7 -> 4.8 -> 4.9 -> 5.5 -> 7.5 -> 9.5
 
 其中 GCC 天梯由 `tests/gcc-ladder/run.sh` 驱动，已在干净构建目录中一次跑通。每一级都构建 `all-gcc`、`all-target-libgcc`、`all-target-libstdc++-v3`，并编译运行 C++ iostream 测试。
 
-GCC 4.7 的 configure 内部仍按自身逻辑执行 `AC_PATH_PROG`，会在日志里发现 `/usr/bin/gcc` 等路径；这是 GCC 4.7 构建系统写死的探测，不参与目标构建。实际 Makefile 中 `CC/CXX` 指向 TCC，`CC_FOR_TARGET/GCC_FOR_TARGET` 指向当前 stage 的 xgcc。GCC 4.7 pass1 的 `CC/CXX` 都是 TCC；pass1 生成的 `cc1plus` 提供 C++ 能力，pass2 用这份能力重建 GCC 4.7，GCC 4.8 及以后则完全由前一级 4.7 的 C++ 能力承接。完整 `make install`、逐级 GCC testsuite、C1 -> TCC 与 GCC 天梯的统一 driver、自有 binutils/glibc/sysroot 尚未完成。`seed.elf`/`seed.hex` 仍是剩余信任根。
+GCC 4.7 的 configure 内部仍按自身逻辑执行 `AC_PATH_PROG`，会在日志里发现 `/usr/bin/gcc` 等路径；这是 GCC 4.7 构建系统写死的探测，不参与目标构建。实际 Makefile 中 `CC/CXX` 指向 TCC，`CC_FOR_TARGET/GCC_FOR_TARGET` 指向当前 stage 的 xgcc。GCC 4.7 pass1 的 `CC/CXX` 都是 TCC；pass1 生成的 `cc1plus` 提供 C++ 能力，pass2 用这份能力重建 GCC 4.7，GCC 4.8 及以后则完全由前一级 4.7 的 C++ 能力承接。C1 -> TCC -> Lua/BusyBox -> GCC 天梯的统一 driver 已跑通；完整 `make install`、逐级 GCC testsuite、自有 binutils/glibc/sysroot 尚未完成。`seed.elf`/`seed.hex` 仍是剩余信任根。
 
 ---
 
@@ -627,8 +627,48 @@ GCC 14 体量的完整形式化验证不现实。CompCert 这类工作证明了 
 
 ## 8. 复现
 
+两阶段执行。
+
+Stage 1：seed -> C1 -> TCC，并用 TCC 构建真实 C 项目作为退出验收。
+
 ```sh
 cd /home/quqiufeng/bit
+PHASE=tcc sh tests/selfhost-pipeline.sh
+```
+
+包含：
+
+```text
+seed -> C1
+C1 -> TCC
+TCC -> TCC self-host
+TCC -> Lua 5.4.7
+TCC -> BusyBox 1.36.1
+```
+
+Stage 2：TCC 进入 GCC 天梯。
+
+```sh
+cd /home/quqiufeng/bit
+JOBS=4 BUILD_BASE=/opt/gcc-ladder-final PHASE=gcc sh tests/selfhost-pipeline.sh
+```
+
+包含：
+
+```text
+TCC -> GCC 4.7 pass1 -> GCC 4.7 pass2
+GCC 4.7 -> 4.8 -> ... -> 14.2
+```
+
+一次跑完两个阶段：
+
+```sh
+JOBS=4 BUILD_BASE=/opt/gcc-ladder-final PHASE=all sh tests/selfhost-pipeline.sh
+```
+
+只跑 GCC 天梯也可以直接使用：
+
+```sh
 JOBS=4 BUILD_BASE=/opt/gcc-ladder-final sh tests/gcc-ladder/run.sh
 ```
 
@@ -652,21 +692,22 @@ TCC:   build/tcc/bit-tcc
 ```text
 完整 make install 未逐级通过
 完整 GCC testsuite 未逐级通过
-C1 -> TCC 尚未并入同一个 driver
+seed -> C1 尚未并入 selfhost-pipeline.sh（当前 C1 是输入）
 seed.elf 仍是剩余信任根
 自有 binutils/glibc/sysroot 未完成
 ```
 
 ### 9.2 路线图
 
+C1 -> TCC -> ecosystem -> GCC 14.2 的统一 driver 已完成。configure 的
+`AC_PATH_PROG` 路径探测不参与目标构建，不作为功能路线图项。
+
 ```text
-P1 把 C1 -> TCC 接入 seed -> GCC 14.2 的统一 driver
-P2 清理/固定 configure 的宿主工具路径探测（非功能阻塞）
-P3 完成逐级 make install 与 testsuite
-P4 用 tcc_bloodline_tag + nm 建立二进制级血统审计
-P5 构建自有 binutils/glibc/sysroot，缩小系统输入
-P6 建立可复现构建矩阵与独立验证报告
-P7 可选：对 seed/A0/A1/C0/C1 核心语义做局部形式化或半形式化验证；不把 GCC 14 全链作为形式化目标
+P1 完成逐级 make install 与 testsuite
+P2 用 tcc_bloodline_tag + nm 建立二进制级血统审计
+P3 构建自有 binutils/glibc/sysroot，缩小系统输入
+P4 建立可复现构建矩阵与独立验证报告
+P5 可选：对 seed/A0/A1/C0/C1 核心语义做局部形式化或半形式化验证；不把 GCC 14 全链作为形式化目标
 ```
 
 最终目标不是宣称“没有任何外部依赖”，而是：

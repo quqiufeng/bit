@@ -783,7 +783,7 @@ C++ 实现，但 GCC 4.7 的 `gcc/cp/*.c` 仍是 C 源码，`cc1plus` 由
 `$(CC)` 编译；需要 C++ 编译器的是 `libstdc++` 的 C++ 源文件。
 
 仍未完成的是：完整 `make install`
-和 GCC testsuite 未逐级通过；C1 -> TCC 尚未并入同一个 driver；
+和 GCC testsuite 未逐级通过；
 Lua 5.4.7 已由 TCC 实测通过；musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，
 不是“TCC 已完全替代系统 GCC/binutils”。BusyBox shell 试用方法见
