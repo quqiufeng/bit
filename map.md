@@ -801,7 +801,7 @@ GCC 9.5.0 已开始：
 PASS: GCC 9.5.0 cc1 and cc1plus compile C and C++ hello
 ```
 
-完整现代 GCC 阶梯仍未完成。
+GCC 12.3.0 已通过 C/C++ hello 验证。
 
 ### 5.2 libcpp
 

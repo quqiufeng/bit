@@ -23,6 +23,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC 5.5 cc1/cc1plus | 5.5.0 | `/opt/gcc-5.5.0` | none | PASS |
 | GCC 7.5 cc1/cc1plus | 7.5.0 | `/opt/gcc-7.5.0` | none | PASS |
 | GCC 9.5 cc1/cc1plus | 9.5.0 | `/opt/gcc-9.5.0` | none | PASS |
+| GCC 12.3 cc1/cc1plus | 12.3.0 | `/opt/gcc-12.3.0` | none | PASS |
 
 ## Commands
 
@@ -45,6 +46,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 ./tests/gcc55/run.sh
 ./tests/gcc75/run.sh
 ./tests/gcc95/run.sh
+./tests/gcc123/run.sh
 ```
 
 The project scripts skip when their source directory is absent.
