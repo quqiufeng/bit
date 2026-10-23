@@ -605,6 +605,14 @@ TCC -> GCC 14.2 目标编译器/libgcc/libstdc++ pipeline 已跑通
 但完整 install/testsuite、C1 -> TCC 统一 driver 还没有闭合
 ```
 
+证明边界：
+
+```text
+全链跑通 = 对可自举性的工程验证证明
+不是 GCC 14 的形式化正确性证明
+形式化可先限定在 seed/A0/A1/C0/C1 核心语义
+```
+
 边界和参数表见：
 
 ```text
