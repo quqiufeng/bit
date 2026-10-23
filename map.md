@@ -801,7 +801,7 @@ GCC 9.5.0 已开始：
 PASS: GCC 9.5.0 cc1 and cc1plus compile C and C++ hello
 ```
 
-GCC 12.3.0 已通过 C/C++ hello 和 libstdc++ 运行验证；GCC 13.3.0 cc1/cc1plus、libstdc++ 已通过 C/C++ 和 C++ iostream 运行验证。
+GCC 12.3.0 已通过 C/C++ hello 和 libstdc++ 运行验证；GCC 13.3.0 cc1/cc1plus、libstdc++ 已通过 C/C++ 和 C++ iostream 运行验证；GCC 14.2.0 cc1/cc1plus 已通过 C/C++ hello 验证。
 
 ### 5.2 libcpp
 
