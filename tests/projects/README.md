@@ -19,6 +19,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC stage2/stage3 cc1 | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC 4.8 cc1/cc1plus | 4.8.5 | `/opt/gcc-4.8.5` | none | PASS |
 | GCC 4.8 libstdc++ | 4.8.5 | `/opt/gcc-4.8.5` | `tests/gcc48/libgcc-ucontext.patch` | PASS |
+| GCC 4.9 cc1/cc1plus | 4.9.4 | `/opt/gcc-4.9.4` | none | PASS |
 
 ## Commands
 
@@ -37,6 +38,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 ./tests/gcc47/stage3.sh
 ./tests/gcc48/run.sh
 ./tests/gcc48/libstdcxx.sh
+./tests/gcc49/run.sh
 ```
 
 The project scripts skip when their source directory is absent.
