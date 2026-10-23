@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-BUILD=${GCC142_BUILD:-/opt/gcc143-build/gcc}
+BUILD=${GCC142_BUILD:-/opt/gcc142-build/gcc}
 DEPS=${GCC142_DEPS:-/opt/gcc47-deps/lib}
 SRC=${GCC142_SRC:-/opt/gcc-14.2.0}
-OUT=${OUT:-"$ROOT/build/gcc143-libstdcxx"}
-if [ ! -x "$BUILD/gcc/xgcc" ]; then echo "SKIP: GCC 12 xgcc" >&2; exit 0; fi
+OUT=${OUT:-"$ROOT/build/gcc142-libstdcxx"}
+if [ ! -x "$BUILD/gcc/xgcc" ]; then echo "SKIP: GCC 14 xgcc" >&2; exit 0; fi
 LIB="$BUILD/x86_64-pc-linux-gnu/libstdc++-v3/src/.libs"
 if [ ! -f "$LIB/libstdc++.so" ]; then echo "SKIP: libstdc++ not built" >&2; exit 0; fi
 mkdir -p "$OUT"
