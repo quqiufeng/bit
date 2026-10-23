@@ -765,6 +765,18 @@ GCC 4.8 libgcc 的现代 glibc 兼容补丁为
 PASS: GCC 4.9.4 cc1 and cc1plus compile C and C++ hello
 ```
 
+GCC 5.5.0 已开始：
+
+```sh
+./tests/gcc55/run.sh
+```
+
+结果：
+
+```text
+PASS: GCC 5.5.0 cc1 and cc1plus compile C and C++ hello
+```
+
 完整现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
