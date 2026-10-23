@@ -89,6 +89,24 @@ array and pointer indexing
 function calls
 ```
 
+## TCC 0.9.27 compatibility
+
+`tests/tcc/upstream.sh` is the real-world integration gate. It requires
+`TCC_SRC` (default `/tmp/tcc-0.9.27`) and checks:
+
+```text
+Native C1 -> tcc.o
+tcc.o + c1-init.o -> bit-tcc
+bit-tcc -v
+bit-tcc -c hello.c
+bit-tcc compiles tcc.c
+tcc-self1.o == tcc-self2.o
+tcc-stage2 runs
+```
+
+The script skips cleanly when the TCC source or native C1 is absent. It does
+not yet cover TCC's own `libtcc1`/CRT native link path.
+
 ## Commands
 
 ```sh
@@ -97,6 +115,7 @@ BUILD=/tmp/fuzz tests/fuzz-struct.sh
 BUILD=/tmp/fuzz tests/fuzz-float.sh
 BUILD=/tmp/fuzz tests/fuzz-varargs.sh
 HOSTED=1 ./build.sh
+TCC_SRC=/tmp/tcc-0.9.27 tests/tcc/upstream.sh
 ```
 
 The zero-dependency native checks remain:

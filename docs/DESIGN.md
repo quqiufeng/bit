@@ -1,8 +1,8 @@
 # BitKindle Native 技术设计
 
-- 版本：0.1（设计基线）
-- 状态：M1 Linux SysV 自举与 M2 hosted glibc 核心完成；M3/M4 待做
-- 日期：2026-10-21
+- 版本：0.2（TCC 二级自举基线）
+- 状态：M1 Linux SysV 自举、M2 hosted glibc、C1→TCC 0.9.27 编译/自举完成；M3/M4 待做
+- 日期：2026-10-23
 - 适用范围：Linux x86-64 与 Windows x86-64 两条原生工具链
 - 上游参考：[tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle)
 
@@ -476,6 +476,11 @@ flowchart LR
 5. **P4（并行）：纯种子链**
    - 构造 Linux ELF seed；移植/重写 A0/A1/C0；从种子复现 C1。
    - 这一阶段的目标是复刻上游的“从种子自举”叙事，不是第一版的前提。
+6. **P5：容量扩展与 TCC 二级自举**
+   - C0v2/A1 先构建 `compiler-bootstrap.c`，得到 `c1-bootstrap.elf`。
+   - `c1-bootstrap` 编译扩容后的 `linux/compiler.c` / `linux/runtime.c`，
+     链接出最终 `c1.elf`，再完成 `stage1 == stage2`。
+   - 最终 C1 编译 TCC 0.9.27，TCC 再编译自身；详细契约见 6.8。
 
 **syscall stub 的处理：**
 
@@ -642,6 +647,9 @@ shim 维护方式：
   完成 `C0 -> Windows C1 -> SysV Linux C1`，不再依赖 minimal-chain 的 C1。
   仍使用上游源码、C 工具 `pe2elf` 和上游 PE 链接器。
 - 下一步是零依赖 Linux 链：C0 扩到能编译 bootstrap C1，再完成 A1/C0 源码级自举。
+- 容量扩展后，上游旧 C1 的 1 MiB/2048 标识符限制已无法表示完整
+  `linux/compiler.c`；`bootstrap/bridge.sh` 现在检测到该容量失败时输出
+  `SKIP`，不再把旧上游 bridge 作为扩容 C1 的阻塞项。
 
 ### 6.7 Linux C0 窄域契约（第一阶段）
 
@@ -679,6 +687,52 @@ windows/upstream/bootstrap-c99/base/c1/bootstrap.c
 ---
 
 C0 类型系统重构计划见 `docs/C0_REFACTOR.md`。
+
+### 6.8 TCC 0.9.27 兼容与二级自举
+
+C1 现在能编译 TCC 0.9.27（`tcc.c`，含 one-source 的 `libtcc.c`），并在
+hosted glibc 下完成二级自举：
+
+```text
+Native C1
+  -> tcc.o
+  -> bit-tcc（c1-init 构造器执行 C1 全局初始化）
+  -> bit-tcc 编译 hello.c / tcc.c
+  -> tcc-stage2
+  -> tcc-self1.o == tcc-self2.o
+```
+
+为吞下 TCC，C1 的容量和语义边界扩展为：
+
+| 项目 | 当前值 |
+| --- | --- |
+| `source` / `pp_input` / `image` | 2 MiB `int` 元素 |
+| 预处理宏 | 4096 |
+| 标识符 / 记录 / 函数签名 | 8192 |
+| `parameter_type` / `function_parameter` | `8192 * 128` |
+| `initializer_checkpoint` | 1236992 `int`，偏移由容量联动 |
+| 全局数据分配上限 | `0x10000000` |
+
+语义兼容：
+
+- `__attribute__((...))` token 级消费，含 `packed`、`aligned`；
+- `__extension__`、`__builtin_expect`、`__builtin_constant_p`、
+  `__builtin_unreachable`；
+- 匿名 `struct`/`union` 成员按 layout 展平，保留位域 offset/shift；
+- `unsigned char` 位域；
+- `char *` 与 `unsigned char *`、`void *` 与函数指针的 sandbox 兼容放行。
+
+验证入口：
+
+```sh
+./bootstrap/linux/c0/native-c1.sh
+TCC_SRC=/tmp/tcc-0.9.27 ./tests/tcc/upstream.sh
+```
+
+TCC 自身原生链接所需的 `libtcc1`/`crt` 和 BusyBox/Lua/musl 实测尚未完成；
+当前里程碑是“C1 能编译 TCC，TCC 能编译自身”，不是“TCC 已完全替代系统链接器”。
+
+---
 
 ## 7. 构建系统
 
@@ -837,9 +891,13 @@ C0 类型系统重构计划见 `docs/C0_REFACTOR.md`。
   - 语言测试套件总时间；
   - 大源文件（数 MB）编译；
   - 深包含/大宏展开。
-- 容量限制（基线，可调整）：
-  - 输出上限 64 MiB（上游 PE 链接器基线）；
-  - 路径 1024 字节；
+- 容量限制（当前 TCC 基线）：
+  - `source` / `pp_input` / `image`：2,097,152 个 `int`；
+  - 宏 4096，标识符/记录/函数签名 8192；
+  - `parameter_type` / `function_parameter`：1,048,576；
+  - `initializer_checkpoint`：1,236,992 个 `int`（4.72 MiB）；
+  - 全局数据分配上限 0x10000000；
+  - 输出上限 64 MiB；路径 1024 字节；
   - 包含深度、宏展开深度/数量、符号/重定位数量有明确上限；
   - 超限时报错，不崩溃。
 - 后续可做：字符串驻留、符号表哈希、避免重复解析、增量构建（非目标）。
@@ -1010,8 +1068,9 @@ bit/
 当前状态：`tools/elflink.py` 原型与 C1 编译的 `linux/linker.c` 均已能链接 hello、C1 runtime/compiler 对象并运行；`tests/run-selflink.sh` 已用 c1link 完成 stage1/stage2 自举链（这两步不使用系统 `ld`）。c1link 自身已由 C1 编译并自举（c1link1 = c1link2）；系统 `ld` 只用于最初构建 bootstrap c1link，之后所有 C1 输出由 c1link 链接。`.a` 归档已支持按未定义符号选择性抽取成员；c1link 输出已包含 `.text`/`.data`/`.bss`/`.symtab`/`.strtab`/`.shstrtab` 节表。动态链接和其余重定位待补；hosted glibc 测试仍用系统 `ld`。
 
 - 自制 ELF 链接器（静态→动态）。
+- C1 → TCC 0.9.27：C1 编译 TCC，bit-tcc 编译自身，`tcc-self1.o == tcc-self2.o`；入口见 `tests/tcc/upstream.sh`。
 - 上游最小链 `seed → A0/A1 → C0 → C1` 已在 Linux 上跑通（`tools/pe2elf.c` + kernel32 shim），但产物仍是上游 Windows PE C1；它只证明上游链可在 Linux 宿主执行，不是 Linux 最终 C1。
-- Win64 PE C1 → SysV 桥接：`bootstrap/bridge.sh` 已完成，上游 object C1 编译 `linux/compiler.c`，上游 PE 链接器生成 `bridge.exe`，c1link 闭合 Linux stage1/stage2；仍依赖上游 seed/PE 链接器。
+- Win64 PE C1 → SysV 桥接：历史路径由 `bootstrap/bridge.sh` 完成；容量扩展后旧上游 C1 无法表示完整 `linux/compiler.c`，脚本改为容量不足时 `SKIP`，不影响 Native C1/TCC 链。
 - Linux 纯种子链：手写 seed 解码器已完成，`seed.elf` 可复现自身并从 `a0.seed.hex` 按需物化 A0；A0 已完成；A1 freestanding 本体已完成，A0 可从 `a1.seed.hex` 按需物化 A1（A0/A1 二进制不提交）；最小 C0 已完成 C→A1→ELF 的 `return N` 闭环，尚未实现函数/控制流。
 - PIC/PIE。
 - 更多系统头/扩展（E2）。

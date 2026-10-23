@@ -27,9 +27,10 @@ The reusable helpers are `bootstrap/linux/a0/from-hex.sh` and
 seed.elf
   + a0.seed.hex       -> A0 (materialized)
   + a1.seed.hex       -> A1 (materialized from A0)
-  + c0v2.a1           -> C0v2
-  + compiler-runtime.c-> native C1 (via C0v2 + A1)
-  + standalone-*.c    -> c1l standalone linker (via C0v2 + A1)
+  + c0v2.a1              -> C0v2
+  + compiler-bootstrap.c -> c1-bootstrap (via C0v2 + A1)
+  + compiler.c/runtime.c -> final native C1 (via c1-bootstrap)
+  + standalone-*.c       -> c1l standalone linker (via C0v2 + A1)
 ```
 
 The native script checks the fixed points:
@@ -40,6 +41,7 @@ The native script checks the fixed points:
 - `C0v2(c0v2.c)` equals `c0v2.a1`
 - native C1 stage1 equals stage2
 - DDC: native C1 and gcc-built C1 produce identical compiler/runtime objects
+- TCC: final C1 compiles TCC 0.9.27; TCC compiles itself with identical objects
 
 ## Seeds
 
@@ -51,6 +53,7 @@ The native script checks the fixed points:
 | `a1.seed.hex` | hex text | A0 |
 | `c0.seed.hex` | hex text | A1 |
 | `c0v2.a1` | A1 text | C0v2 fixed point |
+| `compiler-bootstrap.c` | C text | frozen stable C1 + raised allocator limit |
 | `compiler-runtime.c` | C text | `make-seed-source.sh` with `make-source.c` (optional) |
 | `linux/standalone-*.c` | C source | source-built `c1l` linker |
 

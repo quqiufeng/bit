@@ -48,3 +48,17 @@ fe4219b0a528b9da7f583aa5569e38ab46f1cd7fbd5c572a89f8aecb78754023  bootstrap/seed
 
 The bundle is architecture-specific x86-64 Linux. Replacing it with a minimal
 seed → A0/A1 → C0 → C1 chain remains the long-term M5 goal.
+
+## TCC compatibility
+
+The native C1 bootstrap now uses a two-stage path:
+
+```text
+C0v2 + A1 + compiler-bootstrap.c -> c1-bootstrap
+c1-bootstrap + compiler.c/runtime.c -> final C1
+```
+
+The final C1 can compile TCC 0.9.27 and TCC can compile itself.  See
+`tests/tcc/upstream.sh` and `docs/DESIGN.md` section 6.8.  The old upstream PE
+bridge is skipped when its fixed C1 capacity cannot represent the expanded
+`linux/compiler.c`.
