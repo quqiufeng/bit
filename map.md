@@ -635,7 +635,22 @@ PASS: TCC-linked GCC 4.7.4 cc1 compiles and runs hello
 ```
 
 cc1 由 bit-tcc 链接；它使用动态 MPFR/MPC，需要
-`LD_LIBRARY_PATH=/opt/gcc47-deps/lib`。下一步是 GCC 4.7 自举。
+`LD_LIBRARY_PATH=/opt/gcc47-deps/lib`。
+
+xgcc 驱动也已由 bit-tcc 链接，并能编译/运行 hello：
+
+```sh
+./tests/gcc47/xgcc.sh
+```
+
+结果：
+
+```text
+PASS: TCC-linked GCC 4.7.4 xgcc compiles and runs hello
+```
+
+xgcc 当前仍使用系统 libgcc/crtbegin 来完成 libgcc 链接；下一步是 GCC 自举
+和自有 libgcc 构建。
 
 ### 5.2 libcpp
 
