@@ -699,8 +699,21 @@ PASS: GCC 4.7.4 libgcc built and linked by stage1 GCC
 ```
 
 为兼容现代 glibc，`libgcc/config/i386/linux-unwind.h` 使用 `ucontext_t`，
-补丁为 `tests/gcc47/libgcc-ucontext.patch`。完整 GCC 驱动全量自举和现代
-GCC 阶梯仍未完成。
+补丁为 `tests/gcc47/libgcc-ucontext.patch`。
+
+stage2 xgcc 驱动也已用 stage1 xgcc 构建，并使用自有 libgcc：
+
+```sh
+./tests/gcc47/driver.sh
+```
+
+结果：
+
+```text
+PASS: GCC 4.7.4 stage2 xgcc uses its own libgcc
+```
+
+完整 GCC 驱动全量自举和现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
 
