@@ -28,6 +28,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC 13.3 cc1/cc1plus | 13.3.0 | `/opt/gcc-13.3.0` | none | PASS |
 | GCC 13.3 libstdc++ | 13.3.0 | `/opt/gcc-13.3.0` | none | PASS |
 | GCC 14.2 cc1/cc1plus | 14.2.0 | `/opt/gcc-14.2.0` | none | PASS |
+| GCC 14.2 libstdc++ | 14.2.0 | `/opt/gcc-14.2.0` | none | PASS |
 
 ## Commands
 
@@ -55,6 +56,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 ./tests/gcc133/run.sh
 ./tests/gcc133/libstdcxx.sh
 ./tests/gcc142/run.sh
+./tests/gcc142/libstdcxx.sh
 ```
 
 The project scripts skip when their source directory is absent.
