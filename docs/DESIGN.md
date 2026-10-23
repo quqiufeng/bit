@@ -767,16 +767,23 @@ cc1（`tests/gcc47/stage2.sh`）。stage1 cc1/xgcc 由 TCC 链接，stage2 cc1 �
 stage1 GCC 编译；generator 暂用系统 gcc，最终 stage2 链接使用 stage1 GCC/
 collect2。stage2/stage3 cc1 对同一源码生成相同汇编。
 
-GCC 4.7 的完整 TCC 起始链尚未打通。当前阻塞在 target `libgcc` 的
-`soft-fp`：TCC 0.9.27 不实现 `__attribute__((mode(TI)))` 和
-`__attribute__((mode(TF)))`，而 GCC 4.7 的 `addtf3.c` / `divtf3.c`
-需要 128-bit 整数和浮点类型。pipeline 曾在该阶段出现 cc1 段错误，因此
-不能把 4.7 `libgcc` 标记为 TCC 构建通过。
+GCC 4.7 的 TCC 起始构建已经打通到目标库：在 clean build 目录
+`/opt/gcc47-tcc-clean2` 中使用 `CC=bit-tcc CXX=bit-tcc
+CC_FOR_BUILD=bit-tcc` 构建 `all-gcc`，再用同一 TCC 构建
+`all-target-libgcc` 和 `all-target-libstdc++-v3`，三者均通过。
+`libstdc++` 使用 TCC-built `build/gcc/xgcc` 作为 `CXX`，C++ iostream
+程序运行通过。TCC fork 增加了 `mode(TI/TF)` 等类型支持，GCC 侧增加
+`tests/gcc47/tcc-softfp.patch` 的 soft-fp 和系统头兼容补丁。
 
-GCC 4.8 起使用 C++ 实现，需要 C++ 编译器；GCC 4.8.5 及后续版本的
-host-built 4.7 阶梯已经验证，但这条链的 4.7 起点由 host gcc/g++ 构建，
-不是 TCC 起始链。GCC 4.7 的 `gcc/cp/*.c` 本身仍是 C 源码，`cc1plus`
-默认由 `$(CC)` 编译；需要 C++ 编译器的是 `libstdc++` 的 C++ 源文件。
+`tests/gcc-ladder/run.sh` 已把 TCC -> GCC 4.7 两遍 -> GCC 4.8 -> ...
+-> GCC 14.2 固化为一条 pipeline，并在 clean build 目录
+`/opt/gcc-ladder-final` 一次跑通；每级 `all-gcc`、`all-target-libgcc`、
+`all-target-libstdc++-v3` 和 C++ iostream 测试均通过。GCC 4.8 起使用
+C++ 实现，但 GCC 4.7 的 `gcc/cp/*.c` 仍是 C 源码，`cc1plus` 由
+`$(CC)` 编译；需要 C++ 编译器的是 `libstdc++` 的 C++ 源文件。
+
+仍未完成的是：configure 探测仍依赖 host gcc/g++；完整 `make install`
+和 GCC testsuite 未逐级通过；C1 -> TCC 尚未并入同一个 driver；
 Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，
 不是“TCC 已完全替代系统 GCC/binutils”。BusyBox shell 试用方法见

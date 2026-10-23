@@ -104,14 +104,17 @@ TCC -shared / -L / -l 基础共享库链接
 GCC 4.7.4 libiberty/libcpp/gcc 基础设施/C 前端 probe
 TCC-linked GCC 4.7 cc1/xgcc
 TCC-built GCC 4.7 stage2 cc1
+TCC-built GCC 4.7 all-gcc / target libgcc / libstdc++
+TCC-built GCC 4.7 cc1plus 运行 C++ iostream
+TCC -> GCC 4.7 两遍 -> GCC 4.8 ~ 14.2 全 pipeline
 ```
 
 未完成：
 
 ```text
-TCC 完整编译 GCC 4.7（含 target libgcc）
-TCC 起始的 GCC 4.7 自举链
-GCC 4.8+ 从 TCC 起始链构建
+完全无 host gcc/g++ 的 configure 探测
+完整 make install / GCC testsuite
+C1 -> TCC 并入同一 pipeline
 binutils / glibc 原生构建
 ```
 
@@ -537,40 +540,70 @@ GCC/binutils/glibc 源码体积大，不建议 vendor 进 bit 主仓库。
 ./tests/gcc-ladder/run.sh
 ```
 
-当前状态必须分成两条链记录，不能混为一谈：
+`tests/gcc-ladder/run.sh` 已把整条链固化为一个 driver，并在 clean
+`BUILD_BASE=/opt/gcc-ladder-final` 一次干净跑通：
 
 ```text
-已验证：
-  host gcc/g++ -> GCC 4.7 -> GCC 4.8 -> ... -> GCC 14.2
-
-未打通：
-  C1 -> TCC -> GCC 4.7 -> ...
+PASS: 4.7-pass1
+PASS: 4.7-pass2
+PASS: 4.8
+PASS: 4.9
+PASS: 5.5
+PASS: 7.5
+PASS: 9.5
+PASS: 12.3
+PASS: 13.3
+PASS: 14.2
+PASS: TCC -> GCC 4.7 (2 passes) -> GCC 14.2
 ```
 
-TCC 起始的 4.7 阶段卡在 target `libgcc`。TCC 0.9.27 不实现：
+执行：
+
+```sh
+cd /home/quqiufeng/bit
+JOBS=4 BUILD_BASE=/opt/gcc-ladder-final sh tests/gcc-ladder/run.sh
+```
+
+每级都构建 `all-gcc`、`all-target-libgcc`、`all-target-libstdc++-v3`，
+并用该级自己的 `cc1plus`/libstdc++ 编译运行 C++ iostream。4.7 使用
+TCC 完成第一遍，第二遍由第一遍 GCC 4.7 重建；4.8 起由前一级 build
+tree 接力。
+
+TCC 需要的关键兼容补丁：
 
 ```text
-__attribute__((mode(TI)))   128-bit integer
-__attribute__((mode(TF)))   128-bit float
+tests/gcc47/tcc-softfp.patch
+  longlong.h        TCC 的 64-bit add/sub/mul/div/clz fallback
+  sfp-machine.h     TCC 下关闭 fenv inline asm
+  op-common.h       TCC 的 __FP_CLZ fallback
+  gcc/system.h      TCC 下补齐 limits/fcntl/stat/dlfcn/mman 等头
 ```
 
-GCC 4.7 的 `libgcc/soft-fp` 使用这两个类型，实际失败文件包括：
+正确的无 host 4.7 顺序是两遍：
 
 ```text
-libgcc/soft-fp/addtf3.c  -> addtf3_s.o
-libgcc/soft-fp/divtf3.c  -> divtf3_s.o
+第一遍：TCC 构建 GCC 4.7 -> cc1/cc1plus
+        cc1plus 编 libstdc++
+
+第二遍：第一遍 GCC 4.7 重建 GCC 4.7 -> stage2 GCC 4.7
+
+然后：stage2 GCC 4.7 -> GCC 4.8 -> ... -> GCC 14.2
 ```
 
-失败现象：
+仍未完成：
 
 ```text
-xgcc: 编译器内部错误：段错误 (program cc1)
-make[1]: *** [libgcc/shared-object.mk:17：addtf3_s.o] 错误 4
-make[1]: *** [libgcc/shared-object.mk:17：divtf3_s.o] 错误 4
+configure 探测仍用 host gcc/g++
+完整 make install 和逐级 GCC testsuite 未通过
+C1 -> TCC 尚未并入同一个 driver
 ```
 
-仓库中的 `tests/gcc-ladder/run.sh` 目前带有临时跳过 4.7 `libgcc` 的改动；
-该跳过不是成功结果，pipeline 不能标记为 green。
+因此可以说：
+
+```text
+TCC -> GCC 14.2 目标编译器/libgcc/libstdc++ pipeline 已跑通
+但 “完全无 host configure + 完整 install/testsuite” 还没有闭合
+```
 
 边界和参数表见：
 
@@ -580,19 +613,18 @@ tests/gcc-ladder/README.md
 
 ### 2.5 GCC 跨代构建总线
 
-必须使用全新的 out-of-tree 目录，不能复用系统 g++ 配置过的 build tree。
+必须使用全新的 out-of-tree 目录，不能复用旧构建目录。
 
-环境锁：
+GCC 4.7 的 C 编译器主体和 C++ 前端实现都是 C 源码：
 
-```sh
-export CC=/opt/gcc47cxx/bin/gcc
-export CXX=/opt/gcc47cxx/bin/g++
-export CC_FOR_BUILD=/opt/gcc47cxx/bin/gcc
-export PATH=/opt/gcc47cxx/bin:$PATH
-export LD_LIBRARY_PATH=/opt/gcc47cxx/lib64:/opt/gcc47cxx/lib:$LD_LIBRARY_PATH
+```text
+gcc/*.c       -> 可用 TCC 编译
+gcc/cp/*.c    -> 可用 TCC 编译，生成 cc1plus 的实现
+libstdc++ .cc -> 真正的 C++，需要 C++ 编译器
 ```
 
-配置锁：
+因此 4.7 不应把 host g++ 当作“C++ 前端编译器”。4.8 起才由
+GCC 4.7 生成的 C++ 工具链接力。配置 4.8 时使用前一版 GCC：
 
 ```sh
 rm -rf /opt/gcc48-owned-build/gcc
@@ -605,19 +637,28 @@ cd /opt/gcc48-owned-build/gcc
 
 | 目标 | 标准 |
 | --- | --- |
+| GCC 4.7 pass 2 all-gcc | `-std=gnu++98` |
+| GCC 4.7 pass 2 libstdc++ | `-std=gnu++11` |
 | GCC 4.8 all-gcc | `-std=gnu++98` |
 | GCC 4.8 libstdc++ | `-std=gnu++11` |
-| GCC 5.5 all-gcc | `-std=gnu++11` |
-| GCC 7.5 all-gcc | `-std=gnu++14` |
-| GCC 7.5 libstdc++ | `-std=gnu++17` |
+| GCC 4.9+ all-gcc | `-std=gnu++11` |
+| GCC 4.9+ libstdc++ | `-std=gnu++11` |
 
-构建命令必须显式覆盖：
+GCC 12 的 libcody 要求精确 C++11，因此 9.5 之后的 all-gcc 也统一用
+`gnu++11`。4.8+ 构建命令由 `run.sh` 为前一版 build tree 生成 `-B`/`-L`
+wrapper；例如：
 
 ```sh
-make -j2 all-gcc   CC=/opt/gcc47cxx/bin/gcc   CXX=/opt/gcc47cxx/bin/g++   CC_FOR_BUILD=/opt/gcc47cxx/bin/gcc   CXXFLAGS='-g -O2 -std=gnu++98'
+make -j2 all-gcc CC="$WRAP/4.8-gcc" CXX="$WRAP/4.8-g++" \
+  CC_FOR_BUILD="$WRAP/4.8-gcc" CXXFLAGS='-g -O2 -std=gnu++98'
 
-make -j2 all-target-libstdc++-v3   CC=/opt/gcc47cxx/bin/gcc   CXX=/opt/gcc47cxx/bin/g++   CXXFLAGS='-g -O2 -std=gnu++11'
+make -j2 all-target-libstdc++-v3 CC="$WRAP/4.8-gcc" CXX="$WRAP/4.8-g++" \
+  CXXFLAGS='-g -O2 -std=gnu++11'
 ```
+
+4.7 本身不应写成 `CC=host-gcc CXX=host-g++`；它的 C/C++ 前端源码应由
+TCC 构建。libstdc++ 的 C++ 源码才需要 C++ 编译器，且应优先使用
+TCC-built GCC 4.7 cc1plus。
 
 反回退探针：
 
@@ -821,11 +862,12 @@ generator 使用系统 gcc
 PASS: GCC 4.7.4 libgcc built and linked by stage1 GCC
 ```
 
-注意：这是既有 stage1 build tree 上的探针，不等于
-`tests/gcc-ladder/run.sh` 中从 TCC 起始的 4.7 `target libgcc` 阶段。
-新 pipeline 在 `addtf3_s.o` / `divtf3_s.o` 上失败；上述探针的 cc1 来源
-和 128-bit ABI 正确性尚未完成独立验证，不能作为 TCC 已完整编译 libgcc
-的证据。
+后续 clean TCC build 已进一步验证：`/opt/gcc47-tcc-clean2` 中使用
+`CC=bit-tcc CXX=bit-tcc CC_FOR_BUILD=bit-tcc` 构建 `all-gcc`，
+再用同一 TCC 构建 `all-target-libgcc` 和 `all-target-libstdc++-v3`，
+三者均 PASS。`libstdc++` 使用 TCC-built `build/gcc/xgcc` 作为 `CXX`，
+没有使用 host g++ 编 libstdc++。configure 探测仍使用 host gcc/g++，
+这是下一项需要清除的依赖。
 
 为兼容现代 glibc，`libgcc/config/i386/linux-unwind.h` 使用 `ucontext_t`，
 补丁为 `tests/gcc47/libgcc-ucontext.patch`。
@@ -1249,14 +1291,14 @@ TCC 不能编译 libstdc++ 的 C++ 源码
 GCC 4.7 C 部分        -> TCC
 GCC 4.7 cc1plus       -> TCC（若 TCC 支持所需 C 扩展）
 GCC 4.7 libstdc++     -> host g++，或 TCC-built GCC 4.7 cc1plus
-GCC 4.7 target libgcc -> 当前被 TCC 的 TI/TF 缺失阻塞
+GCC 4.7 target libgcc -> TCC（已通过 clean build）
 ```
 
-如果接受 bootstrap 例外：
+当前 clean build 已经按下面路径通过：
 
 ```text
-GCC 4.7 target libgcc -> host gcc
-libstdc++             -> host g++ 或 GCC 4.7 cc1plus
+GCC 4.7 target libgcc -> TCC
+libstdc++             -> TCC-built GCC 4.7 cc1plus (build/gcc/xgcc)
 ```
 
 之后：
@@ -1410,8 +1452,8 @@ host g++ 或 GCC 4.7.4 cc1plus 编译 libstdc++ 的 C++ 源码
 当前前置阻塞：
 
 ```text
-TCC 不实现 mode(TI)/mode(TF)
-  -> 不能正确编译 GCC 4.7 target libgcc 的 soft-fp
+TCC 已通过兼容补丁支持 GCC 4.7 soft-fp 所需的 TI/TF 路径；
+configure 仍有 host gcc/g++ 探测依赖，需继续清除。
 ```
 
 C++ 标准边界：

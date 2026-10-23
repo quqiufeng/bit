@@ -1,120 +1,100 @@
 # GCC ladder pipeline
 
-Experimental driver for:
+Driver for:
 
 ```text
-C1 -> TCC -> GCC 4.7 -> GCC 4.8 -> ... -> GCC 14.2
+TCC -> GCC 4.7 (two passes) -> GCC 4.8 -> ... -> GCC 14.2
 ```
+
+The TCC input is the normal C1-built `build/tcc/bit-tcc` seed.  C1 -> TCC
+self-hosting is covered by the TCC pipeline; this driver starts from TCC.
 
 ## Status
 
-This pipeline is **not green from TCC**.  What has been verified is the
-host-built GCC ladder:
+A clean run of this driver completed:
 
 ```text
-host gcc/g++ -> GCC 4.7 -> GCC 4.8 -> ... -> GCC 14.2
+PASS: 4.7-pass1
+PASS: 4.7-pass2
+PASS: 4.8
+PASS: 4.9
+PASS: 5.5
+PASS: 7.5
+PASS: 9.5
+PASS: 12.3
+PASS: 13.3
+PASS: 14.2
+PASS: TCC -> GCC 4.7 (2 passes) -> GCC 14.2
 ```
 
-The TCC-seeded pipeline currently stops at GCC 4.7 target `libgcc`.  TCC
-0.9.27 does not implement `__attribute__((mode(TI)))` or
-`__attribute__((mode(TF)))`; GCC 4.7 `libgcc` uses both for 128-bit integer
-and 128-bit floating-point soft-fp.  A pipeline run reached:
-
-```text
-xgcc: internal compiler error: Segmentation fault (program cc1)
-make[1]: *** [libgcc/shared-object.mk:17: addtf3_s.o] Error 4
-make[1]: *** [libgcc/shared-object.mk:17: divtf3_s.o] Error 4
-```
-
-The current working tree also contains a temporary 4.7 `libgcc` skip.  That
-skip is not a successful TCC build and must not be treated as one.
-
-## C and C++ boundary
-
-GCC 4.7 is implemented mainly in C:
-
-```text
-gcc/*.c          C
-gcc/cp/*.c       C, including the C++ frontend implementation
-libstdc++-v3/src C++ runtime sources
-```
-
-`cc1plus` is therefore C source and is compiled by `$(CC)` unless GCC is
-configured with `--enable-build-with-cxx`.  TCC can in principle compile
-`cc1plus`; it cannot compile the C++ sources of `libstdc++`.
-
-The remaining C++ bootstrap is therefore:
-
-```text
-libstdc++ C++ sources: host g++
-```
-
-not `host g++ compiles gcc/cp/*.c`.
-
-The C parts of GCC 4.7 are intended to be compiled by `bit-tcc`.  System
-`as`, `ld`, crt and glibc remain external inputs.  A host-built `libgcc` is
-currently a possible bootstrap exception, but it has not yet been wired into
-the TCC-seeded path successfully.
-
-## Prerequisites
-
-```text
-/home/quqiufeng/bit/build/tcc/bit-tcc
-/opt/gcc-4.7.4
-/opt/gcc-4.8.5
-/opt/gcc-4.9.4
-/opt/gcc-5.5.0
-/opt/gcc-7.5.0
-/opt/gcc-9.5.0
-/opt/gcc-12.3.0
-/opt/gcc-13.3.0
-/opt/gcc-14.2.0
-/opt/gcc47-deps          (MPFR/MPC built for GCC)
-system gcc/g++, as/ld, glibc
-```
-
-## Run
-
-Full ladder:
+Reproduction:
 
 ```sh
-./tests/gcc-ladder/run.sh
+cd /home/quqiufeng/bit
+JOBS=4 BUILD_BASE=/opt/gcc-ladder-final sh tests/gcc-ladder/run.sh
 ```
 
-A subset:
+The completed run used:
 
-```sh
-STAGES="4.7 4.8" ./tests/gcc-ladder/run.sh
+```text
+build: /opt/gcc-ladder-final
+log:   /tmp/gcc-ladder-final.log
 ```
 
-Override locations:
+Each stage builds and tests:
 
-```sh
-SRC_BASE=/opt \
-BUILD_BASE=/opt/gcc-ladder-build \
-PREFIX_BASE=/opt/gcc-ladder \
-DEPS=/opt/gcc47-deps \
-./tests/gcc-ladder/run.sh
+```text
+all-gcc
+all-target-libgcc
+all-target-libstdc++-v3
+C++ hello using the stage's own cc1plus and libstdc++
 ```
 
-Do not use a green 4.8+ result as evidence that the TCC-seeded 4.7 stage
-passed.  The 4.8+ stages can all be reached from the host-built 4.7 bridge.
+The run is resumable: a stage whose `$BUILD_BASE/log/<stage>-hello.out`
+already exists is skipped.  A newly started `BUILD_BASE` always rebuilds
+from 4.7.
 
-## Per-stage policy
+## Two-pass GCC 4.7
 
-| Stage | GCC source | libstdc++ |
+Pass 1 uses only TCC:
+
+```text
+TCC compiles gcc/*.c and gcc/cp/*.c
+  -> cc1, cc1plus
+  -> cc1plus compiles libstdc++
+  -> TCC-built GCC 4.7 target libgcc/libstdc++
+```
+
+Pass 2 rebuilds GCC 4.7 using the pass-1 build tree:
+
+```text
+pass-1 gcc/xgcc -> stage2 GCC 4.7
+stage2 GCC 4.7 -> GCC 4.8
+```
+
+No host g++ compiles GCC 4.7 frontends or target libraries.  Configure
+probes still invoke the host compiler.
+
+## Build policy
+
+| Stage | all-gcc C++ mode | libstdc++ mode |
 | --- | --- | --- |
-| 4.7 | `-std=gnu++98` | `-std=gnu++11` |
-| 4.8 | `-std=gnu++98` | `-std=gnu++11` |
-| 4.9 | `-std=gnu++98` | `-std=gnu++11` |
-| 5.5 | `-std=gnu++98` | `-std=gnu++11` |
-| 7.5 | `-std=gnu++11` | `-std=gnu++17` |
-| 9.5 | `-std=gnu++14` | `-std=gnu++17` |
-| 12.3 | `-std=gnu++11` | `-std=gnu++17` |
-| 13.3 | `-std=gnu++11` | `-std=gnu++17` |
-| 14.2 | `-std=gnu++11` | `-std=gnu++17` |
+| 4.7 pass 1 | TCC (C frontends) | `gnu++11` |
+| 4.7 pass 2 | `gnu++98` | `gnu++11` |
+| 4.8 | `gnu++98` | `gnu++11` |
+| 4.9 | `gnu++11` | `gnu++11` |
+| 5.5 | `gnu++11` | `gnu++11` |
+| 7.5 | `gnu++11` | `gnu++11` |
+| 9.5 | `gnu++11` | `gnu++11` |
+| 12.3 | `gnu++11` | `gnu++11` |
+| 13.3 | `gnu++11` | `gnu++11` |
+| 14.2 | `gnu++11` | `gnu++11` |
 
-GCC 12 libcody requires exactly C++11, not C++14/17.
+GCC 12 libcody checks for exactly C++11, so the ladder uses `gnu++11`.
+
+The driver creates `-B`/`-L` wrappers around each previous stage's build
+tree.  The C++ wrapper treats compiles as C++ and links with the previous
+stage's libstdc++.  Target libraries are not taken from the host.
 
 ## Patches applied by the driver
 
@@ -127,42 +107,38 @@ GCC 4.7 onward libgcc/config/i386/linux-unwind.h:
 
 TCC linking GCC 4.7:
   provide __dso_handle for TCC
+
+TCC building GCC 4.7 soft-fp:
+  longlong.h      64-bit add/sub/mul/div/clz fallbacks
+  sfp-machine.h   disable fenv inline asm under TCC
+  op-common.h     TCC __FP_CLZ fallback
+  gcc/system.h    TCC limits/fcntl/stat/dlfcn/mman include fixes
+
+GCC 5.5 i386.h:
+  remove const from stringop_strategy members so the 4.9-built
+  stage accepts omitted aggregate initializers
 ```
+
+The soft-fp/header patch is `tests/gcc47/tcc-softfp.patch`.
 
 ## Output
 
-Each stage installs under:
-
 ```text
-/opt/gcc-ladder/<version>
+$BUILD_BASE/<stage>/            stage build tree
+$BUILD_BASE/wrap/               compiler wrappers
+$BUILD_BASE/log/<stage>-*.log   logs
+$BUILD_BASE/log/<stage>-hello.out
 ```
 
-Logs:
-
-```text
-/tmp/gcc-ladder-<version>-*.log
-```
-
-A stage passes only when the installed:
-
-```text
-bin/gcc
-bin/g++
-```
-
-compile and run C and C++ hello.
+A stage passes only after its own C++ hello is compiled and run.
 
 ## Not yet covered
 
 ```text
-TCC -> GCC 4.7 target libgcc
-Verified TCC-built cc1 / cc1plus in the ladder
+Fully host-free configure probes
+Complete make install for every stage
+C1 -> TCC integrated into this same driver
 Full GCC testsuite per stage
 Completely self-owned binutils / glibc / sysroot
 Bit-for-bit reproducible build + full DDC matrix
 ```
-
-The host-built 4.7 -> 14.2 ladder is real, but it is not proof of a
-TCC-origin bootstrap.  The driver must not describe itself as a complete
-`C1 -> TCC -> GCC 14` pipeline until the 4.7 `libgcc` problem is resolved or
-an explicit host-`libgcc` exception is implemented and verified.

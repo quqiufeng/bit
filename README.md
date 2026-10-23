@@ -1,7 +1,7 @@
 # BitKindle Native
 
 > 以自举为目标的 C 工具链，Linux 与 Windows 各自原生发展。  
-> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 已打通 + C1 编译 TCC 0.9.27、完成 TCC 自举、基础原生链接和完整 BusyBox 1.36.1 构建；cJSON/SQLite/Lua 实测通过；GCC 4.7 已有 TCC-linked cc1/xgcc 和 stage2 cc1 探针，但 TCC 起始的 4.7 target libgcc 仍未打通；host-built 4.7 -> GCC 4.8+ 阶梯已验证 · 暂定名
+> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 已打通 + C1 编译 TCC 0.9.27、完成 TCC 自举、基础原生链接和完整 BusyBox 1.36.1 构建；cJSON/SQLite/Lua 实测通过；TCC 起始的 GCC 4.7 两遍自举、GCC 4.8~14.2 阶梯已由 `tests/gcc-ladder/run.sh` 一次干净跑通，每级 all-gcc/libgcc/libstdc++ 和 C++ iostream 均通过；configure 探测仍用 host gcc/g++，完整 install/testsuite 尚未完成 · 暂定名
 
 本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把“从零构建自己的 C 工具链”这一目标带到 Linux，同时保留 Windows 的原生实现。两个平台共享语言前端、纯算法和语言测试；不共享 ABI、运行时、目标文件格式和链接器。
 

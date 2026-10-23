@@ -918,6 +918,11 @@ LIBTCCAPI TCCState *tcc_new(void)
 # endif /* TCC_MUSL */
     /* Some GCC builtins that are simple to express as macros.  */
     tcc_define_symbol(s, "__builtin_extract_return_addr(x)", "x");
+    tcc_define_symbol(s, "INT_MAX", "2147483647");
+    tcc_define_symbol(s, "INT_MIN", "(-2147483647-1)");
+    tcc_define_symbol(s, "UINT_MAX", "4294967295U");
+    tcc_define_symbol(s, "__PRETTY_FUNCTION__", "__func__");
+    tcc_define_symbol(s, "__FUNCTION__", "__func__");
 #endif /* ndef TCC_TARGET_PE */
     return s;
 }

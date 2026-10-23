@@ -1,0 +1,185 @@
+--- a/libgcc/longlong.h
++++ b/libgcc/longlong.h
+@@ -424,6 +424,62 @@
+ #endif /* 80x86 */
+ 
+ #if (defined (__x86_64__) || defined (__i386__)) && W_TYPE_SIZE == 64
++#ifdef __TINYC__
++#define add_ssaaaa(sh, sl, ah, al, bh, bl) \
++  do {									\
++    UDItype __al = (al), __bl = (bl);					\
++    (sl) = __al + __bl;							\
++    (sh) = (ah) + (bh) + ((sl) < __al);					\
++  } while (0)
++#define sub_ddmmss(sh, sl, ah, al, bh, bl) \
++  do {									\
++    UDItype __al = (al), __bl = (bl);					\
++    (sl) = __al - __bl;							\
++    (sh) = (ah) - (bh) - (__al < __bl);					\
++  } while (0)
++#define umul_ppmm(w1, w0, u, v) \
++  do {									\
++    UDItype __u = (u), __v = (v);					\
++    UDItype __u0 = __u & 0xffffffffULL, __u1 = __u >> 32;		\
++    UDItype __v0 = __v & 0xffffffffULL, __v1 = __v >> 32;		\
++    UDItype __p00 = __u0 * __v0, __p01 = __u0 * __v1;			\
++    UDItype __p10 = __u1 * __v0, __p11 = __u1 * __v1;			\
++    UDItype __mid = (__p00 >> 32) + (__p01 & 0xffffffffULL) +		\
++                     (__p10 & 0xffffffffULL);				\
++    (w0) = (__p00 & 0xffffffffULL) | (__mid << 32);			\
++    (w1) = __p11 + (__p01 >> 32) + (__p10 >> 32) + (__mid >> 32);	\
++  } while (0)
++#define udiv_qrnnd(q, r, n1, n0, dv) \
++  do {									\
++    UDItype __n0 = (n0), __n1 = (n1), __d = (dv);			\
++    UDItype __q = 0, __rlo = 0, __rhi = 0;				\
++    int __i;								\
++    for (__i = 0; __i < 128; __i++) {					\
++      UDItype __bit = __n1 >> 63;					\
++      __rhi = (__rhi << 1) | (__rlo >> 63);				\
++      __rlo = (__rlo << 1) | __bit;					\
++      __n1 = (__n1 << 1) | (__n0 >> 63);				\
++      __n0 <<= 1;							\
++      __q <<= 1;							\
++      if (__rhi || __rlo >= __d) {					\
++        __rlo -= __d; __rhi = 0; __q |= 1;				\
++      }									\
++    }									\
++    (q) = __q; (r) = __rlo;						\
++  } while (0)
++#define count_leading_zeros(count, x) \
++  do { UDItype __x = (x); int __c = 0;					\
++    if (__x == 0) __c = 64;						\
++    else { while (!(__x & 0x8000000000000000ULL)) { __x <<= 1; __c++; } }	\
++    (count) = __c;							\
++  } while (0)
++#define count_trailing_zeros(count, x) \
++  do { UDItype __x = (x); int __c = 0;					\
++    if (__x == 0) __c = 64;						\
++    else { while (!(__x & 1)) { __x >>= 1; __c++; } }			\
++    (count) = __c;							\
++  } while (0)
++#else
+ #define add_ssaaaa(sh, sl, ah, al, bh, bl) \
+   __asm__ ("add{q} {%5,%1|%1,%5}\n\tadc{q} {%3,%0|%0,%3}"		\
+ 	   : "=r" ((UDItype) (sh)),					\
+@@ -457,6 +513,8 @@
+ #define count_trailing_zeros(count, x)	((count) = __builtin_ctzll (x))
+ #define UMUL_TIME 40
+ #define UDIV_TIME 40
++
++#endif /* __TINYC__ */
+ #endif /* x86_64 */
+ 
+ #if defined (__i960__) && W_TYPE_SIZE == 32
+--- a/libgcc/config/i386/64/sfp-machine.h
++++ b/libgcc/config/i386/64/sfp-machine.h
+@@ -82,6 +82,9 @@
+  #define ASM_DIVZERO "divss %1, %0"
+ #endif
+ 
++#ifdef __TINYC__
++#define FP_HANDLE_EXCEPTIONS do { } while (0)
++#else
+ #define FP_HANDLE_EXCEPTIONS						\
+   do {									\
+     if (_fex & FP_EX_INVALID)						\
+@@ -128,6 +131,8 @@
+       }									\
+   } while (0)
+ 
++#endif
++
+ #define FP_RND_NEAREST		0
+ #define FP_RND_ZERO		0xc00
+ #define FP_RND_PINF		0x800
+@@ -136,11 +141,16 @@
+ #define _FP_DECL_EX \
+   unsigned short _fcw __attribute__ ((unused)) = FP_RND_NEAREST
+ 
++#ifdef __TINYC__
++#define FP_INIT_ROUNDMODE do { _fcw = 0; } while (0)
++#else
+ #define FP_INIT_ROUNDMODE			\
+   do {						\
+     __asm__ ("fnstcw %0" : "=m" (_fcw));	\
+   } while (0)
+ 
++#endif
++
+ #define FP_ROUNDMODE		(_fcw & 0xc00)
+ #endif
+ 
+--- a/libgcc/soft-fp/op-common.h
++++ b/libgcc/soft-fp/op-common.h
+@@ -1293,6 +1293,19 @@
+ /* Count leading zeros in a word.  */
+ 
+ #ifndef __FP_CLZ
++#ifdef __TINYC__
++#define __FP_CLZ(r, x)							      \
++  do {									      \
++    _FP_W_TYPE __x = (x);						      \
++    int __c = 0;							      \
++    if (__x == 0)							      \
++      __c = _FP_W_TYPE_SIZE;						      \
++    else								      \
++      while (!(__x & ((_FP_W_TYPE)1 << (_FP_W_TYPE_SIZE - 1))))		      \
++        { __x <<= 1; __c++; }						      \
++    r = __c;								      \
++  } while (0)
++#else
+ /* GCC 3.4 and later provide the builtins for us.  */
+ #define __FP_CLZ(r, x)							      \
+   do {									      \
+@@ -1305,6 +1318,8 @@
+     else								      \
+       abort ();								      \
+   } while (0)
++
++#endif /* __TINYC__ */
+ #endif /* ndef __FP_CLZ */
+ 
+ #define _FP_DIV_HELP_imm(q, r, n, d)		\
+--- a/gcc/system.h
++++ b/gcc/system.h
+@@ -262,6 +262,39 @@
+ #if HAVE_LIMITS_H
+ # include <limits.h>
+ #endif
++#ifndef INT_MAX
++# define INT_MAX 2147483647
++#endif
++#ifndef INT_MIN
++# define INT_MIN (-INT_MAX - 1)
++#endif
++#ifndef UINT_MAX
++# define UINT_MAX 4294967295U
++#endif
++#ifndef USHRT_MAX
++# define USHRT_MAX 65535
++#endif
++#ifndef SHRT_MAX
++# define SHRT_MAX 32767
++#endif
++#ifndef SCHAR_MAX
++# define SCHAR_MAX 127
++#endif
++#ifndef UCHAR_MAX
++# define UCHAR_MAX 255
++#endif
++#ifndef LONG_MAX
++# define LONG_MAX 9223372036854775807L
++#endif
++#ifndef ULONG_MAX
++# define ULONG_MAX 18446744073709551615UL
++#endif
++#ifndef LLONG_MAX
++# define LLONG_MAX 9223372036854775807LL
++#endif
++#ifndef ULLONG_MAX
++# define ULLONG_MAX 18446744073709551615ULL
++#endif
+ 
+ /* Get definitions of HOST_WIDE_INT and HOST_WIDEST_INT.  */
+ #include "hwint.h"

@@ -14,7 +14,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC xgcc | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC C frontend selfhost probe | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC stage2 cc1 | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
-| GCC libgcc (stage1 probe) | 4.7.4 | `/opt/gcc-4.7.4` | `tests/gcc47/libgcc-ucontext.patch` | PASS; not the TCC-seeded ladder |
+| GCC 4.7 TCC all-gcc/libgcc/libstdc++ | 4.7.4 | `/opt/gcc-4.7.4` | `tests/gcc47/tcc-softfp.patch` | PASS (configure probes still host) |
 | GCC stage2 xgcc | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC stage2/stage3 cc1 | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC 4.8 cc1/cc1plus | 4.8.5 | `/opt/gcc-4.8.5` | none | PASS |

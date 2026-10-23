@@ -124,6 +124,7 @@
      DEF(TOK_REGPARM2, "__regparm__")
 
      DEF(TOK_MODE, "__mode__")
+     DEF(TOK_MODE1, "mode")
      DEF(TOK_MODE_QI, "__QI__")
      DEF(TOK_MODE_DI, "__DI__")
      DEF(TOK_MODE_HI, "__HI__")

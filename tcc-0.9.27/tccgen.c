@@ -3407,8 +3407,34 @@ redo:
             break;            
 #endif
         case TOK_MODE:
+        case TOK_MODE1:
             skip('(');
-            switch(tok) {
+            if (tok >= TOK_IDENT) {
+                const char *mode_name = get_tok_str(tok, NULL);
+                if (!strcmp(mode_name, "DI")) {
+                    ad->attr_mode = VT_LLONG + 1;
+                } else if (!strcmp(mode_name, "TI") || !strcmp(mode_name, "__TI__")) {
+                    ad->attr_mode = VT_QLONG + 1;
+                } else if (!strcmp(mode_name, "TF") || !strcmp(mode_name, "__TF__")) {
+                    ad->attr_mode = VT_QFLOAT + 1;
+                } else if (!strcmp(mode_name, "SF") || !strcmp(mode_name, "__SF__")) {
+                    ad->attr_mode = VT_FLOAT + 1;
+                } else if (!strcmp(mode_name, "DF") || !strcmp(mode_name, "__DF__")) {
+                    ad->attr_mode = VT_DOUBLE + 1;
+                } else if (!strcmp(mode_name, "XF") || !strcmp(mode_name, "__XF__")) {
+                    ad->attr_mode = VT_LDOUBLE + 1;
+                } else if (!strcmp(mode_name, "QI") || !strcmp(mode_name, "__QI__")) {
+                    ad->attr_mode = VT_BYTE + 1;
+                } else if (!strcmp(mode_name, "HI") || !strcmp(mode_name, "__HI__")) {
+                    ad->attr_mode = VT_SHORT + 1;
+                } else if (!strcmp(mode_name, "SI") || !strcmp(mode_name, "__SI__") ||
+                           !strcmp(mode_name, "word") || !strcmp(mode_name, "__word__")) {
+                    ad->attr_mode = VT_INT + 1;
+                } else {
+                    tcc_warning("__mode__(%s) not supported\n", mode_name);
+                }
+            } else {
+                switch(tok) {
                 case TOK_MODE_DI:
                     ad->attr_mode = VT_LLONG + 1;
                     break;
@@ -3425,6 +3451,7 @@ redo:
                 default:
                     tcc_warning("__mode__(%s) not supported\n", get_tok_str(tok, NULL));
                     break;
+                }
             }
             next();
             skip(')');
@@ -4467,6 +4494,9 @@ static CType *type_decl(CType *type, AttributeDef *ad, int *v, int td)
     }
     post_type(post, ad, storage, 0);
     parse_attribute(ad);
+    if (ad->attr_mode) {
+        type->t = (type->t & ~(VT_BTYPE|VT_LONG)) | (ad->attr_mode - 1);
+    }
     type->t |= storage;
     return ret;
 }
