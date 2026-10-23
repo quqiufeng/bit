@@ -208,6 +208,55 @@ CONFIG_EXTRA_LDLIBS="resolv"
 C 代码仍由 TCC 编译和链接；仅 `.S` 汇编源交给系统 as/gcc。
 这是 BusyBox 1.36.1 与 TCC 的维护补丁，不是 TCC 编译器本体的一部分。
 
+#### 试用 BusyBox shell
+
+构建产物：
+
+```text
+build/busybox-full/busybox_unstripped
+```
+
+进入交互式 shell：
+
+```sh
+cd /home/quqiufeng/bit/build/busybox-full
+./busybox_unstripped sh
+```
+
+或：
+
+```sh
+./busybox_unstripped ash
+```
+
+进入后可以执行：
+
+```sh
+help
+busybox
+echo hello
+uname -a
+pwd
+ls
+cat /etc/hostname
+exit
+```
+
+创建临时 applet 命令：
+
+```sh
+mkdir -p /tmp/bb-bin
+./busybox_unstripped --install -s /tmp/bb-bin
+export PATH=/tmp/bb-bin:$PATH
+sh
+```
+
+完整试用说明见：
+
+```text
+tests/busybox/README.md
+```
+
 ---
 
 ### 1.5 产物控制原则

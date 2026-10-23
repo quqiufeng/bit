@@ -125,6 +125,8 @@ BUSYBOX_SRC=/tmp/busybox-1.35.0 tests/tcc/busybox.sh
 BUSYBOX_SRC=/opt/busybox-1.36.1 tests/busybox/run.sh
 ```
 
+BusyBox shell 试用说明见 `tests/busybox/README.md`。
+
 The zero-dependency native checks remain:
 
 ```sh
