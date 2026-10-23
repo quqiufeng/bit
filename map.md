@@ -686,7 +686,21 @@ generator 使用系统 gcc
 最终 stage2 链接使用 stage1 GCC/collect2
 ```
 
-完整自有 libgcc、GCC 驱动全量自举和现代 GCC 阶梯仍未完成。
+自有 libgcc 已构建并可用：
+
+```sh
+./tests/gcc47/libgcc.sh
+```
+
+结果：
+
+```text
+PASS: GCC 4.7.4 libgcc built and linked by stage1 GCC
+```
+
+为兼容现代 glibc，`libgcc/config/i386/linux-unwind.h` 使用 `ucontext_t`，
+补丁为 `tests/gcc47/libgcc-ucontext.patch`。完整 GCC 驱动全量自举和现代
+GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
 

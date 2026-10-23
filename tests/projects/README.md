@@ -14,6 +14,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 | GCC xgcc | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC C frontend selfhost probe | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
 | GCC stage2 cc1 | 4.7.4 | `/opt/gcc-4.7.4` | none | PASS |
+| GCC libgcc | 4.7.4 | `/opt/gcc-4.7.4` | `tests/gcc47/libgcc-ucontext.patch` | PASS |
 
 ## Commands
 
@@ -27,6 +28,7 @@ These scripts validate bit-tcc against real C projects. Sources live under
 ./tests/gcc47/xgcc.sh
 ./tests/gcc47/selfhost.sh
 ./tests/gcc47/stage2.sh
+./tests/gcc47/libgcc.sh
 ```
 
 The project scripts skip when their source directory is absent.
