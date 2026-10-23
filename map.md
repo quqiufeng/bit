@@ -507,6 +507,8 @@ GCC 4.7.4
   -> GCC 10.5.0
   -> GCC 11.5.0
   -> GCC 12.3.0
+  -> GCC 13.3.0
+  -> GCC 14.2.0
 ```
 
 实际能跳到哪一级取决于中间版本对 C++ 标准、glibc 和 binutils 的要求。
@@ -525,6 +527,77 @@ $BUILD/gcc47/              GCC 4.7 out-of-tree 构建目录
 ```
 
 GCC/binutils/glibc 源码体积大，不建议 vendor 进 bit 主仓库。
+
+### 2.5 GCC 跨代构建总线
+
+必须使用全新的 out-of-tree 目录，不能复用系统 g++ 配置过的 build tree。
+
+环境锁：
+
+```sh
+export CC=/opt/gcc47cxx/bin/gcc
+export CXX=/opt/gcc47cxx/bin/g++
+export CC_FOR_BUILD=/opt/gcc47cxx/bin/gcc
+export PATH=/opt/gcc47cxx/bin:$PATH
+export LD_LIBRARY_PATH=/opt/gcc47cxx/lib64:/opt/gcc47cxx/lib:$LD_LIBRARY_PATH
+```
+
+配置锁：
+
+```sh
+rm -rf /opt/gcc48-owned-build/gcc
+mkdir -p /opt/gcc48-owned-build/gcc
+cd /opt/gcc48-owned-build/gcc
+/opt/gcc-4.8.5/configure   --disable-bootstrap   --enable-languages=c,c++   --disable-multilib   --disable-libgomp --disable-libssp --disable-libquadmath   --disable-libatomic --disable-werror   --prefix=/opt/gcc48-owned   --with-gmp=/usr --with-mpfr=/opt/gcc47-deps --with-mpc=/opt/gcc47-deps
+```
+
+编译参数分轨：
+
+| 目标 | 标准 |
+| --- | --- |
+| GCC 4.8 all-gcc | `-std=gnu++98` |
+| GCC 4.8 libstdc++ | `-std=gnu++11` |
+| GCC 5.5 all-gcc | `-std=gnu++11` |
+| GCC 7.5 all-gcc | `-std=gnu++14` |
+| GCC 7.5 libstdc++ | `-std=gnu++17` |
+
+构建命令必须显式覆盖：
+
+```sh
+make -j2 all-gcc   CC=/opt/gcc47cxx/bin/gcc   CXX=/opt/gcc47cxx/bin/g++   CC_FOR_BUILD=/opt/gcc47cxx/bin/gcc   CXXFLAGS='-g -O2 -std=gnu++98'
+
+make -j2 all-target-libstdc++-v3   CC=/opt/gcc47cxx/bin/gcc   CXX=/opt/gcc47cxx/bin/g++   CXXFLAGS='-g -O2 -std=gnu++11'
+```
+
+反回退探针：
+
+```sh
+grep -E '^(CC|CXX|CC_FOR_BUILD) ?=' Makefile
+grep -n 'gcc47cxx/bin/g++' config.log
+```
+
+固定点门禁：
+
+```text
+1. stage2/stage3 cc1 对同一源码生成相同汇编
+2. stage2/stage3 cc1plus 对同一源码生成相同汇编
+3. C hello / C++ hello 运行正确
+4. libstdc++ std::string + iostream 运行正确
+5. 构建日志没有 /usr/bin/g++ 回退
+6. 自有 libgcc/libstdc++ 路径优先于系统路径
+```
+
+版本策略：
+
+```text
+4.8 先做固定点，证明 C++ bootstrap 自洽
+5.5 做固定点，覆盖较完整 C++11
+7.5 做固定点，进入 C++17
+9.5 做固定点，达到现代 Linux 实用线
+12/13/14 验证主流发行版线
+```
+
+不要求每个版本都跑完整发行版测试，但不允许跳过固定点门禁。
 
 ---
 

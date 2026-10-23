@@ -773,6 +773,28 @@ collect2。自有 libgcc 已由 stage1 GCC 构建；stage2 xgcc 驱动也已构�
 
 ## 7. 构建系统
 
+### 7.0 GCC 跨代 C++ 自举参数
+
+后续 GCC 阶梯必须使用独立 build tree，显式锁定：
+
+```text
+CC / CXX / CC_FOR_BUILD
+PATH / LD_LIBRARY_PATH
+```
+
+并分轨标准：
+
+```text
+GCC 4.8 all-gcc        -std=gnu++98
+GCC 4.8 libstdc++      -std=gnu++11
+GCC 5.5 all-gcc        -std=gnu++11
+GCC 7.5 all-gcc        -std=gnu++14
+GCC 7.5 libstdc++      -std=gnu++17
+```
+
+每级必须验证 stage2/stage3 代码生成一致性、C/C++ hello、libstdc++
+和“不回退系统 g++”。
+
 ### 7.1 Linux
 
 - 入口：`linux/build.sh`。
