@@ -713,7 +713,19 @@ stage2 xgcc 驱动也已用 stage1 xgcc 构建，并使用自有 libgcc：
 PASS: GCC 4.7.4 stage2 xgcc uses its own libgcc
 ```
 
-完整 GCC 驱动全量自举和现代 GCC 阶梯仍未完成。
+stage3 cc1 也已构建；stage2 与 stage3 对同一源码生成相同汇编：
+
+```sh
+./tests/gcc47/stage3.sh
+```
+
+结果：
+
+```text
+PASS: GCC 4.7.4 stage2 and stage3 cc1 produce identical assembly
+```
+
+完整现代 GCC 阶梯仍未完成。
 
 ### 5.2 libcpp
 
