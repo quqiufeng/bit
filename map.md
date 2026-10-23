@@ -614,9 +614,13 @@ libiberty: cplus-dem.c argv.c obstack.c hashtab.c splay-tree.c fibheap.c pex-uni
 libcpp:    lex.c macro.c directives.c expr.c files.c identifiers.c init.c
            line-map.c symtab.c charset.c traditional.c pch.c mkdeps.c errors.c
 gcc:       ggc-page.c bitmap.c vec.c double-int.c tree.c diagnostic.c
+x86:       i386.c i386-c.c
+C front:   c-decl.c c-parser.c c-typeck.c c-convert.c c-lang.c
+c-family:  c-common.c c-format.c c-lex.c c-cppbuiltin.c c-opts.c
+           c-pragma.c c-semantics.c
 ```
 
-这是 GCC 4.7.4 的前三层兼容验证。下一层是 x86_64 后端和 C 前端。
+这是 GCC 4.7.4 的前四层兼容验证。下一步是链接 cc1 并尝试 GCC 自举。
 
 ### 5.2 libcpp
 

@@ -30,7 +30,7 @@ cJSON     single-file library, malloc/stdio/math
 SQLite    very large single-file amalgamation, pthread/dl/math link
 Lua       multi-file build, liblua.a archive, hosted executable
 BusyBox   full defconfig applet build, shell/init userland target
-GCC 4.7   libiberty, libcpp and gcc infrastructure probes; first GCC bootstrap layers
+GCC 4.7   libiberty, libcpp, gcc infrastructure, x86 backend and C frontend probes; first GCC bootstrap layers
 ```
 
 Only BusyBox currently needs source patches. The other three compile directly

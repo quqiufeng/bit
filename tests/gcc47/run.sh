@@ -42,7 +42,26 @@ if [ -f "$GCC47_BUILD/gcc/gtype-desc.h" ] && [ -f "$GCC47_BUILD/gcc/bversion.h" 
             -I"$SRC/gcc" -I"$SRC/include" -I"$SRC/libcpp/include" \
             -I"$SRC/libiberty" -c "$SRC/gcc/$f" -o "${f%.c}.o"
     done
-    echo "PASS: bit-tcc compiles GCC 4.7.4 libiberty, libcpp and gcc infrastructure probes"
+    for f in i386.c i386-c.c; do
+        "$CC" -DIN_GCC -DHAVE_CONFIG_H -I"$GCC47_BUILD/gcc" \
+            -I"$SRC/gcc" -I"$SRC/gcc/config" -I"$SRC/include" \
+            -I"$SRC/libcpp/include" -I"$SRC/libiberty" \
+            -c "$SRC/gcc/config/i386/$f" -o "${f%.c}.o"
+    done
+    for f in c-decl.c c-parser.c c-typeck.c c-convert.c c-lang.c; do
+        "$CC" -DIN_GCC -DHAVE_CONFIG_H -I"$GCC47_BUILD/gcc" \
+            -I"$SRC/gcc" -I"$SRC/gcc/config" -I"$SRC/gcc/c-family" \
+            -I"$SRC/include" -I"$SRC/libcpp/include" -I"$SRC/libiberty" \
+            -c "$SRC/gcc/$f" -o "${f%.c}.o"
+    done
+    for f in c-common.c c-format.c c-lex.c c-cppbuiltin.c c-opts.c \
+             c-pragma.c c-semantics.c; do
+        "$CC" -DIN_GCC -DHAVE_CONFIG_H -I"$GCC47_BUILD/gcc" \
+            -I"$SRC/gcc" -I"$SRC/gcc/config" -I"$SRC/gcc/c-family" \
+            -I"$SRC/include" -I"$SRC/libcpp/include" -I"$SRC/libiberty" \
+            -c "$SRC/gcc/c-family/$f" -o "${f%.c}.o"
+    done
+    echo "PASS: bit-tcc compiles GCC 4.7.4 libiberty, libcpp, gcc infra, x86 backend and C frontend probes"
 else
     echo "PASS: bit-tcc compiles GCC 4.7.4 libiberty and libcpp probes (infra skipped)"
 fi
