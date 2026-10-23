@@ -16,4 +16,4 @@ LD_LIBRARY_PATH="$DEPS" "$BUILD/gcc/cc1plus" -quiet "$OUT/hello.cc" -o "$OUT/cpp
 as "$OUT/cpp.s" -o "$OUT/cpp.o"; gcc "$OUT/cpp.o" -o "$OUT/cpp"
 set +e; "$OUT/c"; a=$?; "$OUT/cpp"; b=$?; set -e
 [ "$a" -eq 42 ] && [ "$b" -eq 42 ]
-echo "PASS: GCC 7.5.4 cc1 and cc1plus compile C and C++ hello"
+echo "PASS: GCC 7.5.0 cc1 and cc1plus compile C and C++ hello"
