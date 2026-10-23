@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-TCC_SRC=${TCC_SRC:-/opt/tcc-0.9.27}
+TCC_SRC=${TCC_SRC:-"$ROOT/tcc-0.9.27"}
 C1=${C1:-"$ROOT/build/native-c1/c1.elf"}
 OUT=${OUT:-"$ROOT/build/tcc"}
 INC="$ROOT/include"

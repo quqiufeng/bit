@@ -691,6 +691,10 @@ C0 类型系统重构计划见 `docs/C0_REFACTOR.md`。
 
 ### 6.8 TCC 0.9.27 兼容与二级自举
 
+TCC 0.9.27 源码已 vendored 到仓库根目录 `tcc-0.9.27/`，作为后续
+`bit-tcc` fork 的上游基线。仓库只保留最小 `config.h`；`config.mak`、目标文件、
+TCC 二进制和 `libtcc.a` 都是构建产物，不提交。
+
 C1 现在能编译 TCC 0.9.27（`tcc.c`，含 one-source 的 `libtcc.c`），并在
 hosted glibc 下完成二级自举：
 
@@ -727,8 +731,12 @@ Native C1
 
 ```sh
 ./bootstrap/linux/c0/native-c1.sh
-TCC_SRC=/opt/tcc-0.9.27 ./tests/tcc/upstream.sh
+./tests/tcc/upstream.sh
 ```
+
+默认源码路径是 `$ROOT/tcc-0.9.27`，也可以用 `TCC_SRC` 指向另一份源码。
+后续兼容补丁应提交到 `bit-tcc` fork 或 `tcc-0.9.27` 的独立分支，不在
+`/opt` 或构建产物中做不可追踪修改。
 
 TCC 自身原生链接所需的 `libtcc1`/`crt` 和 BusyBox/Lua/musl 实测尚未完成；
 当前里程碑是“C1 能编译 TCC，TCC 能编译自身”，不是“TCC 已完全替代系统链接器”。
