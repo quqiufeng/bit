@@ -208,6 +208,41 @@ CONFIG_EXTRA_LDLIBS="resolv"
 C 代码仍由 TCC 编译和链接；仅 `.S` 汇编源交给系统 as/gcc。
 这是 BusyBox 1.36.1 与 TCC 的维护补丁，不是 TCC 编译器本体的一部分。
 
+#### 小型 C 项目验证
+
+当前已实测并通过的项目：
+
+| 项目 | 版本 | 源码 | 补丁 | 结果 |
+| --- | --- | --- | --- | --- |
+| cJSON | 1.7.18 | `/opt/cJSON-1.7.18` | 无 | PASS |
+| SQLite | 3.45.3 | `/opt/sqlite-amalgamation-3450300` | 无 | PASS |
+| Lua | 5.4.7 | `/opt/lua-5.4.7` | 无 | PASS |
+| BusyBox | 1.36.1 | `/opt/busybox-1.36.1` | `tests/busybox/busybox-1.36.1-tcc.patch` | PASS |
+
+验证命令：
+
+```sh
+./tests/cjson/run.sh
+./tests/sqlite/run.sh
+./tests/lua/run.sh
+./tests/busybox/run.sh
+```
+
+覆盖点：
+
+```text
+cJSON    单文件库、malloc/stdio/math
+SQLite   超大单文件 amalgamation、pthread/dl/math
+Lua      多文件构建、liblua.a、hosted executable
+BusyBox  完整 defconfig、shell/init 用户态目标
+```
+
+说明文档：
+
+```text
+tests/projects/README.md
+```
+
 #### 试用 BusyBox shell
 
 构建产物：
