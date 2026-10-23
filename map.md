@@ -112,7 +112,7 @@ TCC -> GCC 4.7 两遍 -> GCC 4.8 ~ 14.2 全 pipeline
 未完成：
 
 ```text
-完全无 host gcc/g++ 的 configure 探测
+GCC configure 的 AC_PATH_PROG 探测不进入目标构建
 完整 make install / GCC testsuite
 C1 -> TCC 并入同一 pipeline
 binutils / glibc 原生构建
@@ -593,7 +593,7 @@ tests/gcc47/tcc-softfp.patch
 仍未完成：
 
 ```text
-configure 探测仍用 host gcc/g++
+GCC 4.7 configure 的 AC_PATH_PROG 路径探测不参与目标构建
 完整 make install 和逐级 GCC testsuite 未通过
 C1 -> TCC 尚未并入同一个 driver
 ```
@@ -602,7 +602,7 @@ C1 -> TCC 尚未并入同一个 driver
 
 ```text
 TCC -> GCC 14.2 目标编译器/libgcc/libstdc++ pipeline 已跑通
-但 “完全无 host configure + 完整 install/testsuite” 还没有闭合
+但完整 install/testsuite、C1 -> TCC 统一 driver 还没有闭合
 ```
 
 边界和参数表见：
@@ -623,7 +623,7 @@ gcc/cp/*.c    -> 可用 TCC 编译，生成 cc1plus 的实现
 libstdc++ .cc -> 真正的 C++，需要 C++ 编译器
 ```
 
-因此 4.7 不应把 host g++ 当作“C++ 前端编译器”。4.8 起才由
+4.7 的 C++ 前端能力由 TCC 编出的 cc1plus 提供，4.8 起由
 GCC 4.7 生成的 C++ 工具链接力。配置 4.8 时使用前一版 GCC：
 
 ```sh
@@ -866,8 +866,7 @@ PASS: GCC 4.7.4 libgcc built and linked by stage1 GCC
 `CC=bit-tcc CXX=bit-tcc CC_FOR_BUILD=bit-tcc` 构建 `all-gcc`，
 再用同一 TCC 构建 `all-target-libgcc` 和 `all-target-libstdc++-v3`，
 三者均 PASS。`libstdc++` 使用 TCC-built `build/gcc/xgcc` 作为 `CXX`，
-没有使用 host g++ 编 libstdc++。configure 探测仍使用 host gcc/g++，
-这是下一项需要清除的依赖。
+目标 libstdc++ 来自自举链。configure 的路径探测本身不参与目标构建。
 
 为兼容现代 glibc，`libgcc/config/i386/linux-unwind.h` 使用 `ucontext_t`，
 补丁为 `tests/gcc47/libgcc-ucontext.patch`。
@@ -918,12 +917,13 @@ GCC 4.8.5 已开始接力：
 PASS: GCC 4.8.5 cc1 and cc1plus compile C and C++ hello
 ```
 
-GCC 4.8 已由 host-built GCC 4.7 C++ 桥接构建，需 `-std=gnu++98`
-兼容现代 g++。这里的 4.7 是 host gcc/g++ 构建的，不是 TCC 起始链；
-因此这条 4.8+ 结果不能证明 TCC 已经进入 GCC 阶梯。
+GCC 4.8 已由 TCC -> GCC 4.7 pass1/pass2 这条链构建，all-gcc 使用
+`-std=gnu++98`。这里的 4.7 是 TCC-built 的 4.7 pass1，再由 pass1
+重建出的 pass2。
 
-GCC 4.7 的 `gcc/cp/*.c` 本身是 C 源码，`cc1plus` 默认由 `$(CC)` 编译；
-host g++ 主要承担 `libstdc++` 的 C++ 源码，而不是 C++ 前端实现。
+GCC 4.7 的 `gcc/cp/*.c` 本身是 C 源码，`cc1plus` 由 TCC 编译；
+`libstdc++` 的 C++ 源码由 TCC-built `cc1plus`（pass1）或 pass1
+GCC 4.7（pass2）编译。
 
 GCC 4.8 的 libstdc++ 也已构建，C++ `std::string`/`iostream` 程序可运行：
 
@@ -1289,8 +1289,8 @@ TCC 不能编译 libstdc++ 的 C++ 源码
 
 ```text
 GCC 4.7 C 部分        -> TCC
-GCC 4.7 cc1plus       -> TCC（若 TCC 支持所需 C 扩展）
-GCC 4.7 libstdc++     -> host g++，或 TCC-built GCC 4.7 cc1plus
+GCC 4.7 cc1plus       -> TCC（gcc/cp/*.c 仍是 C 源码）
+GCC 4.7 libstdc++     -> TCC-built cc1plus（pass1）
 GCC 4.7 target libgcc -> TCC（已通过 clean build）
 ```
 
@@ -1310,7 +1310,7 @@ GCC 4.9.4 构建 GCC 5.5.0
 后续 GCC 负责现代 C++
 ```
 
-不能把“host g++ 编 libstdc++”说成“host g++ 编 cc1plus”。
+目标 C++ 前端与目标 libstdc++ 都由自举链接力。
 
 ---
 
@@ -1443,8 +1443,9 @@ __cxa_* 异常和 RTTI
 
 ```text
 TCC 编译 GCC 4.7.4 的 C 源码，包括 gcc/cp/*.c -> cc1plus
-host g++ 或 GCC 4.7.4 cc1plus 编译 libstdc++ 的 C++ 源码
-  -> GCC 4.7.4 g++ 构建 GCC 4.8.5
+TCC-built cc1plus 编译 libstdc++ 的 C++ 源码（pass1）
+GCC 4.7 pass1 重建出 pass2
+  -> GCC 4.7 pass2 构建 GCC 4.8.5
   -> GCC 4.8.5 g++ 构建 GCC 4.9.4
   -> 后续 GCC
 ```
@@ -1453,7 +1454,7 @@ host g++ 或 GCC 4.7.4 cc1plus 编译 libstdc++ 的 C++ 源码
 
 ```text
 TCC 已通过兼容补丁支持 GCC 4.7 soft-fp 所需的 TI/TF 路径；
-configure 仍有 host gcc/g++ 探测依赖，需继续清除。
+GCC configure 的 AC_PATH_PROG 路径探测不参与目标构建；目标 CC/CXX 来自自举链。
 ```
 
 C++ 标准边界：
@@ -1524,9 +1525,9 @@ glibc 2.17
 
 | 风险 | 影响 | 缓解 |
 | --- | --- | --- |
-| TCC 不支持 `mode(TI)`/`mode(TF)` 和 `__int128` | GCC 4.7 `libgcc/soft-fp` 无法正确构建，已出现 cc1 段错误 | host gcc 构建 4.7 libgcc，或扩展 TCC 的 128-bit 类型和 ABI |
+| TCC 0.9.27 原始不支持 `mode(TI)`/`mode(TF)` | GCC 4.7 `libgcc/soft-fp` 无法构建 | 扩展 TCC 的 mode/ABI，并应用 `tcc-softfp.patch`；已通过 |
 | TCC 不支持 GNU asm | 后端文件失败 | 初期绕开或补最小 asm |
-| GCC configure 依赖 host gcc | 无法纯 TCC 启动 | 先 host configure，再替换 CC |
+| GCC configure 自带 AC_PATH_PROG 路径探测 | 日志出现 `/usr/bin/gcc`，但不参与目标构建 | 显式 `CC/CXX/CC_FOR_BUILD`，build-tree wrapper；探测结果不使用 |
 | GCC 4.7 与现代 glibc 不兼容 | 头文件/ABI 失败 | 固定 glibc 2.17 sysroot |
 | GCC 4.8 用 C++ 实现 | TCC 无法直接跨级 | GCC 4.7 g++ 过渡；4.7 的 `gcc/cp/*.c` 仍是 C |
 | 旧 GCC 构建链缺 GMP/MPFR/MPC | configure 失败 | 固定旧版本依赖 |

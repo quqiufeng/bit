@@ -782,7 +782,7 @@ CC_FOR_BUILD=bit-tcc` 构建 `all-gcc`，再用同一 TCC 构建
 C++ 实现，但 GCC 4.7 的 `gcc/cp/*.c` 仍是 C 源码，`cc1plus` 由
 `$(CC)` 编译；需要 C++ 编译器的是 `libstdc++` 的 C++ 源文件。
 
-仍未完成的是：configure 探测仍依赖 host gcc/g++；完整 `make install`
+仍未完成的是：完整 `make install`
 和 GCC testsuite 未逐级通过；C1 -> TCC 尚未并入同一个 driver；
 Lua/musl 和更复杂的 libc/ELF 边界尚未实测。当前里程碑是
 “C1 编译 TCC，TCC 编译自身并完成 Linux hosted 链接和完整 BusyBox”，

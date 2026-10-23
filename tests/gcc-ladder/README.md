@@ -72,8 +72,10 @@ pass-1 gcc/xgcc -> stage2 GCC 4.7
 stage2 GCC 4.7 -> GCC 4.8
 ```
 
-No host g++ compiles GCC 4.7 frontends or target libraries.  Configure
-probes still invoke the host compiler.
+GCC 4.7 frontends and target libraries come from the self-hosted chain.  GCC 4.7
+configure still runs its hard-coded AC_PATH_PROG checks, but the results
+are not used for target builds; target CC/CXX come from TCC or the
+previous build-tree wrapper.
 
 ## Build policy
 
@@ -135,7 +137,7 @@ A stage passes only after its own C++ hello is compiled and run.
 ## Not yet covered
 
 ```text
-Fully host-free configure probes
+Cleanup of GCC configure AC_PATH_PROG probes (non-blocking noise)
 Complete make install for every stage
 C1 -> TCC integrated into this same driver
 Full GCC testsuite per stage

@@ -28,7 +28,7 @@ GCC 4.7 -> 4.8 -> 4.9 -> 5.5 -> 7.5 -> 9.5
 
 其中 GCC 天梯由 `tests/gcc-ladder/run.sh` 驱动，已在干净构建目录中一次跑通。每一级都构建 `all-gcc`、`all-target-libgcc`、`all-target-libstdc++-v3`，并编译运行 C++ iostream 测试。
 
-本文同时明确边界：configure 探测仍使用 host gcc/g++；完整 `make install`、逐级 GCC testsuite、C1 -> TCC 与 GCC 天梯的统一 driver、自有 binutils/glibc/sysroot 尚未完成。`seed.elf`/`seed.hex` 仍是剩余信任根。
+GCC 4.7 的 configure 内部仍按自身逻辑执行 `AC_PATH_PROG`，会在日志里发现 `/usr/bin/gcc` 等路径；这是 GCC 4.7 构建系统写死的探测，不参与目标构建。实际 Makefile 中 `CC/CXX` 指向 TCC，`CC_FOR_TARGET/GCC_FOR_TARGET` 指向当前 stage 的 xgcc。GCC 4.7 pass1 的 `CC/CXX` 都是 TCC；pass1 生成的 `cc1plus` 提供 C++ 能力，pass2 用这份能力重建 GCC 4.7，GCC 4.8 及以后则完全由前一级 4.7 的 C++ 能力承接。完整 `make install`、逐级 GCC testsuite、C1 -> TCC 与 GCC 天梯的统一 driver、自有 binutils/glibc/sysroot 尚未完成。`seed.elf`/`seed.hex` 仍是剩余信任根。
 
 ---
 
@@ -156,7 +156,7 @@ T6 把“configure 能用 host”误写成“目标代码由 host 构建”
 
 ```text
 第一阶段不消灭系统 as/ld/glibc/crt
-第一阶段不要求完全无 host configure 探测
+第一阶段不重写 GCC 4.7 configure 自带的 `AC_PATH_PROG` 探测；其探测结果不参与目标构建
 第一阶段不承诺每一级 GCC 都逐字节可复现
 第一阶段不把 C1 -> TCC 与 GCC 天梯合并成单一 driver
 ```
@@ -292,6 +292,17 @@ Pass 2：第一遍 GCC 4.7 重建 GCC 4.7
 
 Pass 2 的作用是移除 4.8 过渡对 TCC 和外部 C++ 编译器的依赖。它不声称 pass1 与 pass2 逐字节相同；GCC 构建本身包含时间戳、路径和配置差异。可验证门禁是：每一遍都能构建目标库、编译并运行 C++ 程序。
 
+因此 4.7 阶段的 C++ 能力来源是：
+
+```text
+TCC 编译 gcc/cp/*.c -> pass1 cc1plus
+pass1 cc1plus 编译 libstdc++
+pass1 GCC 4.7 重建自身 -> pass2 cc1plus/libstdc++
+pass2 GCC 4.7 的 gcc/g++ -> GCC 4.8
+```
+
+这条链的目标 C++ 编译器来自自举链；configure 的路径探测不改变目标构建。
+
 ### 5.2 类型系统扩展
 
 TCC 0.9.27 原始类型系统不足以处理 GCC 4.7 soft-fp 所需的 128 位模式。项目内 TCC fork 增加了：
@@ -305,6 +316,54 @@ VT_QFLOAT -> SSE ABI
 ```
 
 对应修改位于 `tcc-0.9.27/tccgen.c`、`tcctok.h`、`x86_64-gen.c`。这些修改使 TCC 能解析 GCC 4.7 的 `__attribute__((mode(...)))`，并正确分类 x86_64 SysV ABI 中的 128 位整数和浮点类型。
+
+#### 5.2.1 SysV AMD64 传参契约
+
+`mode(TI)` 和 `mode(TF)` 都是 16 字节对象，在 SysV AMD64 中分别属于 INTEGER 和 SSE class。ABI 的关键不是类型名字，而是：
+
+```text
+class（INTEGER / SSE / MEMORY）
+size（8 字节为一个 eightbyte）
+可用寄存器数量
+```
+
+TCC 的 `classify_x86_64_arg()` 根据 `type_size()` 和 `classify_x86_64_inner()` 计算 `reg_count`：
+
+```text
+size > 16                 -> MEMORY，整对象走栈
+INTEGER class, size > 8   -> reg_count = 2，ret_t = VT_QLONG
+SSE class, size > 8       -> reg_count = 2，ret_t = VT_QFLOAT
+```
+
+调用者侧，`gfunc_call()` 先做从左到右的分配预扫描：
+
+```text
+INTEGER：nb_reg_args + reg_count <= 6 才走 GPR
+SSE：    nb_sse_args + reg_count <= 8 才走 XMM
+否则整个参数走栈，不允许半个 128 位对象拆成寄存器 + 栈
+```
+
+寄存器映射遵循 SysV：
+
+```text
+INTEGER 参数：RDI, RSI, RDX, RCX, R8, R9
+SSE 参数：    XMM0 ... XMM7
+INTEGER 返回：RAX:RDX
+SSE 返回：    XMM0:XMM1
+```
+
+在实现上：
+
+```text
+VT_QLONG  -> x86_64_mode_integer -> 两个连续 GPR
+VT_QFLOAT -> x86_64_mode_sse     -> 两个连续 XMM
+```
+
+调用者用 `gen_reg`/`sse_reg` 从高到低扣减寄存器配额，`arg_prepare_reg()` 把逻辑索引映射到参数寄存器；由于准备参数时 `gv()` 可能破坏 RDX/RCX，索引 2/3 暂存到 R10/R11，最后再统一搬到 RDX/RCX。128 位 INTEGER 用 `r` 和 `vtop->r2` 两个源寄存器，SSE 则通过 `RC_FRET` 成对加载到 `xmm0/xmm1` 后再搬到目标 XMM 对。被调用者侧反向执行：INTEGER 用 `arg_regs[]` 连续保存，SSE 用 `sse_param_index` 连续保存。
+
+这条规则保证 soft-fp 的 `TI`/`TF` 值在 TCC 调用 GCC 生成的代码时不会被错误地拆成“一个寄存器 + 一块栈”，也不会把 SSE class 误当 INTEGER class。
+
+边界必须写明：当前验证覆盖了 GCC 4.7 soft-fp 构建、TCC-built libgcc/libstdc++ 和 C++ iostream 运行；尚未做完整的 SysV ABI 边界矩阵（寄存器耗尽、混合 INTEGER/SSE、可变参数、返回大对象等），因此不能把本节写成“ABI 全量形式化证明”。
 
 ### 5.3 soft-fp 与系统头补丁
 
@@ -435,7 +494,7 @@ C++ hello：使用该级自己的 cc1plus 和 libstdc++
 
 ```text
 生成目标代码的 cc1/cc1plus 必须来自当前或前一级自举链。
-host gcc/g++ 只允许出现在 configure 探测中。
+目标 `CC/CXX` 来自自举链；GCC 4.7 configure 自带的路径探测不会进入目标构建。
 ```
 
 ---
@@ -512,7 +571,6 @@ TCC:   build/tcc/bit-tcc
 ### 9.1 局限
 
 ```text
-configure 探测仍调用 host gcc/g++
 完整 make install 未逐级通过
 完整 GCC testsuite 未逐级通过
 C1 -> TCC 尚未并入同一个 driver
@@ -524,7 +582,7 @@ seed.elf 仍是剩余信任根
 
 ```text
 P1 把 C1 -> TCC 接入 seed -> GCC 14.2 的统一 driver
-P2 消除 configure 对 host 编译器的探测依赖
+P2 清理/固定 configure 的宿主工具路径探测（非功能阻塞）
 P3 完成逐级 make install 与 testsuite
 P4 用 tcc_bloodline_tag + nm 建立二进制级血统审计
 P5 构建自有 binutils/glibc/sysroot，缩小系统输入
