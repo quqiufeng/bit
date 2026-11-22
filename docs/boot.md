@@ -390,7 +390,7 @@ rm -rf /opt/gcc-ladder-2026/{4.7-pass1,4.7-pass2,4.8,4.9,5.5,7.5,9.5,12.3,13.3,1
 | C0v2 输出镜像 | 定长 32 MiB（`.zero` 补齐） | 布局固定才能"整镜像编译" |
 | `.zero` / `.org` 参数 | 仅十进制常量 | A1 不解析表达式 |
 | 帧布局 | 标量 8 字节槽、数组按元素宽、16 字节对齐 | 避免 char 紧凑槽的复杂度 |
-| 参数落位 | 前 6 个 SysV 参数溢出到 `[rbp-8]`,`[rbp-16]`… | 见 `c0/README.md` |
+| 参数落位 | 前 6 个 SysV 参数溢出到 `[rbp-8]`,`[rbp-16]`… | 见 §11 C0 emitter 契约 |
 
 `c0v2_bss.c` 的存在也是容量问题：A1 的源码自举要编译 `a1_self.c`，它需要比默认布局更大的 BSS，于是有一个只改段布局的 C0v2 变体（`c0v2-bss-build.sh`）。这类"变体"是原始时期的典型产物——**能力不够时改布局，而不是改语言**。
 
@@ -423,7 +423,7 @@ B 是"先把 C1 跑起来"的产物，A 是"从字节火种长出来"的产物�
 
 诚实记录，避免下一个人以为已经做完了：
 
-1. **`seed.elf` 本身仍是 cc 编译 `seed.S` 得来的**。`seed.hex` 让它自产自，但"第一个 seed 怎么来的"仍依赖宿主汇编器。目标是一个手写的极小 seed 解码器（`a0/README.md` 末尾记着这个 gap）。
+1. **`seed.elf` 本身仍是 cc 编译 `seed.S` 得来的**。`seed.hex` 让它自产自，但"第一个 seed 怎么来的"仍依赖宿主汇编器。目标是一个手写的极小 seed 解码器（见 §11 的 `a0/` 一行）。
 2. **A1 的源级自举依赖 C0v2**（`a1_self.c` 路径），还不是"A1 从 A0 长出来"的纯字节叙事。
 3. **C1 不支持内联汇编**，`_start`/syscall 桩靠 `helpers.a1` 和 `c1-init.c` 补，属于"文本桩 + 一次宿主链接"的混合状态。
 4. **TCC 的第一次链接需要 gcc/glibc**。彻底闭合需要 C1 支持动态链接输出（或一个自写的动态链接器）。
@@ -451,3 +451,82 @@ TCC       C1 编 TCC（gcc 只做一次链接），TCC 自建运行时并编自�
 时间与哈希（§5）：空目录到 TCC 约 12 秒（L0–L5 4.3 s，L5–L6 7.9 s），所有产物跨运行逐字节可复现。
 
 一句话：**每一层只做"下一层需要的那一件事"，并且每一层都有一个 `cmp` 能证明它没坏。** 原始时期的全部复杂度，就花在这两件事上。
+
+---
+
+## 11. 各层目录：一个文件干什么
+
+原始时期没有单独的说明文档，这一节就是。每个目录的脚本名即用途，跑之前不必读别的。
+
+**`bootstrap/`（过渡种子包，入口 B）**
+
+| 文件 | 作用 |
+|---|---|
+| `seed-c1.hex` / `seed-link.hex` / `seed-startup.hex` / `seed-syscalls.hex` | 预固化的 C1 + c1link + `_start` + syscall 桩，唯一被提交的二进制内容 |
+| `seed.sha256` | 上面四个 hex 的校验和，`from-seed.sh` 解码前先验 |
+| `from-seed.sh` | hex → `build/`，重编 stage1/stage2，断言四个 cmp |
+| `make-seed.sh` | 编译器/链接器有意变更后重新生成这四个 hex |
+| `minimal-chain.sh` | 上游 PE 种子链在 Linux 上跑的对照实验（产物仍是 PE C1） |
+| `bridge.sh` | 上游 PE C1 → SysV C1（`stage1 == stage2`） |
+| `native-zero.sh` | 从 `bootstrap/linux` 零基种子一路走到 C1 + c1l，入口 A 的顶层脚本 |
+
+**`bootstrap/linux/`（零基根）**
+
+| 文件 | 作用 |
+|---|---|
+| `seed.S` / `seed.hex` / `seed.elf` | 手写 hex 解码器；`seed.hex` 是它的自身折叠；`seed.elf` 是唯一提交的二进制 |
+| `seed-selfhost.sh` | `seed.elf < seed.hex == seed.elf`，并接着生成 A0/A1 |
+
+**`bootstrap/linux/a0/`（地址解析层）**
+
+| 文件 | 作用 |
+|---|---|
+| `a0.S` | syscall-only 本体，进链的实现 |
+| `a0_ref.c` | 宿主 C 语义 oracle，只用于对照 |
+| `a0.seed.hex` | A0 的文本种子，由 `seed.elf` 解出 A0 二进制 |
+| `from-hex.sh [out]` | 从 `seed.elf` + `a0.seed.hex` 现生成 A0 |
+| `make-seed.sh` | 仅此处允许用宿主 cc/ld 重新生成 `a0.seed.hex` |
+| `selfhost.sh` | `A0 < a0.seed.hex == A0` |
+| `test.sh` / `test-asm.sh` | 跑 `smoke.a0`（双 PT_LOAD，exit 42）；把 `a0.S` 与 `a0_ref.c` 的输出逐字节比对 |
+| `smoke.a0` / `rel.a0` | 最小镜像；前向标签引用用例 |
+
+**`bootstrap/linux/a1/`（命名层）**
+
+| 文件 | 作用 |
+|---|---|
+| `a1.c` | freestanding 本体（`%name` 写 4 字节 PC 相对位移，`.zero` 只收十进制） |
+| `a1_ref.c` | 宿主 C oracle |
+| `a1.seed.hex` | A1 的文本种子；A0 和 A1 都能造出它 |
+| `from-hex.sh [out]` | 由 A0 从 `a1.seed.hex` 现生成 A1 |
+| `selfhost.sh` | `A0 < a1.seed.hex == A1` 且 `A1 < a1.seed.hex == A1` |
+| `a1_self.c` + `a1-selfhost.sh` | 源级自举：C0v2 的 BSS 变体编 `a1.c`，stage1 再编同一份文本得 stage2，二者相同 |
+| `build.sh` / `test.sh` / `smoke.a1` | 编自身；跑"跳过一个字符串后 exit 42"的镜像 |
+
+**`bootstrap/linux/c0/`（C 子集层）**
+
+| 文件 | 作用 |
+|---|---|
+| `c0.c` / `c0.seed.hex` | 第一代：函数/局部/控制流/表达式/全局 `int` 与 `int[]` |
+| `c0v2.c` / `c0v2.a1` | 主线：类型表 + `char` 宽度 + 1D/2D 数组 + `++/--` + 复合赋值 + 指针 |
+| `c0v2_bss.c` + `c0v2-bss-build.sh` | BSS 变体，用于编 `a1.c`（A1 源级自举的载体） |
+| `c0v2-build.sh` / `c0v2-selfhost.sh` | 编 C0v2；C0v2 重放自己的 A1 文本得到相同 ELF |
+| `c0v2-from-a1.sh` / `c0v2-from-a1-selfhost.sh` | 从 A1 种子生成 C0v2 二进制，并断言二进制不动点 |
+| `native-c1.sh` | **主入口**：seed → A0 → A1 → C0v2 → c1-bootstrap → C1 + c1l |
+| `native/` | `compiler-bootstrap.c`（冻结 C1，抬容量）与桥接用的源 |
+| `linux.sh` / `chain.sh` / `build.sh` / `selfhost.sh` | 早期 C0→C1 的中间脚本，主路径已不需要 |
+| `selfsource.sh` | 源级自举审计：把 `c0.c` 喂回 C0，看它卡在哪 |
+
+**C0 emitter 契约**（改 C0 前必须守住，`%Lxxxx`/立即数各占 4 字节）：
+
+```text
+头 + 两个 program header = 176 字节（0xB0）
+.zero 80 → 入口在 0x100，随后 :0100 与 :start
+.org 524288（0x80000）→ 文件偏移与虚拟地址一起跳到代码段之后
+代码段补齐到 0x80000；数据段起点 0x500000；整文件补齐到 0x480000（32 MiB）
+generated_bytes 从 0 起，每吐一个字节 +1，每处 %引用/立即数 +4，
+字符串算自身字节 + NUL；最后一次 .zero = 0x480000 - generated_bytes
+```
+
+定长镜像是刻意的：文本不动点要用 `cmp` 逐字节比较，长度必须完全确定。
+
+**尚未完成的 C0 语言项**（扩语言，不是闭合链）：2D 数组整体（`char name[256][64]`）、`char` 标量与数组宽度、非 `int` 指针的 `*p`/`p[i]`/算术、`char *` 形参与返回值、`c0.c` 用到的字符串/字符辅助函数。
