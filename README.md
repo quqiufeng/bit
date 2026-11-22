@@ -1,326 +1,204 @@
 # BitKindle Native
 
-> 以自举为目标的 C 工具链，Linux 与 Windows 各自原生发展。  
-> 状态：M1 SysV 自举（`stage1` = `stage2`）+ M2 hosted glibc 已打通 + C1 编译 TCC 0.9.27、完成 TCC 自举、基础原生链接和带 tests/busybox/busybox-1.36.1-tcc.patch 的完整 BusyBox 1.36.1 defconfig 构建并运行；cJSON/SQLite/Lua 5.4.7 实测通过；TCC 起始的 GCC 4.7 两遍自举、GCC 4.8~14.2 阶梯已由 `tests/gcc-ladder/run.sh` 一次干净跑通，每级 all-gcc/libgcc/libstdc++ 和 C++ iostream 均通过；GCC 4.8 起由 4.7 pass2 的 C++ 能力承接；GCC 4.7 configure 的 AC_PATH_PROG 路径探测不参与目标构建；两阶段 driver 已跑通：Stage 1 = C1 -> TCC -> Lua/BusyBox；Stage 2 = TCC -> GCC 14.2；完整 install/testsuite 尚未完成 · 暂定名
+> **从一个 5088 字节的手写火种出发，一层层长出一个能编译 TCC、TCC 又能编译自己的 C 编译器，
+> 再经 GCC 4.7 两遍自举爬上天梯，直到 GCC 14.2。**
+>
+> 整条链只用两条脚本、约 12 秒，中间零人工干预；每一层都有一条 `cmp` 断言，
+> 每一件产物跨运行逐字节可复现。
 
-本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把“从零构建自己的 C 工具链”这一目标带到 Linux，同时保留 Windows 的原生实现。两个平台共享语言前端、纯算法和语言测试；不共享 ABI、运行时、目标文件格式和链接器。
+本项目解决的是**编译信任链**问题：你机器上的编译器是二进制，那个二进制由更早的编译器编出来，
+一路追溯到一个谁也审计不了的起点。这里把那根链的"根"压缩到 5 KiB 可以眼睛读完的机器码，
+并让链上每一步都能被重新执行、被逐字节验证。
 
-**不是跨平台编译器，不做翻译层，不追求二进制或目标文件互通。**
+本项目受 [tombkeeper/BitKindle](https://github.com/tombkeeper/BitKindle) 启发，把"从零构建自己的 C 工具链"
+带到 Linux，同时保留 Windows 的原生实现。**不是跨平台编译器，不做翻译层，不追求二进制或目标文件互通。**
 
 ---
 
-## 这是什么
+## 1. 为什么要有这条链
 
-- **Linux 原生工具链**：目标为 SysV AMD64 ABI、ELF64；用户程序默认链接 glibc，使用系统链接器；编译器自身 freestanding，自举后不依赖外部 C 编译器。
-- **Windows 原生工具链**：目标为 Microsoft x64 ABI、PE32+；自带 CRT、自制 `.c1o` 目标格式和 PE 链接器；按 ABI 调用 DLL，不接 MinGW 构建生态。
-- **共享核心**：C 预处理、词法、语法、语义、诊断、纯算法（数学、格式化、扫描、字符串、TZif）和语言测试。
-- **最终目标**：两个平台各自完成自举——`stage1` 与 `stage2` 逐字节一致，构建自身不再需要外部 C 编译器。
+现代软件世界的底层是一个黑箱：`gcc` / `clang` 是几千万行的程序，发行版只给你编译好的二进制，
+它由上一代二进制编出来，代代相传。你可以读源码，但**你无法证明你跑的那个二进制就是那份源码的产物**。
+这条链追到某个点就断了，"信任"在那里变成信仰。
 
-## 不是什么
+这个项目做的是把断点尽可能往小推：
 
-本项目明确不做以下事情：
+- 仓库里唯一提交的二进制根是 `seed.elf`（5088 B）——一个 ~80 行、只用 `read`/`write`/`exit`
+  三个系统调用的 hex 解码器。语义能写在半张纸上，可以手工审计它没有后门。
+- 它自产自（`seed.elf < seed.hex == seed.elf`），之后一切——A0、A1、C0、C1、TCC、GCC——**全部由链上产物按需生成**，
+  没有第二个提交的二进制。
+- 每加一层，输入语言的抽象度升一级，输出仍压在下一层能吃的格式上。
+  这是"原始时期"的全部结构，细节见 [docs/boot.md](docs/boot.md)。
 
-- 不做 Linux ↔ Windows 的交叉编译。
-- 不做 Wine / Proton / WSL / 任何翻译层。
-- 不承诺 Linux 与 Windows 的二进制、目标文件、ABI 或运行时兼容。
-- 不把两个平台的差异抽象成一套“统一 OS 层”。
-- 不提供 Linux 上运行 Windows 二进制的能力；现成 Windows 程序由 Windows 自己运行。
-- 不支持 C++ ABI、STL、异常，也不以编译 C++ 游戏引擎为目标。
-- Windows 侧不接 COFF、`.lib`/`.a`、MinGW CRT、Windows SDK 头；只保证 DLL 导出 ABI 级兼容。
-- 不承诺直接编译使用 GNU/MSVC 扩展的任意现有项目；需要时按库提供最小 ABI 头或手写原型。
-- 不以“替换平台 libc/链接器”为第一目标。
+一句话版本：
 
-## 为什么分开
+> **seed 解字节 → A0 解地址 → A1 解标签 → C0v2 解 C 子集 → c1-bootstrap 解完整 C → C1 解 TCC → TCC 解自己。**
 
-两个平台对不齐不是工程量问题，而是模型冲突：
-
-- **类型模型**：Linux x86-64 是 LP64，Windows x64 是 LLP64；`long` 的宽度不同，`wchar_t` 分别是 32/16 位，`long double` 的格式和精度不同，`va_list` 的实现不同。
-- **OS 对象模型**：`fd` 对 `HANDLE`，`fork+exec` 对 `CreateProcess`，POSIX signal 对 SEH，UTF-8 字节路径对 UTF-16，文本/二进制模式不同，`errno` 对 `GetLastError`。
-- **装载与链接模型**：ELF + PLT/GOT + `ld.so` + TLS + 符号版本，对 PE/COFF + IAT + Windows loader。
-- **标准本身**：C 标准保留了大量 implementation-defined 行为，所谓“完全对齐”没有唯一答案。
-
-几十年的桥接方案——Cygwin、Wine、WSL1、MinGW 的 POSIX 层、Windows NT 的 POSIX 子系统——都只能做到“模拟”或“部分兼容”。本项目不重复这条路。
-
-**结论：共享语言，不共享平台。**
-
-## 平台路线
-
-| | Linux x86-64 | Windows x86-64 |
-| --- | --- | --- |
-| 定位 | 新增原生实现 | 上游参考实现，冻结后演进 |
-| ABI | SysV AMD64 | Microsoft x64 |
-| 数据模型 | LP64 | LLP64 |
-| 可执行格式 | ELF64 | PE32+ |
-| 用户程序标准库 | glibc（hosted） | 自带 CRT |
-| 链接 | 源码构建的 standalone `c1link`；hosted 测试仍用系统 `ld` | 自制 PE 链接器 |
-| 编译器自身 | freestanding（syscall + 自带最小运行时） | freestanding（kernel32 导入 + 自带运行时） |
-| 升级路径 | gcc stage0 → C1 自举 → 纯种子链（并行） | 现有 BitKindle 链 → 自举 |
-| 第三方库 | `.so` ABI 级调用 | DLL 导出 ABI 级调用（含 MinGW 编出的 DLL） |
-
-Linux 与 Windows 不需要对称。对称本身就是另一种“什么都想要”。
-
-## 架构一览
-
-```mermaid
-flowchart TB
-    subgraph Shared["共享：语言与纯计算"]
-        FE["预处理 / 词法 / 语法 / 语义 / 诊断"]
-        ALG["纯算法：数学 / 格式化 / 扫描 / 字符串 / TZif"]
-        TEST["语言一致性测试"]
-    end
-
-    subgraph Linux["Linux 原生"]
-        LTM["Target Model：LP64"]
-        LABI["SysV AMD64 ABI"]
-        LOBJ["ELF64 目标文件"]
-        LLINK["系统 ld（初期）/ 自制链接器（后置）"]
-        LRT["编译器：freestanding 运行时<br/>用户程序：glibc"]
-        LTM --> LABI --> LOBJ --> LLINK
-        LRT --> LOBJ
-    end
-
-    subgraph Windows["Windows 原生"]
-        WTM["Target Model：LLP64"]
-        WABI["Microsoft x64 ABI"]
-        WOBJ[".c1o 目标文件"]
-        WLINK["自制 PE 链接器"]
-        WRT["自带 CRT + kernel32 导入"]
-        WTM --> WABI --> WOBJ --> WLINK
-        WRT --> WOBJ
-    end
-
-    FE --> LTM
-    FE --> WTM
-    ALG --> LRT
-    ALG --> WRT
-    TEST --> Linux
-    TEST --> Windows
-```
-
-## 共享边界
-
-**共享（必须与 OS 无关）：**
-
-- 预处理、词法、语法、语义、AST、诊断、常量求值。
-- 纯算法：整数/浮点数学、`printf`/`scanf` 核心、字符串/内存操作、TZif 解析。
-- C 语言测试用例、编译失败用例、差分测试语料。
-- 编译器内部的纯数据结构和工具代码。
-
-**分叉（平台原生）：**
-
-- 目标数据模型、ABI、调用约定、结构体分类、varargs。
-- 启动代码、入口、系统调用/系统库、进程/时间/环境/控制台。
-- 目标文件写出、可执行文件写出、导入表、链接器。
-- 标准库的平台实现、平台头文件、类型定义。
-- 构建驱动、测试驱动、期望输出、CI。
-
-**原则：**
-
-- 不在共享代码里堆 `#ifdef`。需要平台差异时，分叉文件。
-- 共享是收益，不是目标。某个文件为了“两边都能用”开始变形，就让它分叉。
-- 唯一必须对齐的是 C 语言语义和语言测试；其余差异写进文档。
-
-## 自举路线
-
-```mermaid
-flowchart LR
-    G["gcc / MinGW-w64 GCC<br/>仅作 stage0"] --> S0["C1 stage0"]
-    S0 --> S1["C1 stage1<br/>自己编译自己"]
-    S1 --> S2["C1 stage2"]
-    S1 -. "逐字节比较" .-> S2
-    S2 --> TOOL["可长期使用的原生 C1"]
-```
-
-- **stage0** 可以使用平台原生 C 编译器，这是允许的“前期依赖”。
-- **stage1** 由 C1 自己编译；**stage2** 再编译一次；要求 stage1 与 stage2 逐字节一致。
-- 自举完成后，构建 C1 不再需要 gcc/MinGW GCC。
-- Linux freestanding 链已改用自制 `c1link`：gcc/ld 只负责构建最初的 bootstrap c1link，stage0/stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
-- Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）与 gcc stage0 路线并行推进：`bootstrap/linux/seed.S` 是手写十六进制解码器，`seed.hex` 可复现 `seed.elf`；`seed.elf` 从 `a0.seed.hex` 按需生成 A0，A0 从 `a1.seed.hex` 按需生成 A1，A0/A1 二进制不提交；Linux A1 参考实现和 freestanding 本体已完成；最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已支持函数/局部变量/控制流/表达式/全局变量，并能把 `bootstrap.c` 编成 A1、由 A1 装配成 ELF；C0 已能编译 bootstrap.c -> capacity -> C1，产物与上游 minimal-chain 逐字节一致；`c0/linux.sh` 已把 C0 产出的 C1 接入桥接，得到 SysV Linux C1；C0 源码级自举待做；上游最小链只作为对照，不作为 Linux 最终 C1。
-- Win64 PE C1 → SysV 桥接方案：`win32_runtime.c`（13 个符号）+ C 工具 `pe2elf.c` 的内置 stub + 上游 C1 编译 `linux/compiler.c` + c1link 闭合 stage1/stage2。
-
-## 能做什么 / 不能做什么
-
-| 场景 | Linux | Windows |
-| --- | --- | --- |
-| 编译 C89 + 部分 C99 到原生可执行文件 | 计划支持 | 计划沿用上游能力 |
-| 编译器自举 | 计划支持 | 计划沿用上游能力 |
-| 调用平台动态库 | `.so`，ABI 级 | DLL，ABI 级 |
-| 运行现成平台二进制 | 原生 Linux 程序 | 原生 Windows 程序 |
-| 在 Linux 运行 Windows 二进制 | 不做 | — |
-| 在 Windows 运行 Linux 二进制 | — | 不做 |
-| 链接 MinGW `.a` / COFF / `.lib` | — | 不做 |
-| 直接 include Windows SDK / GNU 扩展头 | — | 不做（按需最小头） |
-| 编译 C++ / 游戏引擎 | 不做 | 不做 |
-| 用工具链编 C + Win32/GDI 游戏 | — | 可行，上游 Mario 已验证 |
-| 用工具链编 C + SDL/OpenGL 游戏 | 可行方向，需最小头/导入 | 可行方向，需最小头/导入 |
-
-## 与上游 BitKindle 的关系
-
-- 上游 BitKindle 是 Windows x64 项目：3,584 字节十六进制种子、A0/A1 装配器、C0 过渡编译器、自举 C1、自制 `.c1o` 目标文件、自制 PE 链接器和自带运行时。
-- 上游明确不依赖 MSVC/GCC/Clang、Windows SDK 或外部链接器，也不支持 COFF `.obj/.lib`、通用 `windows.h`、DLL 生成。
-- 本项目把上游的 Windows 实现作为**参考实现**和可移植算法/测试的来源；Linux 侧是新的原生实现。
-- 本项目不是上游的官方分支，与上游作者无隶属关系。上游代码与文档按 MIT License 使用，保留版权与许可声明。
-
-## 目录结构（当前）
+## 2. 链长什么样
 
 ```text
-bit/
-├── build.sh                   # Linux 自举构建入口
-├── README.md
-├── docs/
-│   └── boot.md                # 从火种到 TCC 的原始时期
-├── linux/
-│   ├── compiler.c             # 移植后的 C1 编译器主体
-│   ├── elf-output.c           # ELF64 可重定位对象写出
-│   ├── linker.c               # C1 编译的静态 ELF 链接器
-│   ├── runtime.c              # freestanding 运行时 / 12 个平台符号
-│   ├── linuximports.h         # 编译器使用的运行时声明
-│   ├── startup-sysv.S         # SysV 入口（gcc stage0 与 C1 共用）
-│   ├── syscalls-sysv.S        # SysV syscall stub
-│   ├── link-hosted.sh         # crt1/crti + glibc + crtn 链接
-│   └── link-shared.sh         # C1 对象 -> .so
-├── include/
-│   ├── stdarg.h               # SysV va_list / va_start / va_arg
-│   ├── stddef.h
-│   ├── stdint.h
-│   ├── inttypes.h
-│   ├── stdbool.h
-│   ├── complex.h
-│   ├── wchar.h
-│   ├── wctype.h
-│   ├── poll.h
-│   ├── getopt.h
-│   ├── fnmatch.h
-│   ├── pwd.h
-│   ├── grp.h
-│   ├── netdb.h
-│   ├── regex.h
-│   ├── iconv.h
-│   ├── glob.h
-│   ├── limits.h
-│   ├── float.h
-│   ├── assert.h
-│   ├── stdio.h
-│   ├── stdlib.h
-│   ├── string.h
-│   ├── ctype.h
-│   ├── math.h
-│   ├── dlfcn.h
-│   ├── errno.h
-│   ├── setjmp.h
-│   ├── time.h
-│   ├── fcntl.h
-│   ├── unistd.h
-│   ├── signal.h
-│   ├── dirent.h
-│   ├── pthread.h
-│   └── sys/
-│       ├── types.h
-│       ├── stat.h
-│       ├── time.h
-│       ├── wait.h
-│       ├── socket.h
-│       ├── un.h
-│       ├── epoll.h
-│       ├── inotify.h
-│       ├── eventfd.h
-│       ├── timerfd.h
-│       ├── signalfd.h
-│       ├── memfd.h
-│       └── select.h
-├── netinet/
-│   └── in.h
-├── shared/
-│   ├── README.md
-│   ├── sources.json
-│   ├── float_parse.c
-│   └── diagnostic.c
-├── bootstrap/
-│   ├── README.md
-│   ├── from-seed.sh           # 无 gcc/ld 的 seed bundle 自举
-│   ├── minimal-chain.sh       # 上游 seed -> A0 -> A1 -> C0 -> C1
-│   ├── make-seed.sh
-│   ├── seed.sha256
-│   ├── seed-*.hex
-│   └── linux/                 # 零依赖 Linux 自举树
-│       ├── seed.S             # 手写十六进制解码器
-│       ├── seed.elf           # 种子可执行文件
-│       ├── seed.hex           # seed.elf 的原始十六进制
-│       └── a0/                # A0 契约、参考实现、汇编本体和测试
-├── windows/
-│   ├── README.md
-│   ├── upstream.lock
-│   └── upstream/              # 冻结的上游 Windows 参考树
-├── tools/
-│   ├── pe2elf.c               # 上游 PE seed/工具 -> Linux ELF 运行（宿主 gcc 构建）
-│   ├── pe2elf_stubs.S         # Win64 ABI kernel32 shim 源
-│   └── pe2elf_stubs.json/.bin/.h  # shim 偏移、二进制和 C 头
-├── examples/
-│   └── hello.c
-├── tests/
-│   ├── run.sh
-│   ├── run-hosted.sh
-│   ├── run-interop.sh
-│   ├── run-env.sh
-│   ├── run-linker.sh
-│   ├── run-selflink.sh
-│   ├── run-linker-selfhost.sh
-│   ├── run-static-pie.sh
-│   ├── run-archive.sh
-│   ├── run-shared.sh
-│   ├── run-dynamic.sh
-│   ├── shlib/                  # C1 对象 -> .so 测试
-│   ├── dynamic/                # C1 动态可执行文件测试
-│   ├── sysv/                  # SysV ABI/语言回归测试
-│   ├── hosted/                # glibc hosted 互操作测试
-│   ├── interop/               # C1 <-> gcc ABI 双向互操作测试
-│   └── reject/                # 明确拒绝的未实现特性
-├── LICENSE
-└── NOTICE
+seed.elf (5 KiB, 唯一的二进制根)
+  ├─ 自产自:  seed.elf < seed.hex == seed.elf
+  ▼
+A0 (10 KiB)        hex 字节 + ^地址 + %相对引用        → ELF64 映像，不编码指令
+  ▼
+A1 (26 KiB)        + :name %name "str" .zero .org      → 同一个 ELF 映像
+  ▼
+C0v2 (32 MiB 镜像) C 子集源码                          → A1 汇编文本（定长，可 cmp）
+  ▼
+c1-bootstrap       C0v2 编一份抬了容量的冻结 C1        → 能编"完整 C"，是通往最终 C1 的桥
+  ▼
+C1 + c1l           完整 C（指针/char/结构体/全局）      → ELF .o / 自带链接器
+  │  stage1 == stage2（C1 编译自己，两代产物逐字节相同）
+  ▼
+TCC 0.9.27         C1 编 1 万行 TCC；gcc 只做一次链接   → 原始时期结束
+  │  TCC 自建 libtcc1.a → TCC 编自己 → 换一代再编一次仍是同一份二进制
+  ▼
+GCC 4.7（两遍） → 4.8 → 4.9 → 5.5 → 7.5 → 9.5 → 12.3 → 13.3 → GCC 14.2
 ```
 
-共享前端、hosted 运行时、Windows 目录等仍按设计逐步加入。
+| 层 | 产物 | 输入 | 断言（"我怎么知道它没坏"） |
+|---|---|---|---|
+| L0 | `seed.elf` 5088 B | `seed.hex` 字符流 | 自产自逐字节相同 |
+| L1 | A0 10232 B | hex 字节 / `^` / `%` | `A0 < a0.seed.hex == A0` |
+| L2 | A1 26376 B | A0 语法 + 标签/字符串 | `A1 < a1.seed.hex == A1` |
+| L3 | C0v2 134446 B A1 文本 | C 子集源码 | 文本不动点 + 二进制不动点 |
+| L4 | c1-bootstrap 32 MiB | 同上 | 能编出最终 C1，且该 C1 自举闭合 |
+| L5 | `c1.elf` 631440 B + `native-linker` | 完整 C | `stage1 == stage2` |
+| L6 | `tcc.o` 928 KB → `bit-tcc-bin` | 标准 C | 二代不动点：`self3 == self4`、`stage2 == stage3` |
+| 天梯 | 10 级 GCC | TCC → 4.7 ×2 → 14.2 | 每级 all-gcc/libgcc/libstdc++ + C++ iostream 实跑 |
 
-## 路线图
+天梯里的每一级都是**真编译器**：它编自己、编 C++ 标准库、编一个 hello 并运行。
+4.7 之所以要两遍，是因为它第一次只能用 TCC 的 C 编译器，第二遍才用上自己的 C++ 前端，
+后面 4.8 起全部由上一级的 C++ 能力承接。
 
-| 阶段 | 内容 | 状态 |
-| --- | --- | --- |
-| M0 | 项目介绍、技术设计、平台契约、共享/分叉清单 | 已完成 |
-| M1 | Linux freestanding：gcc stage0、SysV ABI、ELF `.o`、系统 `ld`、hello、自举 | 进行中：`stage1` = `stage2`、整数/指针/浮点（含 NaN）/varargs/聚合/80-bit long double/packed/_Complex long double/32-bit wchar_t 与宽字符串已通过；纯种子链待补 |
-| M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP/UNIX sockets/select/poll/epoll/inotify/eventfd/timerfd/signalfd/memfd/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex/iconv/glob/ioctl/statvfs/getauxval 已通过；更多头/边界待完成 |
-| M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
-| M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头、TCC/Linux 生态 | 进行中；C1 已编译 TCC 0.9.27 并完成 TCC 自举：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；上游最小 seed→A0/A1→C0→C1 链已能在 Linux 上跑通（产物仍是 Windows C1，仅作对照）；零依赖 Linux 树已有手写 seed 解码器：`seed.hex` 复现 `seed.elf`；`seed.elf` 从 `a0.seed.hex` 按需生成 A0，A0 从 `a1.seed.hex` 按需生成 A1，A0/A1 二进制不提交；A0 的 C 参考实现与 syscall-only 汇编本体已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出；Linux A1 参考实现和 freestanding 本体已完成；最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已支持函数/局部变量/控制流/表达式/全局变量，并能把 `bootstrap.c` 编成 A1、由 A1 装配成 ELF；C0 已能编译 bootstrap.c -> capacity -> C1，产物与上游 minimal-chain 逐字节一致；`c0/linux.sh` 已把 C0 产出的 C1 接入桥接，得到 SysV Linux C1；C0 源码级自举待做；Win64 C1 → SysV 桥接已完成：`bootstrap/bridge.sh` 用上游 C1 产出 SysV stage1/stage2，`stage1 == stage2`；仍依赖上游 seed/PE 链接器，尚未零依赖；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。hosted glibc 测试仍用系统 `ld`；Linux 原生 C1 已打通：C0v2 直接从 A1 生成 Linux C1，原生 C1 能编译 `compiler.c`/`runtime.c`，链接后的 stage1 再编译 `compiler.c` 得到逐字节相同的 stage2 对象；`native-c1.sh` 已进入 `build.sh`，原生 C1 能自举，原生 linker 也能用自己重新链接出逐字节相同的二进制；`native-c1.sh` 只使用按需从 `a0.seed.hex`/`a1.seed.hex` 生成的 A0/A1 以及已提交的 C0v2/C1/linker/startup/syscalls 种子；C1 新增 `-E` 模式，直接输出 `preprocess()` 后的 `source[]` token 流，用于逐步替换宿主 `cc -E`，不再依赖 Windows PE、pe2elf、build/c1link、C1-built A1 或宿主编译器 |
+## 3. 它证明了什么，没证明什么
 
-## 快速开始
+这是本文档最想讲清楚的一点，也是最容易被误读的一点。
 
-当前 Linux 自举链：
+**它证明的是**：存在一条从 5 KiB 可审计机器码到发行版级 GCC 14.2 的完整、可重放、逐字节可验证的构建路径。
+每一步的产物要么由更下一层重放得到，要么有跨运行一致的哈希。这是**一份工程证书（certificate）**：
+它把"我用了一个黑箱编译器"变成"我跑了一条我能从头检查的链"。
+
+**它没有证明**：链上没有任何后门。不动点只证明**一致性**——编译器编自己得到同一份输出，
+不排除"两代都错得一样"（Thompson 的 `login` 后门正是这样传播的）。真正的对手模型需要的是
+可复现构建的**多方独立验证**，而这里的价值在于：参与验证的那一方，现在只需要审计 5 KiB。
+
+**信任根仍然存在**，写在这里而不是藏在脚注：
+
+- `seed.elf` 由宿主 `cc` 汇编 `seed.S` 得到（产物已提交并哈希，不在推理路径上）。
+- 用户程序仍然用系统 `ld`/glibc；C1 自身 freestanding，但 TCC 的**第一次**链接需要一次 `gcc`（只链接，不编译）。
+- C1 不支持内联汇编，`_start`/syscall 桩靠 `helpers.a1` + 一次宿主链接补齐。
+
+这些是"还没闭合"，不是"假装闭合"。四个未闭合项和取舍理由逐条列在 [boot.md §9](docs/boot.md)。
+
+## 4. 实测证据（Ubuntu 24.04 / gcc 13.3 / 6 核）
+
+**种子 → TCC，两条命令，12196 ms**
+
+```sh
+BUILD=$PWD/build/fromzero ./bootstrap/native-zero.sh
+#   PASS: native Linux C1 and native linker reach stage1 == stage2
+C1=$PWD/build/fromzero/native-c1/c1.elf OUT=$PWD/build/fromzero/tcc ./tests/tcc/upstream.sh
+#   PASS: C1 -> TCC -> TCC self-host + TCC native link
+```
+
+耗时拆分：L0–L5 4273 ms，L5–L6 7923 ms。换一个空目录重跑，16 个共享产物 sha256 全同。
+
+| 层 | 产物 | 大小 | sha256[:16] | 谁编的 |
+|---|---|---|---|---|
+| L0 | `seed.elf` | 5088 B | `65788853cae62f45` | cc（唯一提交的二进制） |
+| L1 | `a0.seed.elf` | 10232 B | `cc2fd3b2559aba8d` | `seed.elf` |
+| L2 | `a1.seed.elf` | 26376 B | `fb8e12b0321271ec` | A0 |
+| L3 | `c0v2.a1` | 134446 B | `7fedbb542fc080c2` | 固化的 A1 文本 |
+| L5 | `c1.elf` = stage1 | 631440 B | `3eee9994795cf3ad` | c1-bootstrap + c1l |
+| L6 | `tcc.o` | 928824 B | `5b64414b1dcf41c4` | C1 |
+| L6 | `tcc-stage2` = `tcc-stage3` | 317276 B | `9f7c9762ad5bf467` | TCC 链自己 |
+
+**TCC → GCC 14.2，一次干净跑通**
+
+```sh
+JOBS=6 SRC_BASE=/opt/src/gcc BUILD_BASE=/opt/gcc-ladder-2026 sh tests/gcc-ladder/run.sh
+#   PASS: 4.7-pass1 … 14.2        （10 级）
+#   PASS: TCC -> GCC 4.7 (2 passes) -> GCC 14.2
+```
+
+每个阶段留下 `log/<name>-witness.txt`（编译器版本、自编 C/C++ 程序的运行结果与哈希）和
+`log/<name>-MANIFEST`（cc1/cc1plus/xgcc/libstdc++ 的大小与哈希）——审计证据先落盘，再谈删构建树。
+
+**跑完怎么瘦**：19 GB 构建树 → 1.3 GB 可执行件。`tests/gcc-ladder/prune.sh` 每级只保留
+`cc1`/`cc1plus`/`lto1`/`xgcc`/`collect2`/`lto-wrapper`/`liblto_plugin.so`、`crt*.o`、`libgcc*`、
+`libstdc++.so` 和头文件，全 `strip`，并生成 `smoke-c`/`smoke-cxx` 包装脚本现场验证：
+
+```sh
+sh tests/gcc-ladder/prune.sh /opt/gcc-ladder-2026 /opt/gcc-ladder-bin
+#   10 级合计 1.3 GB（58–196 MB/级），env -i 下逐级 C 与 C++ 全绿
+#   4.7-pass1: c-ok 4.7.4     14.2: cxx-ok 14.2.0
+```
+
+## 5. 这条链能拿来干什么
+
+1. **可复现构建的独立验算路径。** 想验证你手上的 gcc 有没有被动过手脚，不必从零写编译器：
+   从 5 KiB 种子起跑一遍，比对你构建出的产物与发行版是否一致。审计成本从"几千万行"降到"5088 字节"。
+2. **一个能长期自持的工具链，尺寸可控。** 裁剪后每级 60–200 MB，能编 C 和 C++、能编自己的标准库，
+   不依赖外部 C 编译器（构建 C1 不需要 gcc，只有 TCC 首次链接破例一次）。
+3. **接入现有 Linux 生态。** 14.2 就是发行版级编译器：libc/POSIX、`pthread`、socket、
+   epoll/inotify/eventfd、`dlopen`、BusyBox 1.36.1 defconfig、cJSON、SQLite、Lua 5.4.7、
+   QEMU 最小内核 + SSH 都已在本链产物上跑过。
+4. **一个能读完的教学与审计样本。** 每层 80 行到 1.2 万行，输入输出都是 stdin/stdout 过滤器形态：
+   没有文件名、没有搜索路径、没有 `-o`，只有字节流。想搞清"编译器是从哪儿来的"，这条链可以一节一节读。
+
+## 6. 边界
+
+- **不是跨平台编译器。** Linux x86-64（SysV/ELF64/glibc）与 Windows x86-64（MS x64/PE32+/自带 CRT）
+  是两条独立线，只共享语言前端与纯算法；不共享 ABI、运行时、目标文件格式、链接器。
+  不做 Wine/WSL/MinGW 那一套"兼容层"，也不承诺两边二进制互通。
+- **不做 C++ 编译器。** 不做 C++ ABI/STL/异常。天梯里的 C++ 能力来自真正的 GCC，
+  不是 C1 自己实现的。
+- **不做形式化证明。** 这条链是证书不是定理；不动点证明一致性，不证明无害。
+- **Windows 侧**沿用上游冻结参考实现，尚未整合进本仓库构建。
+
+## 7. 快速开始
 
 ```bash
-./build.sh
+git clone git@github.com:quqiufeng/bit.git && cd bit
+
+# ① 零基自举：seed → A0 → A1 → C0v2 → C1 + c1l（不需要 gcc/ld）
+BUILD=$PWD/build/fromzero ./bootstrap/native-zero.sh
+
+# ② C1 编 TCC，TCC 自建运行时并编自己
+C1=$PWD/build/fromzero/native-c1/c1.elf OUT=$PWD/build/fromzero/tcc ./tests/tcc/upstream.sh
+
+# ③ 上天梯（需事先下载 9 个 GCC tarball：tests/gcc-ladder/fetch.sh）
+JOBS=6 SRC_BASE=/opt/src/gcc BUILD_BASE=/opt/gcc-ladder sh tests/gcc-ladder/run.sh
 ```
 
-脚本会构建 gcc stage0，产出 `build/c1-stage0`、`build/c1-stage1`、`build/c1-stage2`，并检查：
+日常开发用 `./build.sh`（gcc stage0 路线，最快）：它产出 `build/c1-stage0/1/2` 并断言
+`compiler1.o == compiler2.o`、`runtime1.o == runtime2.o`、`stage1 == stage2`、hello 可跑，
+再跑 `tests/sysv`、`tests/hosted`、`tests/interop`（C1 ↔ gcc 双向 ABI）、`tests/reject`。
 
-- `compiler1.o` 与 `compiler2.o` 逐字节一致；
-- `runtime1.o` 与 `runtime2.o` 逐字节一致；
-- `c1-stage1` 与 `c1-stage2` 逐字节一致；
-- `examples/hello.c` 可编译、链接并运行；
-- `tests/sysv/*.c` 的整数/浮点寄存器与栈参数、LP64/`stdint.h`/`limits.h`、预定义目标宏、函数指针、全局初始化、递归、varargs/va_list 等测试通过；
-- `tests/hosted/*.c` 通过系统 crt + glibc 运行，覆盖 c1link `--shared` 生成的 C1 `.so` 被 `dlopen`，以及 `malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`；
-- `tests/interop/` 验证 C1 与 gcc 在整数/浮点聚合（含 8/12/16 字节与 >16 字节内存类）上的双向 ABI 互操作；
-- `tests/reject/` 验证未实现的 `__int128` 会明确报错；`tests/run-env.sh` 验证 `C1_INCLUDE`/`C1_STANDARD` 在仓库外可用。
+## 8. 入口速查
 
-Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
+| 命令 | 作用 |
+|---|---|
+| `bootstrap/linux/c0/native-c1.sh` | **主入口**：零基种子 → C1 + c1l（由 `native-zero.sh` 调用） |
+| `bootstrap/from-seed.sh` | 历史过渡入口：固化的 4 个 hex → C1 不动点（快速回归用） |
+| `tests/tcc/upstream.sh` | C1 → TCC → TCC 自举 + TCC 原生链接 |
+| `tests/gcc-ladder/run.sh` | TCC → GCC 4.7 两遍 → 14.2，逐级 witness |
+| `tests/gcc-ladder/prune.sh` | 构建树 → 可执行件（19 GB → 1.3 GB） |
+| `tests/selfhost-pipeline.sh` | 两阶段全景：C1 → TCC → Lua/BusyBox；TCC → GCC 14.2 |
+| `tests/mini-kernel/ssh.sh` | QEMU 最小内核 + BusyBox + Lua + SSH |
 
-## 文档
+## 9. 文档
 
-- [BOOT：从火种到 TCC 的原始时期](docs/boot.md)：seed → A0 → A1 → C0v2 → C1 → TCC 的逐层流程、不动点清单、实测哈希与信任边界。
-- 入口脚本：`bootstrap/native-zero.sh`（零依赖 Linux 链）、`tests/gcc-ladder/run.sh`（TCC → GCC 14.2 天梯）、`tests/selfhost-pipeline.sh`（C1 -> TCC -> Lua/BusyBox -> GCC 14.2）、`tests/mini-kernel/ssh.sh`（QEMU 最小内核 + BusyBox + Lua + SSH）。各自的用法见所在目录的 `README.md`。
+- **[docs/boot.md](docs/boot.md)** — 从火种到 TCC 的原始时期：逐层讲清每一层为什么存在、
+  不动点清单、实测哈希与耗时、三个实测踩到的坑、信任边界、未闭合项、一页速查。
+- `tests/gcc-ladder/SOURCES.md` — 源码策略：只留 9 个 tarball + SHA256SUMS，解压树按需重建。
+- 各条入口的用法见所在目录的 `README.md`。
+- 历史设计文档（`DESIGN.md`、`WHITEPAPER.zh-CN.md`、`C0_REFACTOR.md`、`SEED_GRAPH.md` 等）
+  已于 2026-11 清理，需要时从 git 历史取：`git show 792784d:docs/DESIGN.md`。
 
-历史上的设计文档（`DESIGN.md`、`WHITEPAPER.zh-CN.md`、`map.md`、`C0_REFACTOR.md`、`FUZZING.md`、`SEED_GRAPH.md`、`NATIVE_BOOTSTRAP.md`、`MINI_OS_IMAGE.zh-CN.md`）已于 2026-11 清理，需要时从 git 历史取：`git show 792784d:docs/DESIGN.md`。
+## 10. 许可证
 
-## 许可证
-
-本项目采用 [Apache License 2.0](LICENSE)。  
-上游 BitKindle 的代码与文档按 MIT License 使用，版权归其贡献者所有；相关归属与 MIT 许可文本见 [NOTICE](NOTICE)。
+本项目采用 [Apache License 2.0](LICENSE)。
+上游 BitKindle 的代码与文档按 MIT License 使用，版权归其贡献者所有；归属与 MIT 许可文本见 [NOTICE](NOTICE)。
