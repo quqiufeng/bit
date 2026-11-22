@@ -139,6 +139,66 @@ $BUILD_BASE/log/<stage>-hello.out
 
 A stage passes only after its own C++ hello is compiled and run.
 
+The full build tree is heavy: a completed run of all ten stages came to 19 GB
+(6.1 GB of intermediate `.o`, 2.3 GB of `.a`, 5.2 GB of unstripped binaries;
+the 14.2 `cc1` alone is 324.8 MB).
+
+## Pruned runtime trees
+
+Once the ladder has passed, `prune.sh` reduces the build tree to compilers that
+can still compile and link C and C++:
+
+```sh
+sh tests/gcc-ladder/prune.sh /opt/gcc-ladder-2026 /opt/gcc-ladder-bin
+# optional: STAGES="4.7-pass1:4.7.4 14.2:14.2.0" ... to pick stages
+```
+
+```text
+$OUT/<stage>/gcc       stripped cc1 cc1plus lto1 lto-dump xgcc collect2
+                       lto-wrapper liblto_plugin.so, crt*.o, libgcc*.a
+$OUT/<stage>/lib       libgcc_s.so, libstdc++.so
+$OUT/<stage>/include   headers, with include/c++/<ver>/ relinked
+$OUT/<stage>/bin       <stage>-gcc / <stage>-g++ wrappers
+                       (-B<stage>/gcc -I<stage>/include/c++/<ver>
+                        -L<stage>/lib, C++ adds -Wl,-rpath -lstdc++)
+$OUT/bin               symlinks to every stage wrapper
+$OUT/<stage>/smoke-c, smoke-cxx
+                       the smoke programs themselves (kept as evidence)
+$OUT/.hdr/             header cache materialized from the tarballs
+$OUT/MANIFEST.txt      size + sha256 of every kept file
+$OUT/log/              per-stage prune logs, build logs, witness, manifest
+```
+
+Measured on the completed run: 19 GB -> **1.3 GB** for all ten stages
+(58-196 MB each), every stage compiling and running one C and one C++ program
+with its own compiler and its own headers/libstdc++.  Using a pruned stage:
+
+```sh
+/opt/gcc-ladder-bin/bin/14.2-gcc hello.c -o hello && ./hello
+/opt/gcc-ladder-bin/bin/9.5-g++ hello.cc -o hello
+```
+
+`PATH` must still contain a host assembler and linker: the pruned tree supplies
+the compiler, headers and runtime libraries only, so `as` and `ld` remain
+borrowed (see the trust boundary in `docs/boot.md`).  With `env -i` the driver
+fails with `collect2: fatal error: cannot find 'ld'`.
+
+Deleting the build trees afterwards leaves only `log/` and `wrap/`:
+
+```sh
+rm -rf /opt/gcc-ladder-2026/{4.7-pass1,4.7-pass2,4.8,4.9,5.5,7.5,9.5,12.3,13.3,14.2}
+```
+
+Three things the script has to work around:
+
+```text
+Headers in a build tree are symlinks into the source tree, which is deleted
+  after the run -> materialized from the tarball and std/bits relinked
+gcc/liblto_plugin.so is itself a symlink for 4.7-9.5 -> copied dereferenced,
+  else xgcc fails with "-fuse-linker-plugin, but liblto_plugin.so not found"
+libstdc++.so lives outside lib/ -> the smoke wrappers pass -rpath and -lstdc++
+```
+
 ## Not yet covered
 
 ```text
