@@ -74,7 +74,7 @@ seed.S ──cc──▶ seed.elf (5088 B, 手写 hex 解码器)          ← �
 | L5 | C1 + c1l | `linux/compiler.c`、`runtime.c`、`linker.c`、`standalone-*.c` | 完整 C（含指针/char/结构体） | ELF64 `.o`（stdout） | 11989 行 / 372 KB |
 | L6 | TCC | `tcc-0.9.27/` | 标准 C | ELF `.o` + 自建链接 | `tcc.o` 928 KB |
 
-所有层都不链接 libc（L6 的第一次链接除外，见 §5）。所有层都是"stdin 读源、stdout 写产物"的过滤器形态，这是刻意的：**没有文件名、没有搜索路径、没有 `-o`，只有字节流**，因为文件系统操作是下一层才敢碰的东西。
+所有层都不链接 libc（L6 的第一次链接除外，见 §6）。所有层都是"stdin 读源、stdout 写产物"的过滤器形态，这是刻意的：**没有文件名、没有搜索路径、没有 `-o`，只有字节流**，因为文件系统操作是下一层才敢碰的东西。
 
 ---
 
@@ -126,7 +126,7 @@ A0 < a1.seed.hex  == A1     # 由上一层造出
 A1 < a1.seed.hex  == A1     # 自己造出自己
 ```
 
-注意 `a1/a1_self.c` + `a1-selfhost.sh` 走的是"源级自举"：用 C0v2 的 **BSS 变体**（`c0v2_bss.c`，见 §6）编译 `a1.c` 得到 `stage1.elf`，再让它编译同一份 A1 汇编文本得到 `stage2.elf`，两者二进制相同。也就是说 A1 有两个独立入口：一份是 `a1.seed.hex`（字节级），一份是 `a1_self.c`（源码级）。
+注意 `a1/a1_self.c` + `a1-selfhost.sh` 走的是"源级自举"：用 C0v2 的 **BSS 变体**（`c0v2_bss.c`，见 §7）编译 `a1.c` 得到 `stage1.elf`，再让它编译同一份 A1 汇编文本得到 `stage2.elf`，两者二进制相同。也就是说 A1 有两个独立入口：一份是 `a1.seed.hex`（字节级），一份是 `a1_self.c`（源码级）。
 
 ### L3 C0 / C0v2：C 子集 → **A1 文本**
 
@@ -219,13 +219,24 @@ TCC 一旦跑起来，就自己接管：
 ```sh
 bit-tcc -c lib/libtcc1.c -o runtime/libtcc1.o   # 自建运行时
 ar rcs runtime/libtcc1.a ...
-bit-tcc -nostdinc -c tcc.c -o tcc-self1.o       # 自己编自己
-bit-tcc -nostdinc -c tcc.c -o tcc-self2.o
-cmp tcc-self1.o tcc-self2.o                     # 不动点
-bit-tcc -o tcc-stage2 tcc-self1.o -ldl -lm      # 自己链自己
+bit-tcc -B runtime -nostdinc -c tcc.c -o tcc-self1.o   # 自己编自己
+bit-tcc -B runtime -nostdinc -c tcc.c -o tcc-self2.o
+cmp tcc-self1.o tcc-self2.o                     # 一代不动点（同二进制的两次运行）
+bit-tcc -B runtime -o tcc-stage2 tcc-self1.o -ldl -lm  # 自己链自己
+
+# 真正的闭合要换一代编译器再编一次
+tcc-stage2 -B runtime -nostdinc -c tcc.c -o tcc-self3.o
+tcc-stage2 -B runtime -o tcc-stage3 tcc-self3.o -ldl -lm
+tcc-stage3 -B runtime -nostdinc -c tcc.c -o tcc-self4.o
+cmp tcc-self3.o tcc-self4.o                     # ★ 二代不动点
+cmp tcc-stage2 tcc-stage3                        # ★ 连二进制也相同
 ```
 
-`tcc-self1.o` 与 `tcc-self2.o`（各 520256 B）相同，说明 TCC 的代码生成对自身源码稳定。从 `bit-tcc-bin` 起，libc 调用、`-shared`、`-L/-l`、`ar` 都能用了——**原始时期结束**。
+实测：`tcc-self1.o == tcc-self2.o`（各 520256 B），`tcc-stage2 == tcc-stage3`（各 317276 B，sha256 `9f7c9762…`），说明 TCC 的代码生成对自身源码稳定。两代之间不要比：`tcc-self3.o`（TCC 编，520236 B）与 `tcc-self1.o`（C1 编）**本来就不同**，那是"两个编译器的产物"而非不动点。细节见 §5.2、§5.3。
+
+`-B runtime` 不是可选项：没有它，`tcc-stage2` 会去找 `$PATH` 里的 gcc 头文件，撞上 `stdarg.h` 的 `__gnuc_va_list`。`upstream.sh` 生成的 `bit-tcc` 包装脚本已内置，裸二进制要自己加。
+
+从 `bit-tcc-bin` 起，libc 调用、`-shared`、`-L/-l`、`ar` 都能用了——**原始时期结束**。
 
 ---
 
@@ -249,10 +260,10 @@ bootstrap/linux/a1/a1-selfhost.sh
 # L3→L5 全链：种子里程碑 + C1 stage1==stage2 + TCC
 bootstrap/linux/c0/native-c1.sh     # 或 ./build.sh / ./build-zero.sh
 
-# L5→L6 TCC 自举
-tests/tcc/upstream.sh
+# L5→L6 TCC 自举（C1 编 TCC + TCC 自编自链）
+C1=$PWD/build/fromzero/native-c1/c1.elf OUT=$PWD/build/fromzero/tcc tests/tcc/upstream.sh
 
-# 过渡种子包（另一条入口，见 §7）
+# 过渡种子包（另一条入口，见 §8）
 bootstrap/from-seed.sh
 ```
 
@@ -260,7 +271,73 @@ bootstrap/from-seed.sh
 
 ---
 
-## 5. 宿主工具出现在哪里（信任边界）
+## 5. 完整跑一遍：空目录 → TCC（实测记录）
+
+§3 讲的是"为什么要有这些层"，这里讲"怎么一次跑完"。**两条脚本、约 12 秒、中间零人工干预**：
+
+```sh
+git clone git@github.com:quqiufeng/bit.git && cd bit
+
+# ① 种子 → A0 → A1 → C0v2 → c1-bootstrap → C1 + c1l
+BUILD=$PWD/build/fromzero ./bootstrap/native-zero.sh
+#   PASS: native Linux C1 and native linker reach stage1 == stage2
+
+# ② C1 编 TCC → TCC 自建运行时 → TCC 编自己
+C1=$PWD/build/fromzero/native-c1/c1.elf \
+OUT=$PWD/build/fromzero/tcc ./tests/tcc/upstream.sh
+#   PASS: C1 -> TCC -> TCC self-host + TCC native link
+```
+
+`BUILD` / `C1` / `OUT` 三个变量是为了把产物落到一个干净目录（默认 `build/`，已在 `.gitignore` 里）。不设也行。两条脚本都是 `set -eu`，任何一层的 `cmp` 不过就立刻退出——**`PASS` 本身就是断言通过的回执**，不是"跑完了"的客套话。
+
+### 5.1 实测产物（Ubuntu 24.04 / gcc 13.3 / 6 核）
+
+| 层 | 产物 | 大小 | sha256[:16] | 谁编的 |
+|---|---|---|---|---|
+| L0 | `seed.elf` | 5088 B | `65788853cae62f45` | cc（产物已提交） |
+| L1 | `a0.seed.elf` | 10232 B | `cc2fd3b2559aba8d` | `seed.elf < a0.seed.hex` |
+| L2 | `a1.seed.elf` | 26376 B | `fb8e12b0321271ec` | `A0 < a1.seed.hex` |
+| L3 | `c0v2.a1` | 134446 B | `7fedbb542fc080c2` | 仓库里固化的 A1 文本 |
+| L4 | `c0v2-seed.elf` | 32 MiB | `636a7c94c74c6837` | `A1 < c0v2.a1` |
+| L4 | `c1-bootstrap.elf` | 32 MiB | `efadc4d022e94e3d` | `C0v2 < compiler-bootstrap.c` + `helpers.a1` |
+| L5 | `c1.elf` = `stage1` | 631440 B | `3eee9994795cf3ad` | `c1-bootstrap < compiler.c` + `c1l` 链接 |
+| L5 | `c1l.elf`（32 MiB 镜像） | → `native-linker` 83760 B | `d1606d6b…` / `c70f84e1…` | `C0v2 < standalone-*.c` |
+| L6 | `tcc.o` | 928824 B | `5b64414b1dcf41c4` | `C1 < tcc.c` |
+| L6 | `bit-tcc-bin` | 744864 B | `2ca814bd8832ed84` | **gcc 只负责链接** |
+| L6 | `tcc-self1.o` = `tcc-self2.o` | 520256 B | `9dc6ff9819305c33` | `bit-tcc < tcc.c` |
+| L6 | `tcc-stage2` = `tcc-stage3` | 317276 B | `9f7c9762ad5bf467` | TCC 链自己 |
+
+哈希全部是**跨运行可复现**的：换一个 `BUILD` 目录重跑，同一层的产物逐字节相同。这是"链没坏"的第二个证据，比单次 `cmp` 更强——它同时排除了"两次都错得一样"以外的偶然。
+
+### 5.2 TCC 自举要怎么算闭合
+
+单次 `cmp tcc-self1.o tcc-self2.o` 只是**同一份二进制跑到两次结果一样**，说服力有限。真正的判据是**换一代编译器再编一次**：
+
+```sh
+bit-tcc    -nostdinc -c tcc.c -o tcc-self1.o   … 编出 self1
+bit-tcc    -o tcc-stage2 tcc-self1.o -ldl -lm  … 第一代 TCC
+tcc-stage2 -nostdinc -c tcc.c -o tcc-self3.o   … 第二代产物
+tcc-stage2 -o tcc-stage3 tcc-self3.o -ldl -lm  … 第二代 TCC
+tcc-stage3 -nostdinc -c tcc.c -o tcc-self4.o
+cmp tcc-self3.o tcc-self4.o   # ← 这才是闭合
+cmp tcc-stage2  tcc-stage3    # ← 而且二进制也相同
+```
+
+两条 `cmp` 都过，才是"TCC 能编译 TCC"。`tcc-stage3 -v` 输出 `tcc version 0.9.27 (x86_64 Linux)`。
+
+注意 `tests/tcc/upstream.sh` 只跑到 `tcc-stage2`（一代不动点 + 原生链接），二代那三行目前是手工补的——所以 §4 清单里的 `PASS` 是**必要条件**，§5.2 的两条 `cmp` 才是充分条件。
+
+### 5.3 三个实测踩到的坑
+
+1. **跨编译器的 `cmp` 没有意义。** `tcc-self1.o`（C1 编）与 `tcc-self3.o`（TCC 编）**不同**，从第 41 字节起分叉。这不是链断了，是两个编译器生成的机器码本来就不同。不动点只能在**同一编译器代际内**比较（self3 == self4），跨代比的是产物，不是不动点。
+2. **`tcc-stage2` 必须带 `-B runtime`。** 不带的话它会退回 `$PATH` 里的 gcc，把 `/usr/lib/gcc/.../include/stdarg.h` 拉进来，报 `';' expected (got "__gnuc_va_list")`。TCC 自举靠的是自建的 `runtime/include`，不是宿主的头文件。`upstream.sh` 生成的 `bit-tcc` 包装脚本已经内置了这个 `-B`，直接调裸二进制时要自己加。
+3. **`-nostdinc` 不能省。** 自举命令带 `-nostdinc -Itcc-0.9.27/include -Iinclude`，最后那个 `include/` 是本仓库的兼容层（补 `__REDIRECT` 一类 glibc 宏）。少了它同样会撞上宿主头文件。
+
+三条坑的共同含义：**TCC 自举的边界不在"能不能编自己"，而在"它吃哪套头文件"。** 见 §9 第 4 条。
+
+---
+
+## 6. 宿主工具出现在哪里（信任边界）
 
 原始时期里，宿主 C 编译器/工具只出现在下面这些位置，而且**产物都进哈希清单**（`bootstrap/linux/c0/native/seeds.sha256`、`bootstrap/seed.sha256`）：
 
@@ -275,7 +352,7 @@ bootstrap/from-seed.sh
 
 ---
 
-## 6. 容量与硬约束（为什么代码长成这样）
+## 7. 容量与硬约束（为什么代码长成这样）
 
 读源码时会反复撞到这些数字，它们不是随手写的：
 
@@ -293,7 +370,7 @@ bootstrap/from-seed.sh
 
 ---
 
-## 7. 两条入口（别被目录结构迷惑）
+## 8. 两条入口（别被目录结构迷惑）
 
 仓库里目前有两条都能走到 C1 的路，别混：
 
@@ -316,7 +393,7 @@ B 是"先把 C1 跑起来"的产物，A 是"从字节火种长出来"的产物�
 
 ---
 
-## 8. 还没闭合的部分
+## 9. 还没闭合的部分
 
 诚实记录，避免下一个人以为已经做完了：
 
@@ -329,7 +406,7 @@ B 是"先把 C1 跑起来"的产物，A 是"从字节火种长出来"的产物�
 
 ---
 
-## 9. 一页速查
+## 10. 一页速查
 
 ```text
 seed.elf  五 KiB。hex → 字节。唯一的二进制根。
@@ -339,6 +416,12 @@ C0v2      C 子集 → A1 文本。定长 32 MiB 镜像。自己重放自己。
 c1-boot   冻结 C1（抬容量）→ 全链桥。C0v2 编它，它编最终 C1。
 C1 + c1l  完整 C → ELF .o，自带链接器。stage1 == stage2。
 TCC       C1 编 TCC（gcc 只做一次链接），TCC 自建运行时并编自己。
+
+两种 cmp：
+  一阶   同一个二进制跑两次结果相同（seed/A0/A1/C0v2/C1 都靠它）
+  二阶   换一代编译器再编一次，产物与二进制都相同（只有 TCC 做到）
 ```
+
+时间与哈希（§5）：空目录到 TCC 约 12 秒（L0–L5 4.3 s，L5–L6 7.9 s），所有产物跨运行逐字节可复现。
 
 一句话：**每一层只做"下一层需要的那一件事"，并且每一层都有一个 `cmp` 能证明它没坏。** 原始时期的全部复杂度，就花在这两件事上。
