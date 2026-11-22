@@ -5,7 +5,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-SRC_BASE=${SRC_BASE:-/opt}
+SRC_BASE=${SRC_BASE:-/opt/src/gcc}
 BUILD_BASE=${BUILD_BASE:-/opt/gcc-ladder-build}
 TCC=${TCC:-"$ROOT/build/tcc/bit-tcc"}
 DEPS=${DEPS:-/opt/gcc47-deps}
@@ -15,6 +15,24 @@ LOG="$BUILD_BASE/log"
 CFLAGS_COMMON="-g -O2 -DLONG_MIN=-9223372036854775807L-1"
 
 need() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; }
+
+# 源码树是派生物：长期只保留 tarball + SHA256SUMS（见 SOURCES.md）。
+# 树缺失时从 SRC_BASE 里的 tarball 就地解出来，不联网。
+ensure_src() {
+    v=$1
+    d="$SRC_BASE/gcc-$v"
+    [ -d "$d" ] && return 0
+    for e in tar.xz tar.bz2; do
+        t="$SRC_BASE/gcc-$v.$e"
+        [ -f "$t" ] || continue
+        echo "extract: $t" >&2
+        tar xf "$t" -C "$SRC_BASE"
+        [ -d "$d" ] && return 0
+        echo "extract failed: $t" >&2; exit 1
+    done
+    echo "missing source: $d (no gcc-$v.tar.* in $SRC_BASE; run tests/gcc-ladder/fetch.sh)" >&2
+    exit 1
+}
 trip() {
     for d in "$1"/*-linux-gnu; do
         case $(basename "$d") in build-*) continue;; esac
@@ -33,8 +51,15 @@ patch_47() {
         patch -d "$src" -p1 --dry-run < "$p" >/dev/null 2>&1 &&
             patch -d "$src" -p1 < "$p"
     done
-    f="$src/libgcc/config/i386/linux-unwind.h"
+    fix_ucontext "$src"
+}
+
+# glibc >= 2.26 不再提供裸的 "struct ucontext"（只有 ucontext_t）：
+# 4.7/4.8/4.9 的 i386 linux-unwind.h 还在用它，换成 ucontext_t。
+fix_ucontext() {
+    f="$1/libgcc/config/i386/linux-unwind.h"
     [ -f "$f" ] && sed -i 's/struct ucontext \*uc_/ucontext_t *uc_/; s/struct ucontext uc;/ucontext_t uc;/' "$f"
+    return 0
 }
 
 patch_55() {
@@ -68,19 +93,25 @@ build_47_pass1() {
     src="$SRC_BASE/gcc-4.7.4"
     d="$BUILD_BASE/4.7-pass1"
     rm -rf "$d"; mkdir -p "$d"; cd "$d"
-    CC="$TCC" CXX="$TCC" CC_FOR_BUILD="$TCC" "$src/configure" \
+    # -w: TCC predefines __REDIRECT/__REDIRECT_NTH, so glibc 2.39 headers emit
+    # "redefined" warnings; autoconf (2.64) treats *any* stderr output from a
+    # header probe as failure, which silently undefines HAVE_SYS_STAT_H,
+    # HAVE_SYS_MMAN_H, ... and then breaks the build. Silencing warnings keeps
+    # the probes honest.
+    CCW="$TCC -w"
+    CC="$CCW" CXX="$CCW" CC_FOR_BUILD="$CCW" "$src/configure" \
         --disable-bootstrap --enable-languages=c,c++ \
         --disable-multilib --disable-libgomp --disable-libssp \
         --disable-libquadmath --disable-libatomic --disable-decimal-float \
         --disable-werror --prefix="$d/prefix" --with-gmp=/usr \
         --with-mpfr="$DEPS" --with-mpc="$DEPS" >"$LOG/4.7-pass1-conf.log" 2>&1
-    make -j"$JOBS" all-gcc CC="$TCC" CXX="$TCC" CC_FOR_BUILD="$TCC" \
+    make -j"$JOBS" all-gcc CC="$CCW" CXX="$CCW" CC_FOR_BUILD="$CCW" \
         CFLAGS="$CFLAGS_COMMON" CFLAGS_FOR_BUILD="$CFLAGS_COMMON" \
         >"$LOG/4.7-pass1-allgcc.log" 2>&1
-    make -j"$JOBS" all-target-libgcc CC="$TCC" CXX="$TCC" CC_FOR_BUILD="$TCC" \
+    make -j"$JOBS" all-target-libgcc CC="$CCW" CXX="$CCW" CC_FOR_BUILD="$CCW" \
         CFLAGS="$CFLAGS_COMMON" CFLAGS_FOR_BUILD="$CFLAGS_COMMON" \
         >"$LOG/4.7-pass1-libgcc.log" 2>&1
-    make -j"$JOBS" all-target-libstdc++-v3 CC="$TCC" CXX="$d/gcc/xgcc" CC_FOR_BUILD="$TCC" \
+    make -j"$JOBS" all-target-libstdc++-v3 CC="$CCW" CXX="$d/gcc/xgcc" CC_FOR_BUILD="$CCW" \
         >"$LOG/4.7-pass1-libstdcxx.log" 2>&1
     test_cxx 4.7-pass1 "$d" "$src"
 }
@@ -135,17 +166,18 @@ main() {
     need "$TCC"; need "$DEPS/include/mpfr.h"
     mkdir -p "$BUILD_BASE" "$LOG"
     export LD_LIBRARY_PATH="$DEPS/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-    patch_47 "$SRC_BASE/gcc-4.7.4"
-    [ -f "$LOG/4.7-pass1-hello.out" ] || build_47_pass1
-    [ -f "$LOG/4.7-pass2-hello.out" ] || build_stage 4.7-pass2 "$SRC_BASE/gcc-4.7.4" "$BUILD_BASE/4.7-pass1" "$SRC_BASE/gcc-4.7.4" gnu++98 gnu++11
-    [ -f "$LOG/4.8-hello.out" ] || build_stage 4.8 "$SRC_BASE/gcc-4.8.5" "$BUILD_BASE/4.7-pass2" "$SRC_BASE/gcc-4.7.4" gnu++98 gnu++11
-    [ -f "$LOG/4.9-hello.out" ] || build_stage 4.9 "$SRC_BASE/gcc-4.9.4" "$BUILD_BASE/4.8" "$SRC_BASE/gcc-4.8.5" gnu++11 gnu++11
-    [ -f "$LOG/5.5-hello.out" ] || { patch_55; build_stage 5.5 "$SRC_BASE/gcc-5.5.0" "$BUILD_BASE/4.9" "$SRC_BASE/gcc-4.9.4" gnu++11 gnu++11; }
-    [ -f "$LOG/7.5-hello.out" ] || build_stage 7.5 "$SRC_BASE/gcc-7.5.0" "$BUILD_BASE/5.5" "$SRC_BASE/gcc-5.5.0" gnu++11 gnu++11
-    [ -f "$LOG/9.5-hello.out" ] || build_stage 9.5 "$SRC_BASE/gcc-9.5.0" "$BUILD_BASE/7.5" "$SRC_BASE/gcc-7.5.0" gnu++11 gnu++11
-    [ -f "$LOG/12.3-hello.out" ] || build_stage 12.3 "$SRC_BASE/gcc-12.3.0" "$BUILD_BASE/9.5" "$SRC_BASE/gcc-9.5.0" gnu++11 gnu++11
-    [ -f "$LOG/13.3-hello.out" ] || build_stage 13.3 "$SRC_BASE/gcc-13.3.0" "$BUILD_BASE/12.3" "$SRC_BASE/gcc-12.3.0" gnu++11 gnu++11
-    [ -f "$LOG/14.2-hello.out" ] || build_stage 14.2 "$SRC_BASE/gcc-14.2.0" "$BUILD_BASE/13.3" "$SRC_BASE/gcc-13.3.0" gnu++11 gnu++11
+    # 每个 stage 自己保证源码到位：树不在就从 tarball 解出来再打补丁
+    # （补丁函数本身幂等，重复调用无副作用）。
+    [ -f "$LOG/4.7-pass1-hello.out" ] || { ensure_src 4.7.4; patch_47 "$SRC_BASE/gcc-4.7.4"; build_47_pass1; }
+    [ -f "$LOG/4.7-pass2-hello.out" ] || { ensure_src 4.7.4; build_stage 4.7-pass2 "$SRC_BASE/gcc-4.7.4" "$BUILD_BASE/4.7-pass1" "$SRC_BASE/gcc-4.7.4" gnu++98 gnu++11; }
+    [ -f "$LOG/4.8-hello.out" ] || { ensure_src 4.8.5; fix_ucontext "$SRC_BASE/gcc-4.8.5" ; build_stage 4.8 "$SRC_BASE/gcc-4.8.5" "$BUILD_BASE/4.7-pass2" "$SRC_BASE/gcc-4.7.4" gnu++98 gnu++11; }
+    [ -f "$LOG/4.9-hello.out" ] || { ensure_src 4.9.4; fix_ucontext "$SRC_BASE/gcc-4.9.4" ; build_stage 4.9 "$SRC_BASE/gcc-4.9.4" "$BUILD_BASE/4.8" "$SRC_BASE/gcc-4.8.5" gnu++11 gnu++11; }
+    [ -f "$LOG/5.5-hello.out" ] || { ensure_src 5.5.0; patch_55; build_stage 5.5 "$SRC_BASE/gcc-5.5.0" "$BUILD_BASE/4.9" "$SRC_BASE/gcc-4.9.4" gnu++11 gnu++11; }
+    [ -f "$LOG/7.5-hello.out" ] || { ensure_src 7.5.0; build_stage 7.5 "$SRC_BASE/gcc-7.5.0" "$BUILD_BASE/5.5" "$SRC_BASE/gcc-5.5.0" gnu++11 gnu++11; }
+    [ -f "$LOG/9.5-hello.out" ] || { ensure_src 9.5.0; build_stage 9.5 "$SRC_BASE/gcc-9.5.0" "$BUILD_BASE/7.5" "$SRC_BASE/gcc-7.5.0" gnu++11 gnu++11; }
+    [ -f "$LOG/12.3-hello.out" ] || { ensure_src 12.3.0; build_stage 12.3 "$SRC_BASE/gcc-12.3.0" "$BUILD_BASE/9.5" "$SRC_BASE/gcc-9.5.0" gnu++11 gnu++11; }
+    [ -f "$LOG/13.3-hello.out" ] || { ensure_src 13.3.0; build_stage 13.3 "$SRC_BASE/gcc-13.3.0" "$BUILD_BASE/12.3" "$SRC_BASE/gcc-12.3.0" gnu++11 gnu++11; }
+    [ -f "$LOG/14.2-hello.out" ] || { ensure_src 14.2.0; build_stage 14.2 "$SRC_BASE/gcc-14.2.0" "$BUILD_BASE/13.3" "$SRC_BASE/gcc-13.3.0" gnu++11 gnu++11; }
     echo "PASS: TCC -> GCC 4.7 (2 passes) -> GCC 14.2"
 }
 

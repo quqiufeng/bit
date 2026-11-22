@@ -34,6 +34,11 @@ cd /home/quqiufeng/bit
 JOBS=4 BUILD_BASE=/opt/gcc-ladder-final sh tests/gcc-ladder/run.sh
 ```
 
+Sources: only the nine upstream tarballs are kept (`tests/gcc-ladder/SOURCES.md`,
+sha256 in `tests/gcc-ladder/SHA256SUMS`).  A stage whose source tree is absent
+extracts it from the tarball on demand (`ensure_src`), then applies the patches
+below; the extracted trees are therefore derived artifacts and are not kept.
+
 The completed run used:
 
 ```text
