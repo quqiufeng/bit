@@ -136,7 +136,7 @@ flowchart LR
 - 自举完成后，构建 C1 不再需要 gcc/MinGW GCC。
 - Linux freestanding 链已改用自制 `c1link`：gcc/ld 只负责构建最初的 bootstrap c1link，stage0/stage1/stage2 和 hello 由 c1link 链接。hosted glibc 测试仍使用系统 `ld`。
 - Linux 的纯种子链（ELF seed → A0 → A1 → C0 → C1）与 gcc stage0 路线并行推进：`bootstrap/linux/seed.S` 是手写十六进制解码器，`seed.hex` 可复现 `seed.elf`；`seed.elf` 从 `a0.seed.hex` 按需生成 A0，A0 从 `a1.seed.hex` 按需生成 A1，A0/A1 二进制不提交；Linux A1 参考实现和 freestanding 本体已完成；最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已支持函数/局部变量/控制流/表达式/全局变量，并能把 `bootstrap.c` 编成 A1、由 A1 装配成 ELF；C0 已能编译 bootstrap.c -> capacity -> C1，产物与上游 minimal-chain 逐字节一致；`c0/linux.sh` 已把 C0 产出的 C1 接入桥接，得到 SysV Linux C1；C0 源码级自举待做；上游最小链只作为对照，不作为 Linux 最终 C1。
-- Win64 PE C1 → SysV 桥接方案见 [技术设计 6.6](docs/DESIGN.md#66-win64-pe-c1--sysvlinux-c1-桥接)：`win32_runtime.c`（13 个符号）+ C 工具 `pe2elf.c` 的内置 stub + 上游 C1 编译 `linux/compiler.c` + c1link 闭合 stage1/stage2。
+- Win64 PE C1 → SysV 桥接方案：`win32_runtime.c`（13 个符号）+ C 工具 `pe2elf.c` 的内置 stub + 上游 C1 编译 `linux/compiler.c` + c1link 闭合 stage1/stage2。
 
 ## 能做什么 / 不能做什么
 
@@ -168,7 +168,7 @@ bit/
 ├── build.sh                   # Linux 自举构建入口
 ├── README.md
 ├── docs/
-│   └── DESIGN.md              # 技术设计
+│   └── boot.md                # 从火种到 TCC 的原始时期
 ├── linux/
 │   ├── compiler.c             # 移植后的 C1 编译器主体
 │   ├── elf-output.c           # ELF64 可重定位对象写出
@@ -290,7 +290,7 @@ bit/
 | M2 | Linux hosted：glibc、`.so` 调用、`dlopen`、互操作测试 | 进行中：非 PIE + PIE crt/glibc 链接（含 crtbegin/crtend）、最小 hosted 头、`malloc`/`strlen`/`puts`/`printf`/`vprintf`/`dlopen`+`dlsym`/`errno`/`fopen`/`assert`/`setjmp`/`time`/`inttypes`/POSIX I/O/`strtol`/signal/qsort/atexit/stat/dirent/pthread（含 mutex/cond）/扩展 libc/math/wchar/wctype/gettimeofday/fork+waitpid/socketpair/TCP/UNIX sockets/select/poll/epoll/inotify/eventfd/timerfd/signalfd/memfd/mmap/uname/getopt/fnmatch/pwd/grp/getaddrinfo/getrlimit/getrandom/regex/iconv/glob/ioctl/statvfs/getauxval 已通过；更多头/边界待完成 |
 | M3 | 共享层抽取、Windows 参考实现冻结、防漂移检查 | 进行中：已抽取 `shared/float_parse.c`、`shared/diagnostic.c`，加入边界/来源/PE 检查，并导入冻结的上游 Windows 参考树；其余共享前端抽取和 Windows ABI 测试待做 |
 | M4 | Windows ABI 加固：varargs、结构体、`long double`、第三方 DLL | 计划 |
-| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头、TCC/Linux 生态 | 进行中；C1 已编译 TCC 0.9.27 并完成 TCC 自举：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；上游最小 seed→A0/A1→C0→C1 链已能在 Linux 上跑通（产物仍是 Windows C1，仅作对照）；零依赖 Linux 树已有手写 seed 解码器：`seed.hex` 复现 `seed.elf`；`seed.elf` 从 `a0.seed.hex` 按需生成 A0，A0 从 `a1.seed.hex` 按需生成 A1，A0/A1 二进制不提交；A0 的 C 参考实现与 syscall-only 汇编本体已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出；Linux A1 参考实现和 freestanding 本体已完成；最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已支持函数/局部变量/控制流/表达式/全局变量，并能把 `bootstrap.c` 编成 A1、由 A1 装配成 ELF；C0 已能编译 bootstrap.c -> capacity -> C1，产物与上游 minimal-chain 逐字节一致；`c0/linux.sh` 已把 C0 产出的 C1 接入桥接，得到 SysV Linux C1；C0 源码级自举待做；Win64 C1 → SysV 桥接已完成：`bootstrap/bridge.sh` 用上游 C1 产出 SysV stage1/stage2，`stage1 == stage2`；仍依赖上游 seed/PE 链接器，尚未零依赖；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。hosted glibc 测试仍用系统 `ld`；Linux 原生 C1 已打通：C0v2 直接从 A1 生成 Linux C1，原生 C1 能编译 `compiler.c`/`runtime.c`，链接后的 stage1 再编译 `compiler.c` 得到逐字节相同的 stage2 对象；`native-c1.sh` 已进入 `build.sh`，原生 C1 能自举，原生 linker 也能用自己重新链接出逐字节相同的二进制；`native-c1.sh` 只使用按需从 `a0.seed.hex`/`a1.seed.hex` 生成的 A0/A1 以及已提交的 C0v2/C1/linker/startup/syscalls 种子；C1 新增 `-E` 模式，直接输出 `preprocess()` 后的 `source[]` token 流，用于逐步替换宿主 `cc -E`（见 `docs/NATIVE_BOOTSTRAP.md`），不再依赖 Windows PE、pe2elf、build/c1link、C1-built A1 或宿主编译器 |
+| M5 | 可选：自制 ELF 链接器、纯种子链、PIC/PIE、更多系统头、TCC/Linux 生态 | 进行中；C1 已编译 TCC 0.9.27 并完成 TCC 自举：无 gcc/ld 的 transitional seed bundle 自举已完成、seed 文件有 SHA-256 校验且 seed compiler 是不动点；上游最小 seed→A0/A1→C0→C1 链已能在 Linux 上跑通（产物仍是 Windows C1，仅作对照）；零依赖 Linux 树已有手写 seed 解码器：`seed.hex` 复现 `seed.elf`；`seed.elf` 从 `a0.seed.hex` 按需生成 A0，A0 从 `a1.seed.hex` 按需生成 A1，A0/A1 二进制不提交；A0 的 C 参考实现与 syscall-only 汇编本体已逐字节一致，`smoke.a0` 生成双 PT_LOAD ELF 并以 42 退出；Linux A1 参考实现和 freestanding 本体已完成；最小 freestanding C0 已能把受限 C 编译成 A1 文本，A1 装配后运行 exit(42)；C0 已支持函数/局部变量/控制流/表达式/全局变量，并能把 `bootstrap.c` 编成 A1、由 A1 装配成 ELF；C0 已能编译 bootstrap.c -> capacity -> C1，产物与上游 minimal-chain 逐字节一致；`c0/linux.sh` 已把 C0 产出的 C1 接入桥接，得到 SysV Linux C1；C0 源码级自举待做；Win64 C1 → SysV 桥接已完成：`bootstrap/bridge.sh` 用上游 C1 产出 SysV stage1/stage2，`stage1 == stage2`；仍依赖上游 seed/PE 链接器，尚未零依赖；c1link 链接 stage0/stage1/stage2/hello，支持 `.a` 选择性抽取、节表/符号表、静态 PIE、`--shared` `.so` 和 C1 动态可执行文件。hosted glibc 测试仍用系统 `ld`；Linux 原生 C1 已打通：C0v2 直接从 A1 生成 Linux C1，原生 C1 能编译 `compiler.c`/`runtime.c`，链接后的 stage1 再编译 `compiler.c` 得到逐字节相同的 stage2 对象；`native-c1.sh` 已进入 `build.sh`，原生 C1 能自举，原生 linker 也能用自己重新链接出逐字节相同的二进制；`native-c1.sh` 只使用按需从 `a0.seed.hex`/`a1.seed.hex` 生成的 A0/A1 以及已提交的 C0v2/C1/linker/startup/syscalls 种子；C1 新增 `-E` 模式，直接输出 `preprocess()` 后的 `source[]` token 流，用于逐步替换宿主 `cc -E`，不再依赖 Windows PE、pe2elf、build/c1link、C1-built A1 或宿主编译器 |
 
 ## 快速开始
 
@@ -315,12 +315,10 @@ Windows 侧仍沿用上游构建方式，尚未整合进本仓库。
 
 ## 文档
 
-- [C0 重构计划](docs/C0_REFACTOR.md)
-- [FUZZING](docs/FUZZING.md)：现有 SysV/fuzz 覆盖、缺口和 ABI-first fuzz 计划
-- [自举总流水线](tests/selfhost-pipeline.sh)：C1 -> TCC -> Lua/BusyBox -> GCC 14.2
-- [自定义操作系统镜像](docs/MINI_OS_IMAGE.zh-CN.md)：QEMU 最小内核、BusyBox、Lua、SSH，以及机顶盒路线
-- [技术设计](docs/DESIGN.md)：平台契约、ABI、对象/链接、运行时、自举、测试、风险和决策记录。
-- [白皮书：从种子到 GCC 14.2](docs/WHITEPAPER.zh-CN.md)：第一推动力、C1/TCC 自举、GCC 天梯、构建边界与验证。
+- [BOOT：从火种到 TCC 的原始时期](docs/boot.md)：seed → A0 → A1 → C0v2 → C1 → TCC 的逐层流程、不动点清单、实测哈希与信任边界。
+- 入口脚本：`bootstrap/native-zero.sh`（零依赖 Linux 链）、`tests/gcc-ladder/run.sh`（TCC → GCC 14.2 天梯）、`tests/selfhost-pipeline.sh`（C1 -> TCC -> Lua/BusyBox -> GCC 14.2）、`tests/mini-kernel/ssh.sh`（QEMU 最小内核 + BusyBox + Lua + SSH）。各自的用法见所在目录的 `README.md`。
+
+历史上的设计文档（`DESIGN.md`、`WHITEPAPER.zh-CN.md`、`map.md`、`C0_REFACTOR.md`、`FUZZING.md`、`SEED_GRAPH.md`、`NATIVE_BOOTSTRAP.md`、`MINI_OS_IMAGE.zh-CN.md`）已于 2026-11 清理，需要时从 git 历史取：`git show 792784d:docs/DESIGN.md`。
 
 ## 许可证
 

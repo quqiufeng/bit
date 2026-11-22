@@ -267,7 +267,7 @@ C1=$PWD/build/fromzero/native-c1/c1.elf OUT=$PWD/build/fromzero/tcc tests/tcc/up
 bootstrap/from-seed.sh
 ```
 
-全部通过时，`docs/SEED_GRAPH.md` 里那句"唯一的二进制根是 `seed.elf`"才是真的。
+全部通过时，"唯一的二进制根是 `seed.elf`"这句话才是真的：`bootstrap/linux/c0/` 下只有 `seed.elf` 一个提交的二进制，其余 A0/A1/C1 全部按需生成。
 
 ---
 

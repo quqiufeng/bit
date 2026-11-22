@@ -84,8 +84,10 @@ sh tests/mini-kernel/run-ssh.sh
 ssh -p 2222 -i /opt/mini-kernel-ssh/client_key root@127.0.0.1
 ```
 
-Full usage, boot logs, persistence checks, ISO and set-top-box plans are in
-`docs/MINI_OS_IMAGE.zh-CN.md`.
+`build.sh` stops at BusyBox + Lua; `ssh.sh` adds OpenSSH and runs an automated
+SSH check (`run-ssh.sh` boots that image interactively).  A writable rootfs,
+bootloader, ISO and board-specific set-top-box image are still plans, not
+scripts.
 
 The next layer is a writable rootfs + bootloader + ISO, then a board-specific
 kernel/DTB for the set-top box.
