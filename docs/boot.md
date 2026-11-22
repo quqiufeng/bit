@@ -335,6 +335,32 @@ cmp tcc-stage2  tcc-stage3    # ← 而且二进制也相同
 
 三条坑的共同含义：**TCC 自举的边界不在"能不能编自己"，而在"它吃哪套头文件"。** 见 §9 第 4 条。
 
+### 5.4 跑完之后怎么瘦：只留可执行件
+
+阶梯跑完是 19 GB（`.o` 6.1 GB / `.a` 2.3 GB / 二进制 5.2 GB / 其余是头文件与缓存），其中 14.2 的 `cc1` 单个 324.8 MB，strip 后 38 MB。跑完就不必再留构建树，`tests/gcc-ladder/prune.sh` 把它压成"能编 C 和 C++"的最小集合：
+
+```sh
+# 每级: /opt/gcc-ladder-2026/<stage> -> /opt/gcc-ladder-bin/<stage>
+sh tests/gcc-ladder/prune.sh /opt/gcc-ladder-2026 /opt/gcc-ladder-bin
+```
+
+保留的东西：`cc1`/`cc1plus`/`lto1`/`lto-dump`/`xgcc`/`collect2`/`lto-wrapper`/`liblto_plugin.so`、`crt*.o`、`libgcc*.a`、`libgcov.a`、`libgcc_s.so`、`libstdc++.so`、`include/` 与 `include/c++/<ver>/`；其余（`.o`、`.a` 中间件、`.gch` 预编译头）全部丢弃。全部 `strip`，每级写一个 `smoke-c`/`smoke-cxx` 包装脚本（`-Wl,-rpath,$D/lib -lstdc++`）现场编一个 C 和一个 C++ 程序并运行，通过才落盘。
+
+实测：10 级合计 **1.3 GB**（58–196 MB/级），干净环境（`env -i`）逐级跑 `smoke-c`/`smoke-cxx` 全绿，`MANIFEST.txt` 给每个文件的内容哈希。
+
+三个坑：
+
+1. **头文件是符号链接，指向源码树。** 源码树按 §5.1 跑完即删，链接就悬空了。`prune.sh` 从 tarball 里把真身取出来（`.hdr` 缓存 + `cpio`），再在 `include/c++/<ver>/` 下重建 `std/*`、`bits/*` 这些目录级链接（14.2 一级 816 个）。
+2. **老版本的 `gcc/liblto_plugin.so` 也是链接**（指向 `lto-plugin/.libs/`）。复制时必须 dereference，否则新树里是个断路链接，`xgcc` 一用就报 `-fuse-linker-plugin, but liblto_plugin.so not found`——这正是 4.7–9.5 头一轮全 FAIL 的原因。
+3. **`libstdc++.so` 不在 `lib/` 就链接失败**（`std::cout` undefined），包装脚本要把 `-lstdc++` 和 `-rpath` 一起给。
+
+裁剪后构建树可以直接删（`log/`、`wrap/`、`driver.log` 与 `MANIFEST.txt` 是审计证据，留着）：
+
+```sh
+rm -rf /opt/gcc-ladder-2026/{4.7-pass1,4.7-pass2,4.8,4.9,5.5,7.5,9.5,12.3,13.3,14.2}
+# 18.5 GB -> 18 MB（只剩日志），可执行件在 /opt/gcc-ladder-bin，1.3 GB
+```
+
 ---
 
 ## 6. 宿主工具出现在哪里（信任边界）
